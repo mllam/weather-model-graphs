@@ -21,6 +21,30 @@ gpu support (see https://pytorch.org/get-started/locally/#linux-pip for older ve
 pdm install --group pytorch
 ```
 
+# Usage
+
+The best way to understand how to use `weather-model-graphs` is to look at the [notebooks/constructing_the_graph.ipynb](notebooks/constructing_the_graph.ipynb) notebook, to have look at the tests in [tests/](tests/) or simply to read through the source code.
+
+## Example, Keisler 2021 flat graph architecture
+
+```python
+import numpy as np
+import weather_model_graphs as wmg
+
+# define your (x,y) grid coodinates
+xy_grid = np.meshgrid(np.linspace(0, 1, 32), np.linspace(0, 1, 32), indexing='ij')
+
+# create the full graph
+graph = wmg.create.architypes.create_keissler_graph(xy=xy_grid)
+
+# split the graph by component
+graph_components = wmg.split_graph_by_edge_attribute(graph=graph, attribute='component')
+
+# save the graph components to disk in pytorch-geometric format
+for component, graph in graph_components.items():
+    wmg.save.to_pyg(graph=graph, name=component)
+```
+
 # Background and design
 
 The only input the graph generation in `weather-model-graphs` requires is the static `(x,y)` *grid* coordinates of the atmospheric state as the state changes over time. These coordinates are used to create the **grid nodes** nodes of the graph, with a node for each `(x,y)` coordinate.
@@ -46,6 +70,12 @@ In summary, the complete message-passing graph consists of three components:
 
 ## Design principles
 
+The key design principle of `weather-model-graphs` is to work with `networkx.DiGraph` objects as the primary data structure for the graph representation right until the graph is to be stored on disk into a specific format.
+Using only `networkx.DiGraph` objects as the intermediate representations makes it possible to
+
+1) easily modularise the whole generation process, with every step outputting a `networkx.DiGraph` object,
+2) easily visualise the graph resulting from any step and
+3) easily connective graph nodes, combine graphs and split graphs based on node and edge attributes.
 
 The graph generation in `weather-model-graphs` is split into to the following steps:
 
