@@ -1,0 +1,40 @@
+[project]
+name = "weather-model-graphs"
+version = "0.1.0"
+description = "Tools for creating and visualising data-driven weather model graphs"
+authors = [
+    {name = "Leif Denby", email = "lcd@dmi.dk"},
+]
+dependencies = [
+    "numpy>=1.26.4",
+    "loguru>=0.7.2",
+    "networkx>=3.3",
+    "scipy>=1.13.0",
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+[project.optional-dependencies]
+pytorch = [
+    "torch>=2.3.0",
+    "torch-geometric>=2.5.3",
+]
+visualisation = [
+    "matplotlib>=3.8.4",
+    "ipykernel>=6.29.4",
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "nbval>=0.11.0",
+    "ipdb>=0.13.13",
+]
