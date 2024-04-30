@@ -23,7 +23,8 @@ pdm install --group pytorch
 
 # Usage
 
-The best way to understand how to use `weather-model-graphs` is to look at the [notebooks/constructing_the_graph.ipynb](notebooks/constructing_the_graph.ipynb) notebook, to have look at the tests in [tests/](tests/) or simply to read through the source code.
+The best way to understand how to use `weather-model-graphs` is to look at the [notebooks/constructing_the_graph.ipynb](notebooks/constructing_the_graph.ipynb) notebook, to have look at the tests in [tests/](tests/) or simply to read through the source code. 
+In addition you can read the [background and design](#background-and-design) section below to understand the design principles of `weather-model-graphs`.
 
 ## Example, Keisler 2021 flat graph architecture
 
@@ -167,3 +168,27 @@ There are a number of node and edge attributes with special meanings in `weather
 ### Splitting graphs
 
 The splitting of the graph is done with by utilising the edge attributes, and thus it is easy to split the complete graph by either which component the edge belongs to, or by the level of the edge in the graph. This is done using the `weather_model_graphs.split_graph_by_edge_attribute(...)` function.
+
+## Code layout
+
+The code layout of `weather-model-graphs` is organise into submodules by the functionality they provide. The main submodules are:
+
+```
+weather_model_graphs
+    .create
+        .architypes: 
+            for creating specific architype graph 
+            architectures (e.g. Keissler 2021, Lam et al 2023, 
+            Oscarsson et al 2023)
+        .base
+            general interface for creating graph architectures
+            (here you define the g2m, m2m and m2g connectivity directly)
+    .visualise
+        for plotting graphs, allowing for easy visualisation using any 
+        edge or node attribute for colouring
+    .save
+        for saving the graph to specific formats (e.g. pytorch-geometric)
+    .mesh
+        for creating the mesh nodes and edges
+    .grid
+        for creating the grid nodes
