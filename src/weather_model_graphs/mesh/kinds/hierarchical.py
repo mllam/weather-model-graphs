@@ -72,10 +72,10 @@ def create_hierarchical_multiscale_mesh_graph(
         for level_i, graph in enumerate(Gs_all_levels)
     ]
     
-    # add `direction` attribute to all edges with value `in-level`
+    # add `direction` attribute to all edges with value `same``
     for G in Gs_all_levels:
         for u, v in G.edges:
-            G.edges[u, v]["direction"] = "inlevel"
+            G.edges[u, v]["direction"] = "same"
 
     num_nodes_level = np.array([len(g_level.nodes) for g_level in Gs_all_levels])
     # First node index in each level in the hierarchical graph
