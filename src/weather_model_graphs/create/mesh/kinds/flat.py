@@ -2,7 +2,7 @@ import networkx
 import numpy as np
 from torch_geometric.utils.convert import from_networkx as pyg_from_networkx
 
-from ...networkx_utils import prepend_node_index
+from ....networkx_utils import prepend_node_index
 from .. import mesh as mesh_graph
 
 

@@ -193,12 +193,12 @@ weather_model_graphs
         .base
             general interface for creating graph architectures
             (here you define the g2m, m2m and m2g connectivity directly)
+        .mesh
+            for creating the mesh nodes and edges
+        .grid
+            for creating the grid nodes
     .visualise
         for plotting graphs, allowing for easy visualisation using any 
         edge or node attribute for colouring
     .save
         for saving the graph to specific formats (e.g. pytorch-geometric)
-    .mesh
-        for creating the mesh nodes and edges
-    .grid
-        for creating the grid nodes

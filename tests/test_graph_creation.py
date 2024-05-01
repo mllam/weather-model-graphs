@@ -19,7 +19,7 @@ def _create_fake_xy(N=10):
 
 def test_create_single_level_mesh_graph():
     xy = _create_fake_xy(N=4)
-    mesh_graph = wmg.mesh.create_single_level_2d_mesh_graph(xy=xy, nx=5, ny=5)
+    mesh_graph = wmg.create.mesh.create_single_level_2d_mesh_graph(xy=xy, nx=5, ny=5)
 
     pos = {node: mesh_graph.nodes[node]["pos"] for node in mesh_graph.nodes()}
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))

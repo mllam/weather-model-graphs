@@ -47,11 +47,11 @@ from torch_geometric.utils.convert import from_networkx as pyg_from_networkx
 from loguru import logger
 
 from ..save import save_edges, save_edges_list
-from ..mesh.kinds.flat import create_flat_multiscale_mesh_graph
-from ..mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
+from .mesh.kinds.flat import create_flat_multiscale_mesh_graph
+from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
 from ..networkx_utils import replace_node_labels_with_unique_ids
-from .. import mesh as mesh_graph
-from ..grid import grid as grid_graph
+from . import mesh as mesh_graph
+from .grid import grid as grid_graph
 
 
 def create_all_graph_components(
@@ -83,8 +83,8 @@ def create_all_graph_components(
     
     m2m_connectivity:
     - "flat": Create a single-level 2D mesh graph, as in Keissler et al. (2021)
-    - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels` and `refinement_factor`, as in GraphCast, Lam et al. (2021)
-    - "hierarchical": Create a hierarchical mesh graph with `refinement_factor` and `max_num_levels`, as in Oscarsson et al. (2021)
+    - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels` and `refinement_factor`, as in GraphCast, Lam et al. (2023)
+    - "hierarchical": Create a hierarchical mesh graph with `refinement_factor` and `max_num_levels`, as in Oscarsson et al. (2023)
 
     m2g_connectivity:
     - "nearest_neighbour": Find the nearest neighbour in `G_target` for each node in `G_source`

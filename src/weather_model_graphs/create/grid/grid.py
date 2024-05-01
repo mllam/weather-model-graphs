@@ -1,7 +1,7 @@
 import networkx
 import numpy as np
 
-from ..networkx_utils import prepend_node_index
+from ...networkx_utils import prepend_node_index
 
 
 def create_grid_graph_nodes(xy, level_id=-1):

@@ -6,7 +6,7 @@ from torch_geometric.utils.convert import from_networkx as pyg_from_networkx
 import torch
 
 from .. import mesh as mesh_graph
-from ...networkx_utils import prepend_node_index
+from ....networkx_utils import prepend_node_index
 
 
 def sort_nodes_internally(nx_graph):
