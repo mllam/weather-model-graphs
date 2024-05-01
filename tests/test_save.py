@@ -13,7 +13,7 @@ def _create_fake_xy(N=10):
 
 def test_save_to_pyg():
     xy = _create_fake_xy(N=64)
-    graph = wmg.create.architypes.create_oscarsson_hierarchical_graph(xy_grid=xy)
+    graph = wmg.create.archetype.create_oscarsson_hierarchical_graph(xy_grid=xy)
     
     graph_components = wmg.split_graph_by_edge_attribute(graph=graph, attribute="component")
 

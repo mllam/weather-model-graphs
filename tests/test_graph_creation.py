@@ -19,7 +19,7 @@ def _create_fake_xy(N=10):
 
 def test_create_single_level_mesh_graph():
     xy = _create_fake_xy(N=4)
-    mesh_graph = wmg.mesh.create_single_level_2d_mesh_graph(xy=xy, nx=5, ny=5)
+    mesh_graph = wmg.create.mesh.create_single_level_2d_mesh_graph(xy=xy, nx=5, ny=5)
 
     pos = {node: mesh_graph.nodes[node]["pos"] for node in mesh_graph.nodes()}
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -45,12 +45,12 @@ def test_create_single_level_mesh_graph():
     # fig.savefig(f"mesh_{lev}.png")
 
 
-@pytest.mark.parametrize("kind", ["graphcast", "keissler", "oscarsson_hierarchical"])
+@pytest.mark.parametrize("kind", ["graphcast", "keisler", "oscarsson_hierarchical"])
 @pytest.mark.parametrize("merge_components", [True, False])
-def test_create_graph_architype(merge_components, kind):
+def test_create_graph_archetype(merge_components, kind):
     xy = _create_fake_xy(N=64)
     fn_name = f"create_{kind}_graph"
-    fn = getattr(wmg.create.architypes, fn_name)
+    fn = getattr(wmg.create.archetype, fn_name)
 
     fn(xy_grid=xy, merge_components=merge_components)
 
@@ -63,8 +63,8 @@ G2M_M2G_CONNECTIVITY_OPTIONS = dict(
 
 # list the connectivity options for m2m and the kwargs to test
 M2M_CONNECTIVITY_OPTIONS = dict(
-    # flat=[],
-    # flat_multiscale=[dict(max_num_levels=3, refinement_factor=3), dict(max_num_levels=1, refinement_factor=5)],
+    flat=[],
+    flat_multiscale=[dict(max_num_levels=3, refinement_factor=3), dict(max_num_levels=1, refinement_factor=5)],
     hierarchical=[dict(max_num_levels=3, refinement_factor=3), dict(max_num_levels=None, refinement_factor=3)],
 )
 
