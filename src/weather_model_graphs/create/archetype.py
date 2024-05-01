@@ -33,10 +33,13 @@ def create_keisler_graph(xy_grid, merge_components=True):
         g2m_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
             max_num_neighbours=4,
-        )
+        ),
     )
 
-def create_graphcast_graph(xy_grid, refinement_factor=3, max_num_levels=None, merge_components=True):
+
+def create_graphcast_graph(
+    xy_grid, refinement_factor=3, max_num_levels=None, merge_components=True
+):
     """
     Create a graph following the Lam et al (2023, https://arxiv.org/abs/2212.12794) GraphCast architecture.
 
@@ -46,7 +49,7 @@ def create_graphcast_graph(xy_grid, refinement_factor=3, max_num_levels=None, me
     to its nearest 4 grid points. The mesh to grid connectivity connects each grid point to the nearest mesh node.
 
     TODO: Verify that GraphCast does in fact use these g2m and m2g connectivities.
-    
+
     Parameters
     ----------
     xy_grid: np.ndarray
@@ -69,13 +72,16 @@ def create_graphcast_graph(xy_grid, refinement_factor=3, max_num_levels=None, me
         xy=xy_grid,
         merge_components=merge_components,
         m2m_connectivity="flat_multiscale",
-        m2m_connectivity_kwargs=dict(refinement_factor=refinement_factor, max_num_levels=max_num_levels),
+        m2m_connectivity_kwargs=dict(
+            refinement_factor=refinement_factor, max_num_levels=max_num_levels
+        ),
         m2g_connectivity="nearest_neighbour",
         g2m_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
             max_num_neighbours=4,
-        )
+        ),
     )
+
 
 def create_oscarsson_hierarchical_graph(xy_grid, merge_components=True):
     """
@@ -89,20 +95,20 @@ def create_oscarsson_hierarchical_graph(xy_grid, merge_components=True):
     edge connections each edge has a `direction` attribute (with value "up",
     "down", or "same"). In addition the `level` attribute indicates which two levels
     are connected for cross-level edges (e.g. "1>2" for edges between level 1 and 2).
-    
+
     The grid to mesh connectivity connects each mesh node to the four nearest
     grid points, and the mesh to grid connectivity connects each grid point to
     the nearest mesh node.
-    
+
     TODO: Is this the right connectivity for the g2m and m2g components?
-    
+
     Parameters
     ----------
     xy_grid: np.ndarray
         2D array of grid point positions.
     merge_components: bool
         Whether to merge the components of the graph.
-    
+
     Returns
     -------
     networkx.DiGraph or dict[networkx.DiGraph]
@@ -117,5 +123,5 @@ def create_oscarsson_hierarchical_graph(xy_grid, merge_components=True):
         g2m_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
             max_num_neighbours=4,
-        )
+        ),
     )

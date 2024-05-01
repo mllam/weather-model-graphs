@@ -1,12 +1,5 @@
-import os
-from argparse import ArgumentParser
-
-import matplotlib.pyplot as plt
 import networkx
 import numpy as np
-import scipy.spatial
-import torch
-from torch_geometric.utils.convert import from_networkx as pyg_from_networkx
 from loguru import logger
 
 
@@ -62,11 +55,7 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
     # add diagonal edges
     g.add_edges_from(
         [((x, y), (x + 1, y + 1)) for x in range(nx - 1) for y in range(ny - 1)]
-        + [
-            ((x + 1, y), (x, y + 1))
-            for x in range(nx - 1)
-            for y in range(ny - 1)
-        ]
+        + [((x + 1, y), (x, y + 1)) for x in range(nx - 1) for y in range(ny - 1)]
     )
 
     # turn into directed graph
@@ -78,7 +67,7 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
         dg.add_edge(v, u)
         dg.edges[v, u]["len"] = d
         dg.edges[v, u]["vdiff"] = g.nodes[v]["pos"] - g.nodes[u]["pos"]
-        
+
     dg.graph["dx"] = dx
     dg.graph["dy"] = dy
 
@@ -91,7 +80,7 @@ def create_multirange_2d_mesh_graphs(max_num_levels, xy, refinement_factor=3):
     scales spanning the spatial domain of the xy coordinates.
     This list of graphs can then later be for example a) flattened into single graph
     containing multiple ranges of connections or b) combined into a hierarchical graph.
-    
+
     Each graph in the list contains a "level" attribute with the level index of the graph.
 
     Parameters

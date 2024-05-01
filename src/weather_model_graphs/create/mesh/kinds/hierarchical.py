@@ -1,12 +1,10 @@
-import scipy
-import numpy as np
 import networkx
-from loguru import logger
+import numpy as np
+import scipy
 from torch_geometric.utils.convert import from_networkx as pyg_from_networkx
-import torch
 
-from .. import mesh as mesh_graph
 from ....networkx_utils import prepend_node_index
+from .. import mesh as mesh_graph
 
 
 def sort_nodes_internally(nx_graph):
@@ -33,7 +31,7 @@ def create_hierarchical_multiscale_mesh_graph(
     connections within each level (horizontally, vertically, and diagonally), and
     connections between levels (coarse to fine and fine to coarse) using the
     nearest neighbour connection.
-    
+
     Parameters
     ----------
     xy: np.ndarray
@@ -43,7 +41,7 @@ def create_hierarchical_multiscale_mesh_graph(
         mesh points between levels (in both x and y directions).
     max_num_levels: int
         The number of levels in the hierarchical mesh graph.
-        
+
     Returns
     -------
     dict
@@ -56,7 +54,7 @@ def create_hierarchical_multiscale_mesh_graph(
         refinement_factor=refinement_factor,
     )
     n_mesh_levels = len(Gs_all_levels)
-    
+
     if n_mesh_levels < 2:
         raise ValueError(
             "At least two mesh levels are required for hierarchical mesh graph. "
@@ -64,24 +62,18 @@ def create_hierarchical_multiscale_mesh_graph(
             f"or increase the max number of levels {max_num_levels} "
             f"or number of grid points {xy.shape[1:]}."
         )
-    
+
     # Relabel nodes of each level with level index first
 
     Gs_all_levels = [
         prepend_node_index(graph, level_i)
         for level_i, graph in enumerate(Gs_all_levels)
     ]
-    
+
     # add `direction` attribute to all edges with value `same``
     for G in Gs_all_levels:
         for u, v in G.edges:
             G.edges[u, v]["direction"] = "same"
-
-    num_nodes_level = np.array([len(g_level.nodes) for g_level in Gs_all_levels])
-    # First node index in each level in the hierarchical graph
-    first_index_level = np.concatenate(
-        (np.zeros(1, dtype=int), np.cumsum(num_nodes_level[:-1]))
-    )
 
     # Create inter-level mesh edges
     up_graphs = []
@@ -116,9 +108,7 @@ def create_hierarchical_multiscale_mesh_graph(
 
             # add edge from mesh to grid
             G_down.add_edge(u, v)
-            d = np.sqrt(
-                np.sum((G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]) ** 2)
-            )
+            d = np.sqrt(np.sum((G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]) ** 2))
             G_down.edges[u, v]["len"] = d
             G_down.edges[u, v]["vdiff"] = (
                 G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]
@@ -128,7 +118,7 @@ def create_hierarchical_multiscale_mesh_graph(
 
         G_up = networkx.DiGraph()
         G_up.add_nodes_from(G_down.nodes(data=True))
-        for (u, v, data) in G_down.edges(data=True):
+        for u, v, data in G_down.edges(data=True):
             data = data.copy()
             data["levels"] = f"{to_level}>{from_level}"
             data["direction"] = "up"
@@ -136,11 +126,11 @@ def create_hierarchical_multiscale_mesh_graph(
 
         up_graphs.append(G_up)
         down_graphs.append(G_down)
-        
+
     G_up_all = networkx.compose_all(up_graphs)
     G_down_all = networkx.compose_all(down_graphs)
     G_all_levels = networkx.compose_all(Gs_all_levels)
-    
+
     G_m2m = networkx.compose_all([G_all_levels, G_up_all, G_down_all])
-    
+
     return G_m2m

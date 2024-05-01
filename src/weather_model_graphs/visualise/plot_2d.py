@@ -1,12 +1,11 @@
 # Third-party
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
-from matplotlib.colorbar import ColorbarBase
-import numpy as np
 import networkx
+import numpy as np
 import torch_geometric as pyg
-from torch_geometric.utils.convert import from_networkx
+from matplotlib.colorbar import ColorbarBase
+from matplotlib.colors import Normalize
 
 from .. import networkx_utils as nx_utils
 
@@ -19,7 +18,7 @@ def nx_draw_with_pos(g, with_labels=False, **kwargs):
     networkx.draw_networkx(
         ax=ax, G=g, pos=pos, hide_ticks=False, with_labels=with_labels, **kwargs
     )
-    
+
     return ax
 
 
@@ -29,12 +28,12 @@ def _get_graph_attr_values(g, attr_name, component="edges"):
     elif component == "nodes":
         features = list(g.nodes(data=True))[0][1].keys()
     else:
-        raise ValueError(f"component {component} not in ['edges', 'nodes']")
-
-    if not attr_name in features:
         raise ValueError(
-            f"feature {attr_name} not in {component} features {features}"
+            f"`component` should be either 'edges' or 'nodes', but got '{component}'"
         )
+
+    if attr_name not in features:
+        raise ValueError(f"feature {attr_name} not in {component} features {features}")
 
     if component == "edges":
         attr_vals = np.array([g.edges[edge][attr_name] for edge in g.edges()])
@@ -60,37 +59,32 @@ def _get_graph_attr_values(g, attr_name, component="edges"):
     elif np.issubdtype(attr_vals.dtype, np.floating):
         attr_vals_for_plot["values"] = attr_vals
     else:
-        raise NotImplementedError(f"Array feature values of type {type(attr_vals[0])} not supported")
+        raise NotImplementedError(
+            f"Array feature values of type {type(attr_vals[0])} not supported"
+        )
 
     return attr_vals_for_plot
 
-def _create_graph_attr_legend(ax, discrete_labels, cmap, attr_kind, attr_name, loc, norm):
+
+def _create_graph_attr_legend(
+    ax, discrete_labels, cmap, attr_kind, attr_name, loc, norm
+):
     if attr_kind == "edge":
-        kwargs = dict(
-            marker=""
-        )
+        kwargs = dict(marker="")
         colouring = "color"
     elif attr_kind == "node":
-        kwargs = dict(
-            marker="o",
-            color="w"
-        )
+        kwargs = dict(marker="o", color="w")
         colouring = "markerfacecolor"
-        
+
     legend_handles = [
-        plt.Line2D(
-            [0],
-            [0],
-            label=label,
-            **kwargs,
-            **{colouring: cmap(norm(val))}
-        )
+        plt.Line2D([0], [0], label=label, **kwargs, **{colouring: cmap(norm(val))})
         for (label, val) in discrete_labels.items()
     ]
     legend = ax.legend(
         handles=legend_handles, title=f"{attr_kind} {attr_name}", loc=loc
     )
     return legend
+
 
 def _create_graph_attr_colorbar(ax, cmap, norm, attr_name, attr_kind, loc):
     if loc == "upper left":
@@ -99,7 +93,7 @@ def _create_graph_attr_colorbar(ax, cmap, norm, attr_name, attr_kind, loc):
         ax_inset = ax.inset_axes([0.87, 0.94, 0.1, 0.02])
     else:
         raise ValueError(f"loc {loc} not in ['upper left', 'upper right']")
-    
+
     cbar = ColorbarBase(ax=ax_inset, cmap=cmap, norm=norm, orientation="horizontal")
 
     ax_inset.set_title(f"{attr_kind} {attr_name}", fontsize=10)
@@ -114,16 +108,13 @@ def nx_draw_with_pos_and_attr(
     node_color_attr=None,
     node_zorder_attr=None,
     node_size=300,
-    **kwargs
+    **kwargs,
 ):
-        
     if node_zorder_attr is not None:
         g = nx_utils.sort_nodes_internally(g, node_attribute=node_zorder_attr)
 
     if edge_color_attr is not None:
-        edge_attr_vals = _get_graph_attr_values(
-            g, edge_color_attr, component="edges"
-        )
+        edge_attr_vals = _get_graph_attr_values(g, edge_color_attr, component="edges")
 
         if "cmap" not in kwargs:
             if "discrete_labels" in edge_attr_vals:
@@ -135,9 +126,7 @@ def nx_draw_with_pos_and_attr(
         kwargs["edge_vmax"] = max(edge_attr_vals["values"])
 
     if node_color_attr is not None:
-        node_attr_vals = _get_graph_attr_values(
-            g, node_color_attr, component="nodes"
-        )
+        node_attr_vals = _get_graph_attr_values(g, node_color_attr, component="nodes")
         if "cmap" not in kwargs:
             if "discrete_labels" in node_attr_vals:
                 kwargs["cmap"] = plt.get_cmap("tab20")
@@ -158,7 +147,7 @@ def nx_draw_with_pos_and_attr(
     )
 
     legends = []
-    
+
     if node_color_attr is not None:
         norm = Normalize(vmin=kwargs["vmin"], vmax=kwargs["vmax"])
         if "discrete_labels" in node_attr_vals:
@@ -169,28 +158,41 @@ def nx_draw_with_pos_and_attr(
                 attr_kind="node",
                 attr_name=node_color_attr,
                 loc="upper left",
-                norm=norm
+                norm=norm,
             )
             legends.append(legend)
         else:
-            _create_graph_attr_colorbar(ax=ax, cmap=kwargs["cmap"], norm=norm, attr_name=node_color_attr, loc="upper left", attr_kind="node")
-            
+            _create_graph_attr_colorbar(
+                ax=ax,
+                cmap=kwargs["cmap"],
+                norm=norm,
+                attr_name=node_color_attr,
+                loc="upper left",
+                attr_kind="node",
+            )
+
     if edge_color_attr is not None:
         norm = Normalize(vmin=kwargs["edge_vmin"], vmax=kwargs["edge_vmax"])
         if "discrete_labels" in edge_attr_vals:
             legend = _create_graph_attr_legend(
-                    ax=ax,
+                ax=ax,
                 discrete_labels=edge_attr_vals["discrete_labels"],
                 cmap=kwargs["edge_cmap"],
                 attr_kind="edge",
                 attr_name=edge_color_attr,
                 loc="upper right",
-                norm=norm
+                norm=norm,
             )
             legends.append(legend)
         else:
-            _create_graph_attr_colorbar(ax=ax, cmap=kwargs["edge_cmap"], norm=norm, attr_name=edge_color_attr, loc="upper right", attr_kind="edge")
-
+            _create_graph_attr_colorbar(
+                ax=ax,
+                cmap=kwargs["edge_cmap"],
+                norm=norm,
+                attr_name=edge_color_attr,
+                loc="upper right",
+                attr_kind="edge",
+            )
 
     for legend in legends:
         ax.add_artist(legend)
@@ -214,9 +216,7 @@ def plot_pyg_graph(graph, ax=None, title=None):
     # TODO: indicate direction of directed edges
 
     # Move all to cpu and numpy, compute (in)-degrees
-    degrees = (
-        pyg.utils.degree(edge_index[1], num_nodes=pos.shape[0]).cpu().numpy()
-    )
+    degrees = pyg.utils.degree(edge_index[1], num_nodes=pos.shape[0]).cpu().numpy()
 
     edge_index = edge_index.cpu().numpy()
     pos = pos.cpu().numpy()
