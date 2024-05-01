@@ -12,7 +12,7 @@ def _create_fake_xy(N=10):
 
 def test_graph_splitting():
     xy = _create_fake_xy(N=64)
-    graph = wmg.create.archetypes.create_oscarsson_hierarchical_graph(xy_grid=xy, merge_components=False)
+    graph = wmg.create.archetype.create_oscarsson_hierarchical_graph(xy_grid=xy, merge_components=False)
     
     # split the m2m graph into the different parts that create the up, in-level
     # and down connections respectively
