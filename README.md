@@ -1,5 +1,7 @@
 # weather-model-graphs
 
+[![linting](https://github.com/mllam/weather-model-graphs/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/mllam/weather-model-graphs/actions/workflows/pre-commit.yml)
+
 `weather-model-graphs` is a package for creating, visualising and storing message-passing graphs for data-driven weather models.
 
 The package is designed to use `networkx.DiGraph` objects as the primary data structure for the graph representation right until the graph is to be stored on disk into a specific format.
