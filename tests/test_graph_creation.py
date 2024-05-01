@@ -47,10 +47,10 @@ def test_create_single_level_mesh_graph():
 
 @pytest.mark.parametrize("kind", ["graphcast", "keissler", "oscarsson_hierarchical"])
 @pytest.mark.parametrize("merge_components", [True, False])
-def test_create_graph_architype(merge_components, kind):
+def test_create_graph_archetype(merge_components, kind):
     xy = _create_fake_xy(N=64)
     fn_name = f"create_{kind}_graph"
-    fn = getattr(wmg.create.architypes, fn_name)
+    fn = getattr(wmg.create.archetypes, fn_name)
 
     fn(xy_grid=xy, merge_components=merge_components)
 
