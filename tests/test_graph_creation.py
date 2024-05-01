@@ -45,7 +45,7 @@ def test_create_single_level_mesh_graph():
     # fig.savefig(f"mesh_{lev}.png")
 
 
-@pytest.mark.parametrize("kind", ["graphcast", "keissler", "oscarsson_hierarchical"])
+@pytest.mark.parametrize("kind", ["graphcast", "keisler", "oscarsson_hierarchical"])
 @pytest.mark.parametrize("merge_components", [True, False])
 def test_create_graph_archetype(merge_components, kind):
     xy = _create_fake_xy(N=64)

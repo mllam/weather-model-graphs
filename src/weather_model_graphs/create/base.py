@@ -82,7 +82,7 @@ def create_all_graph_components(
     - "within_radius": Find all neighbours in `G_target` within a distance of `max_dist` from each node in `G_source`
     
     m2m_connectivity:
-    - "flat": Create a single-level 2D mesh graph, as in Keissler et al. (2021)
+    - "flat": Create a single-level 2D mesh graph, as in Keisler et al. (2022)
     - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels` and `refinement_factor`, as in GraphCast, Lam et al. (2023)
     - "hierarchical": Create a hierarchical mesh graph with `refinement_factor` and `max_num_levels`, as in Oscarsson et al. (2023)
 

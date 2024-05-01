@@ -42,7 +42,7 @@ import weather_model_graphs as wmg
 xy_grid = np.meshgrid(np.linspace(0, 1, 32), np.linspace(0, 1, 32), indexing='ij')
 
 # create the full graph
-graph = wmg.create.archetype.create_keissler_graph(xy=xy_grid)
+graph = wmg.create.archetype.create_keisler_graph(xy=xy_grid)
 
 # split the graph by component
 graph_components = wmg.split_graph_by_edge_attribute(graph=graph, attribute='component')
@@ -188,7 +188,7 @@ weather_model_graphs
     .create
         .archetype: 
             for creating specific archetype graph 
-            architectures (e.g. Keissler 2021, Lam et al 2023, 
+            architectures (e.g. Keisler 2021, Lam et al 2023, 
             Oscarsson et al 2023)
         .base
             general interface for creating graph architectures
