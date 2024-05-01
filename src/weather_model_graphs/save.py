@@ -1,6 +1,7 @@
 import torch
 from pathlib import Path
 import networkx
+import pickle
 from loguru import logger
 
 from .networkx_utils import split_graph_by_edge_attribute
@@ -76,3 +77,13 @@ def to_pyg(graph: networkx.DiGraph, output_directory: str, name: str, list_from_
     torch.save(edge_indecies, fp_edge_index)
     torch.save(edge_features, fp_features)
     logger.info(f"Saved edge index and features to {fp_edge_index} and {fp_features}.")
+    
+
+def to_pickle(graph: networkx.DiGraph, output_directory: str, name: str):
+    """
+    Save the networkx graph to a pickle file.
+    """
+    fp = Path(output_directory) / f"{name}.pickle"
+    with open(fp, "wb") as f:
+        pickle.dump(graph, f)
+    logger.info(f"Saved graph to {fp}.")

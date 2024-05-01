@@ -92,7 +92,9 @@ The graph generation in `weather-model-graphs` is split into to the following st
 3. Split the combined graph into the three *output* graph components again (or more if the specific graph architecture requires it).
 4. Store each of the *output* graph components in the desired format, for example:
 
-    - **pytorch-geometric**: edges indexes and features are stored in separate `torch.Tensor` objects serialised to disk that can then be loaded into `torch_geometric.data.Data` objects
+    - **networkx** `.pickle` file: save `networkx.DiGraph` objects using `pickle` to disk (`weather_model_graphs.save.to_pickle(...)`)
+
+    - [pytorch-geometric](https://github.com/pyg-team/pytorch_geometric) for [neural-lam](https://github.com/mllam/neural-lam): edges indexes and features are stored in separate `torch.Tensor` objects serialised to disk that can then be loaded into `torch_geometric.data.Data` objects (`weather_model_graphs.save.to_pyg(...)`
     
 ### Diagram of the graph generation process:
 
