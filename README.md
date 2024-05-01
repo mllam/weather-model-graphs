@@ -1,5 +1,11 @@
 # weather-model-graphs
 
+`weather-model-graphs` is a package for creating, visualising and storing message-passing graphs for data-driven weather models.
+
+The package is designed to use `networkx.DiGraph` objects as the primary data structure for the graph representation right until the graph is to be stored on disk into a specific format.
+This makes the graph generation process modular (every step outputs a `networkx.Digraph`), easy to debug (visualise the graph at any step) and allows output to different file-formats and file-structures to be easily implemented. More details are given in the [background and design](#background-and-design) section below.
+
+
 ## Installation
 
 ```
@@ -76,7 +82,7 @@ Using only `networkx.DiGraph` objects as the intermediate representations makes 
 
 1) easily modularise the whole generation process, with every step outputting a `networkx.DiGraph` object,
 2) easily visualise the graph resulting from any step and
-3) easily connective graph nodes, combine graphs and split graphs based on node and edge attributes.
+3) easily connect graph nodes across graph components, combine graphs and split graphs based on node and edge attributes.
 
 The graph generation in `weather-model-graphs` is split into to the following steps:
 
@@ -97,6 +103,8 @@ The graph generation in `weather-model-graphs` is split into to the following st
     - [pytorch-geometric](https://github.com/pyg-team/pytorch_geometric) for [neural-lam](https://github.com/mllam/neural-lam): edges indexes and features are stored in separate `torch.Tensor` objects serialised to disk that can then be loaded into `torch_geometric.data.Data` objects (`weather_model_graphs.save.to_pyg(...)`
     
 ### Diagram of the graph generation process:
+    
+Below visualises the graph generation process in `weather-model-graphs` for the example given above:
 
 ```mermaid
 graph TB
@@ -116,7 +124,7 @@ subgraph weather_model_graphs["weather-model-graphs"]
 
     G_full["complete graph\nG_full[networkx.Digraph]"]
 
-    G_full --replace nodes labels with unique integer id--> G_full_int["G_int[networkx.Digraph]"]
+    G_full --replace node labels with unique integer id--> G_full_int["G_int[networkx.Digraph]"]
 
     G_full_int --split and converted into --> pyg_g2m["pyg_g2m[pyg.data.Data]"]
     G_full_int --split and converted into --> pyg_m2m["pyg_m2m[pyg.data.Data]"]
@@ -143,9 +151,9 @@ subgraph pyg_loaded["Loaded into model (e.g. torch.nn.Module)"]
     pyg_m2g_loaded["pyg_m2g[pyg.data.Data]"]
 end
 
-pyg_g2m_file --loaded into--> pyg_g2m_loaded
-pyg_m2m_file --loaded into--> pyg_m2m_loaded
-pyg_m2g_file --loaded into--> pyg_m2g_loaded
+pyg_g2m_file --loaded into --> pyg_g2m_loaded
+pyg_m2m_file --loaded into --> pyg_m2m_loaded
+pyg_m2g_file --loaded into --> pyg_m2g_loaded
 ```
 
 ### Node and edge attributes
