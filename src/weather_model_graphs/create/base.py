@@ -96,7 +96,8 @@ def create_all_graph_components(
     graph_components: dict[networkx.DiGraph] = {}
 
     if m2m_connectivity == "flat":
-        refinement_factor = m2m_connectivity_kwargs["refinement_factor"]
+        logger.warning("Using refinement factor 2 between grid and mesh nodes for flat mesh graph")
+        refinement_factor = 2
         nx_g, ny_g = xy.shape[1:]
         nx = ny = min(nx_g, ny_g) // int(refinement_factor)
         graph_components["m2m"] = mesh_graph.mesh.create_single_level_2d_mesh_graph(
