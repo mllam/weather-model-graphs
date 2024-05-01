@@ -1,14 +1,11 @@
 import networkx
 import numpy as np
-from torch_geometric.utils.convert import from_networkx as pyg_from_networkx
 
 from ....networkx_utils import prepend_node_index
 from .. import mesh as mesh_graph
 
 
-def create_flat_multiscale_mesh_graph(
-    xy, refinement_factor: int, max_num_levels: int
-):
+def create_flat_multiscale_mesh_graph(xy, refinement_factor: int, max_num_levels: int):
     """
     Create flat mesh graph by merging the single-level mesh
     graphs across all levels in `G_all_levels`.
@@ -56,7 +53,7 @@ def create_flat_multiscale_mesh_graph(
 
     # Relabel mesh nodes to start with 0
     G_tot = prepend_node_index(G_tot, 0)
-    
+
     # add dx and dy to graph
     G_tot.graph["dx"] = {i: g.graph["dx"] for i, g in enumerate(G_all_levels)}
     G_tot.graph["dy"] = {i: g.graph["dy"] for i, g in enumerate(G_all_levels)}

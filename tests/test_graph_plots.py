@@ -1,10 +1,11 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import pytest
-from loguru import logger
 import tempfile
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pytest
+
 import weather_model_graphs as wmg
+
 
 def _create_fake_xy(N=10):
     x = np.linspace(0, 1, N)
@@ -28,30 +29,38 @@ def test_plot():
         g2m_connectivity="nearest_neighbour",
         m2g_connectivity="nearest_neighbour",
     )
+
     def _is_ndarray(val):
         return isinstance(val, np.ndarray)
-    
+
     def _is_valid_color_attr(val):
         return isinstance(val, (int, float, str))
-    
+
     fig, ax = plt.subplots()
     for graph in graph_components.values():
         node_attrs = list(list(graph.nodes(data=True))[0][1].keys())
         edge_attrs = list(list(graph.edges(data=True))[0][2].keys())
-        
+
         for edge_attr in edge_attrs + []:
             for node_attr in node_attrs + []:
                 should_raise = None
-                if not _is_valid_color_attr(list(graph.edges(data=True))[0][2][edge_attr]):
+                if not _is_valid_color_attr(
+                    list(graph.edges(data=True))[0][2][edge_attr]
+                ):
                     should_raise = NotImplementedError
-                elif not _is_valid_color_attr(list(graph.nodes(data=True))[0][1][node_attr]):
+                elif not _is_valid_color_attr(
+                    list(graph.nodes(data=True))[0][1][node_attr]
+                ):
                     should_raise = NotImplementedError
 
                 def fn():
                     wmg.visualise.nx_draw_with_pos_and_attr(
-                        graph, ax=ax, edge_color_attr=edge_attr, node_color_attr=node_attr
+                        graph,
+                        ax=ax,
+                        edge_color_attr=edge_attr,
+                        node_color_attr=node_attr,
                     )
-                    
+
                 if should_raise is not None:
                     with pytest.raises(should_raise):
                         fn()

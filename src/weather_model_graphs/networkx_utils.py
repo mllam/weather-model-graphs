@@ -28,12 +28,16 @@ def sort_nodes_internally(nx_graph, node_attribute=None, edge_attribute=None):
     # This function fixes this.
     H = networkx.DiGraph()
     if node_attribute is not None:
-        H.add_nodes_from(sorted(nx_graph.nodes(data=True), key=lambda x: x[1][node_attribute]))
+        H.add_nodes_from(
+            sorted(nx_graph.nodes(data=True), key=lambda x: x[1][node_attribute])
+        )
     else:
         H.add_nodes_from(sorted(nx_graph.nodes(data=True)))
-    
+
     if edge_attribute is not None:
-        H.add_edges_from(sorted(nx_graph.edges(data=True), key=lambda x: x[2][edge_attribute]))
+        H.add_edges_from(
+            sorted(nx_graph.edges(data=True), key=lambda x: x[2][edge_attribute])
+        )
     else:
         H.add_edges_from(nx_graph.edges(data=True))
     return H
@@ -56,17 +60,17 @@ def split_graph_by_edge_attribute(graph, attribute):
     dict
         Dictionary of subgraphs keyed by edge attribute value
     """
-    
+
     # Get unique edge attribute values
     edge_values = set(networkx.get_edge_attributes(graph, attribute).values())
-    
+
     # Create a dictionary of subgraphs keyed by edge attribute value
     subgraphs = {}
     for edge_value in edge_values:
         subgraphs[edge_value] = graph.copy().edge_subgraph(
             [edge for edge in graph.edges if graph.edges[edge][attribute] == edge_value]
         )
-    
+
     return subgraphs
 
 
@@ -84,4 +88,6 @@ def replace_node_labels_with_unique_ids(graph):
     networkx.Graph
         Graph with node labels renamed
     """
-    return networkx.relabel_nodes(graph, {node: i for i, node in enumerate(graph.nodes)}, copy=True)
+    return networkx.relabel_nodes(
+        graph, {node: i for i, node in enumerate(graph.nodes)}, copy=True
+    )

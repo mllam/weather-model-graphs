@@ -28,6 +28,8 @@ visualisation = [
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
+[tool.isort]
+profile = "black"
 
 [tool.pdm]
 distribution = true

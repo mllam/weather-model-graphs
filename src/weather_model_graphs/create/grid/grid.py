@@ -9,12 +9,12 @@ def create_grid_graph_nodes(xy, level_id=-1):
     Create a networkx.Graph comprising only nodes for each (x,y)-point in the `xy` coordinate
     array (the attribute `pos` giving the (x,y)-coordinate value) and with
     node label (level_id, i, j)
-    
+
     Each node contains the following attributes:
     - "pos": the (x,y)-coordinate value of the node
     - "level": the level id of the node (default to -1 for grid nodes)
     - "type": the type of the node (i.e. "grid" for grid nodes)
-    
+
     Parameters
     ----------
     xy : np.ndarray [2, Ny, Nx]
@@ -23,7 +23,7 @@ def create_grid_graph_nodes(xy, level_id=-1):
         of grid points in the y and x direction respectively
     level_id : int
         Level id of the nodes (default to -1)
-    
+
     Returns
     -------
     networkx.Graph
