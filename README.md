@@ -5,7 +5,7 @@
 `weather-model-graphs` is a package for creating, visualising and storing message-passing graphs for data-driven weather models.
 
 The package is designed to use `networkx.DiGraph` objects as the primary data structure for the graph representation right until the graph is to be stored on disk into a specific format.
-This makes the graph generation process modular (every step outputs a `networkx.Digraph`), easy to debug (visualise the graph at any step) and allows output to different file-formats and file-structures to be easily implemented. More details are given in the [background and design](#background-and-design) section below.
+This makes the graph generation process modular (every step outputs a `networkx.DiGraph`), easy to debug (visualise the graph at any step) and allows output to different file-formats and file-structures to be easily implemented. More details are given in the [background and design](#background-and-design) section below.
 
 
 ## Installation
@@ -57,7 +57,7 @@ for component, graph in graph_components.items():
 # Background and design
 
 The only input the graph generation in `weather-model-graphs` requires is the static `(x,y)` *grid* coordinates of the atmospheric state as the state changes over time. These coordinates are used to create the **grid nodes** nodes of the graph, with a node for each `(x,y)` coordinate.
-In addition to grid nodes the graph also contains **mesh nodes** that represent the latent space of the model at a set of `(x,y)` coordinates (this are in general a different set of coordinates to the **grid nodes** coordinates).
+In addition to grid nodes the graph also contains **mesh nodes** that represent the latent space of the model at a set of `(x,y)` coordinates (this is in general a different set of coordinates to the **grid nodes** coordinates).
 
 In summary, there are two sets of nodes in the graph:
 
@@ -76,6 +76,7 @@ In summary, the complete message-passing graph consists of three components:
 
 - **mesh-to-grid** (`m2g`): the decoding component, where edges represent the decoding of the latent space back into physical variables
 
+Practically, the **mesh-to-grid** and **grid-to-mesh** updates can probably also encode some of the time evolution processing, in addition to the latent space encoding/decoding, unless the GNN is trained specifically as an auto-encoder using the same graph as input and output.
 
 ## Design principles
 
@@ -102,11 +103,12 @@ The graph generation in `weather-model-graphs` is split into to the following st
 
     - **networkx** `.pickle` file: save `networkx.DiGraph` objects using `pickle` to disk (`weather_model_graphs.save.to_pickle(...)`)
 
-    - [pytorch-geometric](https://github.com/pyg-team/pytorch_geometric) for [neural-lam](https://github.com/mllam/neural-lam): edges indexes and features are stored in separate `torch.Tensor` objects serialised to disk that can then be loaded into `torch_geometric.data.Data` objects (`weather_model_graphs.save.to_pyg(...)`
+    - [pytorch-geometric](https://github.com/pyg-team/pytorch_geometric) for [neural-lam](https://github.com/mllam/neural-lam): edges indexes and features are stored in separate `torch.Tensor` objects serialised to disk that can then be loaded into `torch_geometric.data.Data` objects (`weather_model_graphs.save.to_pyg(...)`)
 
 ### Diagram of the graph generation process:
 
-Below visualises the graph generation process in `weather-model-graphs` for the example given above:
+Below, the graph generation process is visualised in `weather-model-graphs` for the example given above:
+
 
 ```mermaid
 graph TB
@@ -126,7 +128,7 @@ subgraph weather_model_graphs["weather-model-graphs"]
 
     G_full["complete graph\nG_full[networkx.Digraph]"]
 
-    G_full --replace node labels with unique integer id--> G_full_int["G_int[networkx.Digraph]"]
+    G_full --replace node labels with unique integer id --> G_full_int["G_int[networkx.Digraph]"]
 
     G_full_int --split and converted into --> pyg_g2m["pyg_g2m[pyg.data.Data]"]
     G_full_int --split and converted into --> pyg_m2m["pyg_m2m[pyg.data.Data]"]
@@ -138,24 +140,38 @@ xy_grid --used to create node coordinates in --> G_m2g
 xy_grid --used to create node coordinates in --> G_m2m
 
 subgraph stored_on_disk["stored on disk"]
-    pyg_g2m_file["g2m_edge_index.pt\ng2m_features.pt"]
-    pyg_m2m_file["m2m_edge_index.pt\nm2m_features.pt"]
-    pyg_m2g_file["m2g_edge_index.pt\nm2g_features.pt"]
+    subgraph hidden_graph1[ ]
+        pyg_g2m_file["g2m_edge_index.pt\ng2m_features.pt"]
+        pyg_m2m_file["m2m_edge_index.pt\nm2m_features.pt"]
+        pyg_m2g_file["m2g_edge_index.pt\nm2g_features.pt"]
+    end
 end
 
 pyg_g2m --stored in--> pyg_g2m_file
 pyg_m2m --stored in--> pyg_m2m_file
 pyg_m2g --stored in--> pyg_m2g_file
 
-subgraph pyg_loaded["Loaded into model (e.g. torch.nn.Module)"]
-    pyg_g2m_loaded["pyg_g2m[pyg.data.Data]"]
-    pyg_m2m_loaded["pyg_m2m[pyg.data.Data]"]
-    pyg_m2g_loaded["pyg_m2g[pyg.data.Data]"]
+subgraph pyg_loaded["Loaded into model"]
+    subgraph hidden_graph2["(e.g. torch.nn.Module)"]
+        pyg_g2m_loaded["pyg_g2m[pyg.data.Data]"]
+        pyg_m2m_loaded["pyg_m2m[pyg.data.Data]"]
+        pyg_m2g_loaded["pyg_m2g[pyg.data.Data]"]
+    end
 end
 
 pyg_g2m_file --loaded into --> pyg_g2m_loaded
 pyg_m2m_file --loaded into --> pyg_m2m_loaded
 pyg_m2g_file --loaded into --> pyg_m2g_loaded
+
+classDef title_left margin-right:250px,display:block
+classDef hidden stroke-width:0px,margin-right:250px,display:block
+
+class hidden_graph1 hidden
+class hidden_graph2 hidden
+class weather_model_graphs title_left
+class graph_components title_left
+class stored_on_disk title_left
+class pyg_loaded title_left
 ```
 
 ### Node and edge attributes
@@ -183,7 +199,7 @@ The splitting of the graph is done with by utilising the edge attributes, and th
 
 ## Code layout
 
-The code layout of `weather-model-graphs` is organise into submodules by the functionality they provide. The main submodules are:
+The code layout of `weather-model-graphs` is organised into submodules by the functionality they provide. The main submodules are:
 
 ```
 weather_model_graphs
