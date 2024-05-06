@@ -5,7 +5,7 @@ import networkx
 import torch
 from loguru import logger
 
-from .networkx_utils import split_graph_by_edge_attribute
+from .networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attribute
 
 try:
     import torch_geometric.utils.convert as pyg_convert
@@ -85,11 +85,16 @@ def to_pyg(
 
     if list_from_attribute is not None:
         # create a list of graph objects by splitting the graph by the list_from_attribute
-        sub_graphs = list(
-            split_graph_by_edge_attribute(
-                graph=graph, attribute=list_from_attribute
-            ).values()
-        )
+        try:
+            sub_graphs = list(
+                split_graph_by_edge_attribute(
+                    graph=graph, attribute=list_from_attribute
+                ).values()
+            )
+        except MissingEdgeAttributeError:
+            # neural-lam still expects a list of graphs, so if the attribute is missing
+            # we just return the original graph as a list
+            sub_graphs = [graph]
         pyg_graphs = [pyg_convert.from_networkx(g) for g in sub_graphs]
     else:
         pyg_graphs = [pyg_convert.from_networkx(graph)]
