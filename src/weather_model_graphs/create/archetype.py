@@ -1,4 +1,4 @@
-from . import create_all_graph_components
+from .base import create_all_graph_components
 
 
 def create_keisler_graph(xy_grid, merge_components=True):
