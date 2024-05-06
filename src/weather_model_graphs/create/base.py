@@ -62,6 +62,12 @@ def create_all_graph_components(
     """
     graph_components: dict[networkx.DiGraph] = {}
 
+    if len(xy.shape) != 3:
+        raise NotImplementedError(
+            "Mesh coordinates are assumed to lie on a regular grid so that "
+            "the coordinates values are given with an array of shape [2, nx, ny]"
+        )
+
     if m2m_connectivity == "flat":
         logger.warning(
             "Using refinement factor 2 between grid and mesh nodes for flat mesh graph"

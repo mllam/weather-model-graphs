@@ -43,6 +43,10 @@ def sort_nodes_internally(nx_graph, node_attribute=None, edge_attribute=None):
     return H
 
 
+class MissingEdgeAttributeError(Exception):
+    pass
+
+
 def split_graph_by_edge_attribute(graph, attribute):
     """
     Split a graph into subgraphs based on an edge attribute, returning
@@ -61,6 +65,12 @@ def split_graph_by_edge_attribute(graph, attribute):
         Dictionary of subgraphs keyed by edge attribute value
     """
 
+    # check if any node has the attribute
+    if not any(attribute in graph.edges[edge] for edge in graph.edges):
+        raise MissingEdgeAttributeError(
+            f"Edge attribute '{attribute}' not found in graph. Check the attribute."
+        )
+
     # Get unique edge attribute values
     edge_values = set(networkx.get_edge_attributes(graph, attribute).values())
 
@@ -69,6 +79,17 @@ def split_graph_by_edge_attribute(graph, attribute):
     for edge_value in edge_values:
         subgraphs[edge_value] = graph.copy().edge_subgraph(
             [edge for edge in graph.edges if graph.edges[edge][attribute] == edge_value]
+        )
+
+    # copy node attributes
+    for subgraph in subgraphs.values():
+        for node in subgraph.nodes:
+            subgraph.nodes[node].update(graph.nodes[node])
+
+    # check that at least one subgraph was created
+    if len(subgraphs) == 0:
+        raise ValueError(
+            f"No subgraphs were created. Check the edge attribute '{attribute}'."
         )
 
     return subgraphs
