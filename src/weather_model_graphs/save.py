@@ -2,7 +2,13 @@ import pickle
 from pathlib import Path
 
 import networkx
-import torch
+
+try:
+    import torch
+
+    HAS_PYTORCH = True
+except ImportError:
+    HAS_PYTORCH = False
 from loguru import logger
 
 from .networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attribute
@@ -53,6 +59,11 @@ def to_pyg(
     """
     if name is None:
         raise ValueError("Name must be provided.")
+
+    if not HAS_PYTORCH or not HAS_PYG:
+        raise Exception(
+            "install weather-mode-graphs[pytorch] to enable writing to torch files"
+        )
 
     # check that the node labels are integers and unique so that they can be used as indices
     if not all(isinstance(node, int) for node in graph.nodes):

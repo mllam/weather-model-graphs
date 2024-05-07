@@ -23,6 +23,9 @@ visualisation = [
     "matplotlib>=3.8.4",
     "ipykernel>=6.29.4",
 ]
+docs = [
+    "jupyter-book>=1.0.0",
+]
 
 [build-system]
 requires = ["pdm-backend"]

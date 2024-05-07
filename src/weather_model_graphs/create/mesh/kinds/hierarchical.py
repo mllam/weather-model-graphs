@@ -1,26 +1,9 @@
 import networkx
 import numpy as np
 import scipy
-from torch_geometric.utils.convert import from_networkx as pyg_from_networkx
 
 from ....networkx_utils import prepend_node_index
 from .. import mesh as mesh_graph
-
-
-def sort_nodes_internally(nx_graph):
-    # For some reason the networkx .nodes() return list can not be sorted,
-    # but this is the ordering used by pyg when converting.
-    # This function fixes this.
-    H = networkx.DiGraph()
-    H.add_nodes_from(sorted(nx_graph.nodes(data=True)))
-    H.add_edges_from(nx_graph.edges(data=True))
-    return H
-
-
-def from_networkx_with_start_index(nx_graph, start_index):
-    pyg_graph = pyg_from_networkx(nx_graph)
-    pyg_graph.edge_index += start_index
-    return pyg_graph
 
 
 def create_hierarchical_multiscale_mesh_graph(
