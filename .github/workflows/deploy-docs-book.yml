@@ -27,6 +27,7 @@ jobs:
       run: |
         pdm install --prod
         pdm install --group docs
+        pdm install --group visualisation
 
     # Build the book
     - name: Build the book
