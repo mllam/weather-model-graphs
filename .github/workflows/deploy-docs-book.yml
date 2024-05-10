@@ -24,7 +24,9 @@ jobs:
         cache: true
 
     - name: Install dependencies
-      run: pdm install --group docs
+      run: |
+        pdm install --prod
+        pdm install --group docs
 
     # Build the book
     - name: Build the book
