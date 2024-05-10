@@ -6,7 +6,6 @@ on:
     branches:
     - master
     - main
-    - jupyterbook-docs*
 
 # This job installs dependencies, builds the book, and pushes it to `gh-pages`
 jobs:
@@ -38,7 +37,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v2
       with:
-        path: "_build/html"
+        path: "docs/_build/html"
 
     # Deploy the book's HTML to GitHub Pages
     - name: Deploy to GitHub Pages
