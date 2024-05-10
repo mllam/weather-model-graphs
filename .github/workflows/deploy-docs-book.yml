@@ -6,7 +6,7 @@ on:
     branches:
     - master
     - main
-    - jupyterbook-docs
+    - jupyterbook-docs*
 
 # This job installs dependencies, builds the book, and pushes it to `gh-pages`
 jobs:
@@ -20,7 +20,8 @@ jobs:
 
     - name: Setup PDM
       uses: pdm-project/setup-pdm@v4
-      cache: true
+      with:
+        cache: true
 
     - name: Install dependencies
       run: pdm install --group docs
