@@ -17,15 +17,13 @@ def test_save_to_pyg():
     xy = _create_fake_xy(N=64)
     graph = wmg.create.archetype.create_oscarsson_hierarchical_graph(xy_grid=xy)
 
-    graph_components = wmg.split_graph_by_edge_attribute(
-        graph=graph, attribute="component"
-    )
+    graph_components = wmg.split_graph_by_edge_attribute(graph=graph, attr="component")
 
     # split the m2m graph into the different parts that create the up, in-level and down connections respectively
     # this is how the graphs is stored in the neural-lam codebase
     m2m_graph = graph_components.pop("m2m")
     m2m_graph_components = wmg.split_graph_by_edge_attribute(
-        graph=m2m_graph, attribute="direction"
+        graph=m2m_graph, attr="direction"
     )
     m2m_graph_components = {
         f"m2m_{name}": graph for name, graph in m2m_graph_components.items()

@@ -29,7 +29,6 @@ def create_all_graph_components(
     m2m_connectivity_kwargs={},
     m2g_connectivity_kwargs={},
     g2m_connectivity_kwargs={},
-    merge_components: bool = True,
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -115,24 +114,21 @@ def create_all_graph_components(
         for edge in graph.edges:
             graph.edges[edge]["component"] = name
 
-    if not merge_components:
-        return graph_components
-    else:
-        # merge to single graph
-        G_tot = networkx.compose_all(graph_components.values())
-        # only keep graph attributes that are the same for all components
-        for key in graph_components["m2m"].graph.keys():
-            if not all(
-                graph.graph.get(key, None) == graph_components["m2m"].graph[key]
-                for graph in graph_components.values()
-            ):
-                logger.info(f"Deleting graph attribute {key}")
-                # delete
-                del G_tot.graph[key]
+    # merge to single graph
+    G_tot = networkx.compose_all(graph_components.values())
+    # only keep graph attributes that are the same for all components
+    for key in graph_components["m2m"].graph.keys():
+        if not all(
+            graph.graph.get(key, None) == graph_components["m2m"].graph[key]
+            for graph in graph_components.values()
+        ):
+            logger.info(f"Deleting graph attribute {key}")
+            # delete
+            del G_tot.graph[key]
 
-        G_tot = replace_node_labels_with_unique_ids(graph=G_tot)
+    G_tot = replace_node_labels_with_unique_ids(graph=G_tot)
 
-        return G_tot
+    return G_tot
 
 
 def connect_nodes_across_graphs(

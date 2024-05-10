@@ -4,7 +4,6 @@
 format: jb-book
 root: intro
 chapters:
-#- file: markdown
-#- file: notebooks
-#- file: markdown-notebooks
-- file: constructing_the_graph
+- file: background
+- file: design
+- file: creating_the_graph

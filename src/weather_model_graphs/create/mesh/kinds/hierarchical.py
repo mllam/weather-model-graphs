@@ -54,9 +54,10 @@ def create_hierarchical_multiscale_mesh_graph(
     ]
 
     # add `direction` attribute to all edges with value `same``
-    for G in Gs_all_levels:
+    for i, G in enumerate(Gs_all_levels):
         for u, v in G.edges:
             G.edges[u, v]["direction"] = "same"
+            G.edges[u, v]["level"] = i
 
     # Create inter-level mesh edges
     up_graphs = []

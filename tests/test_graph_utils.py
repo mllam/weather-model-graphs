@@ -22,6 +22,6 @@ def test_graph_splitting():
     G_m2m = graph["m2m"]
 
     m2m_graph_components = wmg.split_graph_by_edge_attribute(
-        graph=G_m2m, attribute="direction"
+        graph=G_m2m, attr="direction"
     )
     assert len(m2m_graph_components) == 3
