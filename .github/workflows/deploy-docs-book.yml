@@ -29,7 +29,7 @@ jobs:
     # Build the book
     - name: Build the book
       run: |
-        LOGURU_LEVEL=WARNING jupyter-book build docs/
+        LOGURU_LEVEL=WARNING pdm run jupyter-book build docs/
 
     # Upload the book's HTML as an artifact
     - name: Upload artifact
