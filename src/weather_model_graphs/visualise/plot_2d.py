@@ -1,9 +1,6 @@
-# Third-party
-import matplotlib
 import matplotlib.pyplot as plt
 import networkx
 import numpy as np
-import torch_geometric as pyg
 from matplotlib.colorbar import ColorbarBase
 from matplotlib.colors import Normalize
 
@@ -14,7 +11,7 @@ def nx_draw_with_pos(g, with_labels=False, **kwargs):
     pos = {node: g.nodes[node]["pos"] for node in g.nodes()}
     ax = kwargs.pop("ax", None)
     if ax is None:
-        _, ax = plt.subplots(1, 1, figsize=(10, 10))
+        _, ax = plt.subplots(figsize=(10, 10))
     networkx.draw_networkx(
         ax=ax, G=g, pos=pos, hide_ticks=False, with_labels=with_labels, **kwargs
     )
@@ -101,20 +98,52 @@ def _create_graph_attr_colorbar(ax, cmap, norm, attr_name, attr_kind, loc):
 
 
 def nx_draw_with_pos_and_attr(
-    g,
+    graph,
     ax=None,
-    with_labels=False,
     edge_color_attr=None,
     node_color_attr=None,
     node_zorder_attr=None,
-    node_size=300,
+    node_size=100,
+    connectionstyle="arc3, rad=0.1",
     **kwargs,
 ):
+    """
+    Create a networkx plot where edges and nodes can be coloured by attributes (
+    both continuous and discrete attributes are supported, with a colorbar legend
+    and a discrete legend respectively).
+
+    Parameters
+    ----------
+    graph : networkx.Graph
+        The graph to plot
+    ax : matplotlib.axes.Axes, optional
+        The axes to plot on, by default None (and a new figure is created)
+    edge_color_attr : str, optional
+        The attribute to use for edge coloring, by default None
+    node_color_attr : str, optional
+        The attribute to use for node coloring, by default None
+    node_zorder_attr : str, optional
+        The attribute to use for sorting nodes, by default None
+    node_size : int, optional
+        The size of the nodes, by default 100
+    connectionstyle : str, optional
+        The style of the edge connections, by default "arc3, rad=0.1"
+        (giving curved edges)
+    **kwargs : dict
+        Additional keyword arguments to passed down to networkx.draw_networkx
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes with the plot
+    """
     if node_zorder_attr is not None:
-        g = nx_utils.sort_nodes_internally(g, node_attribute=node_zorder_attr)
+        graph = nx_utils.sort_nodes_internally(graph, node_attr=node_zorder_attr)
 
     if edge_color_attr is not None:
-        edge_attr_vals = _get_graph_attr_values(g, edge_color_attr, component="edges")
+        edge_attr_vals = _get_graph_attr_values(
+            graph, edge_color_attr, component="edges"
+        )
 
         if "cmap" not in kwargs:
             if "discrete_labels" in edge_attr_vals:
@@ -126,7 +155,9 @@ def nx_draw_with_pos_and_attr(
         kwargs["edge_vmax"] = max(edge_attr_vals["values"])
 
     if node_color_attr is not None:
-        node_attr_vals = _get_graph_attr_values(g, node_color_attr, component="nodes")
+        node_attr_vals = _get_graph_attr_values(
+            graph, node_color_attr, component="nodes"
+        )
         if "cmap" not in kwargs:
             if "discrete_labels" in node_attr_vals:
                 kwargs["cmap"] = plt.get_cmap("tab20")
@@ -137,12 +168,12 @@ def nx_draw_with_pos_and_attr(
         kwargs["vmax"] = max(node_attr_vals["values"])
 
     ax = nx_draw_with_pos(
-        g,
+        graph,
         ax=ax,
-        node_size=node_size,
         arrows=True,
         with_labels=False,
-        connectionstyle="arc3, rad=0.1",
+        node_size=node_size,
+        connectionstyle=connectionstyle,
         **kwargs,
     )
 
@@ -196,56 +227,5 @@ def nx_draw_with_pos_and_attr(
 
     for legend in legends:
         ax.add_artist(legend)
-
-    return ax
-
-
-def plot_pyg_graph(graph, ax=None, title=None):
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 8), dpi=200)  # W,H
-    edge_index = graph.edge_index
-    pos = graph.pos
-
-    # Fix for re-indexed edge indices only containing mesh nodes at
-    # higher levels in hierarchy
-    edge_index = edge_index - edge_index.min()
-
-    if pyg.utils.is_undirected(edge_index):
-        # Keep only 1 direction of edge_index
-        edge_index = edge_index[:, edge_index[0] < edge_index[1]]  # (2, M/2)
-    # TODO: indicate direction of directed edges
-
-    # Move all to cpu and numpy, compute (in)-degrees
-    degrees = pyg.utils.degree(edge_index[1], num_nodes=pos.shape[0]).cpu().numpy()
-
-    edge_index = edge_index.cpu().numpy()
-    pos = pos.cpu().numpy()
-
-    # Plot edges
-    from_pos = pos[edge_index[0]]  # (M/2, 2)
-    to_pos = pos[edge_index[1]]  # (M/2, 2)
-    edge_lines = np.stack((from_pos, to_pos), axis=1)
-    ax.add_collection(
-        matplotlib.collections.LineCollection(
-            edge_lines, lw=0.4, colors="black", zorder=1
-        )
-    )
-
-    # Plot nodes
-    node_scatter = ax.scatter(
-        pos[:, 0],
-        pos[:, 1],
-        c=degrees,
-        s=3,
-        marker="o",
-        zorder=2,
-        cmap="viridis",
-        clim=None,
-    )
-
-    plt.colorbar(node_scatter, aspect=50)
-
-    if title is not None:
-        ax.set_title(title)
 
     return ax
