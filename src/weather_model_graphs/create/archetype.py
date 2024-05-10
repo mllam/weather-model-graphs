@@ -1,7 +1,7 @@
 from .base import create_all_graph_components
 
 
-def create_keisler_graph(xy_grid, merge_components=True):
+def create_keisler_graph(xy_grid):
     """
     Create a graph following Keisler (2022, https://arxiv.org/abs/2202.07575) architecture.
 
@@ -26,7 +26,6 @@ def create_keisler_graph(xy_grid, merge_components=True):
     """
     return create_all_graph_components(
         xy=xy_grid,
-        merge_components=merge_components,
         m2m_connectivity="flat",
         m2m_connectivity_kwargs={},
         m2g_connectivity="nearest_neighbour",
@@ -37,9 +36,7 @@ def create_keisler_graph(xy_grid, merge_components=True):
     )
 
 
-def create_graphcast_graph(
-    xy_grid, refinement_factor=3, max_num_levels=None, merge_components=True
-):
+def create_graphcast_graph(xy_grid, refinement_factor=3, max_num_levels=None):
     """
     Create a graph following the Lam et al (2023, https://arxiv.org/abs/2212.12794) GraphCast architecture.
 
@@ -60,8 +57,6 @@ def create_graphcast_graph(
         x and y directions).
     max_num_levels: int
         The number of levels of longer-range connections in the mesh graph.
-    merge_components: bool
-        Whether to merge the components of the graph.
 
     Returns
     -------
@@ -70,7 +65,6 @@ def create_graphcast_graph(
     """
     return create_all_graph_components(
         xy=xy_grid,
-        merge_components=merge_components,
         m2m_connectivity="flat_multiscale",
         m2m_connectivity_kwargs=dict(
             refinement_factor=refinement_factor, max_num_levels=max_num_levels
@@ -83,7 +77,7 @@ def create_graphcast_graph(
     )
 
 
-def create_oscarsson_hierarchical_graph(xy_grid, merge_components=True):
+def create_oscarsson_hierarchical_graph(xy_grid):
     """
     Create a graph following Oscarsson et al (2023, https://arxiv.org/abs/2309.17370)
     hierarchical architecture.
@@ -106,8 +100,6 @@ def create_oscarsson_hierarchical_graph(xy_grid, merge_components=True):
     ----------
     xy_grid: np.ndarray
         2D array of grid point positions.
-    merge_components: bool
-        Whether to merge the components of the graph.
 
     Returns
     -------
@@ -116,7 +108,6 @@ def create_oscarsson_hierarchical_graph(xy_grid, merge_components=True):
     """
     return create_all_graph_components(
         xy=xy_grid,
-        merge_components=merge_components,
         m2m_connectivity="hierarchical",
         m2m_connectivity_kwargs=dict(refinement_factor=2, max_num_levels=3),
         m2g_connectivity="nearest_neighbour",
