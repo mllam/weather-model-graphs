@@ -2,18 +2,12 @@ import pickle
 from pathlib import Path
 
 import networkx
-
-try:
-    import torch
-
-    HAS_PYTORCH = True
-except ImportError:
-    HAS_PYTORCH = False
 from loguru import logger
 
 from .networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attribute
 
 try:
+    import torch
     import torch_geometric.utils.convert as pyg_convert
 
     HAS_PYG = True
@@ -60,7 +54,7 @@ def to_pyg(
     if name is None:
         raise ValueError("Name must be provided.")
 
-    if not HAS_PYTORCH or not HAS_PYG:
+    if not HAS_PYG:
         raise Exception(
             "install weather-mode-graphs[pytorch] to enable writing to torch files"
         )
@@ -99,7 +93,7 @@ def to_pyg(
         try:
             sub_graphs = list(
                 split_graph_by_edge_attribute(
-                    graph=graph, attr=list_from_attribute
+                    graph=graph, attribute=list_from_attribute
                 ).values()
             )
         except MissingEdgeAttributeError:

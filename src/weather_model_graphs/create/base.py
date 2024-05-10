@@ -122,7 +122,6 @@ def create_all_graph_components(
             graph.graph.get(key, None) == graph_components["m2m"].graph[key]
             for graph in graph_components.values()
         ):
-            logger.info(f"Deleting graph attribute {key}")
             # delete
             del G_tot.graph[key]
 

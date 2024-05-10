@@ -1,8 +1,10 @@
 import tempfile
 
 import numpy as np
+from loguru import logger
 
 import weather_model_graphs as wmg
+from weather_model_graphs.save import HAS_PYG
 
 
 def _create_fake_xy(N=10):
@@ -14,6 +16,12 @@ def _create_fake_xy(N=10):
 
 
 def test_save_to_pyg():
+    if not HAS_PYG:
+        logger.warning(
+            "Skipping test_save_to_pyg because weather-model-graphs[pytorch] is not installed."
+        )
+        return
+
     xy = _create_fake_xy(N=64)
     graph = wmg.create.archetype.create_oscarsson_hierarchical_graph(xy_grid=xy)
 

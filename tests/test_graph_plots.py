@@ -18,10 +18,9 @@ def _create_fake_xy(N=10):
 def test_plot():
     xy = _create_fake_xy(10)
 
-    graph_components = wmg.create.create_all_graph_components(
+    graph = wmg.create.create_all_graph_components(
         m2m_connectivity="flat_multiscale",
         xy=xy,
-        merge_components=False,
         m2m_connectivity_kwargs=dict(
             max_num_levels=3,
             refinement_factor=2,
@@ -29,6 +28,8 @@ def test_plot():
         g2m_connectivity="nearest_neighbour",
         m2g_connectivity="nearest_neighbour",
     )
+
+    graph_components = wmg.split_graph_by_edge_attribute(graph=graph, attr="component")
 
     def _is_ndarray(val):
         return isinstance(val, np.ndarray)

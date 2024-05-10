@@ -92,6 +92,17 @@ def split_graph_by_edge_attribute(graph, attr):
             f"No subgraphs were created. Check the edge attribute '{attr}'."
         )
 
+    # copy node attributes
+    for subgraph in subgraphs.values():
+        for node in subgraph.nodes:
+            subgraph.nodes[node].update(graph.nodes[node])
+
+    # check that at least one subgraph was created
+    if len(subgraphs) == 0:
+        raise ValueError(
+            f"No subgraphs were created. Check the edge attribute '{attr}'."
+        )
+
     return subgraphs
 
 
