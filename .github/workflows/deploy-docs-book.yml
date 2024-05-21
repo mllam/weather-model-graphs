@@ -1,0 +1,45 @@
+name: build-docs
+
+# Run this when the master or main branch changes
+on:
+  push:
+    branches:
+    - master
+    - main
+
+# This job installs dependencies, builds the book, and pushes it to `gh-pages`
+jobs:
+  deploy-book:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PDM
+      uses: pdm-project/setup-pdm@v4
+      with:
+        cache: true
+
+    - name: Install dependencies
+      run: |
+        pdm install --prod
+        pdm install --group docs
+        pdm install --group visualisation
+
+    # Build the book
+    - name: Build the book
+      run: |
+        LOGURU_LEVEL=WARNING pdm run jupyter-book build docs/
+
+    # Upload the book's HTML as an artifact
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: "docs/_build/html"
+
+    # Deploy the book's HTML to GitHub Pages
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2

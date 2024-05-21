@@ -29,6 +29,12 @@ def create_grid_graph_nodes(xy, level_id=-1):
     networkx.Graph
         Graph representing the grid nodes
     """
+    if len(xy.shape) != 3:
+        raise NotImplementedError(
+            "Mesh coordinates are assumed to lie on a regular grid so that "
+            "the coordinates values are given with an array of shape [2, nx, ny]"
+        )
+
     # grid nodes
     Ny, Nx = xy.shape[1:]
 
