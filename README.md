@@ -31,8 +31,7 @@ pdm install --group pytorch
 
 # Usage
 
-The best way to understand how to use `weather-model-graphs` is to look at the [notebooks/constructing_the_graph.ipynb](notebooks/constructing_the_graph.ipynb) notebook, to have look at the tests in [tests/](tests/) or simply to read through the source code.
-In addition you can read the [background and design](#background-and-design) section below to understand the design principles of `weather-model-graphs`.
+The best way to understand how to use `weather-model-graphs` is to look at the [documentation](https://mllam.github.io/weather-model-graphs) (which are executable Jupyter notebooks!), to have look at the tests in [tests/](tests/) or simply to read through the source code.
 
 ## Example, Keisler 2021 flat graph architecture
 
