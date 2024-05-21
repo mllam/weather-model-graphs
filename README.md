@@ -5,7 +5,7 @@
 `weather-model-graphs` is a package for creating, visualising and storing message-passing graphs for data-driven weather models.
 
 The package is designed to use `networkx.DiGraph` objects as the primary data structure for the graph representation right until the graph is to be stored on disk into a specific format.
-This makes the graph generation process modular (every step outputs a `networkx.DiGraph`), easy to debug (visualise the graph at any step) and allows output to different file-formats and file-structures to be easily implemented. More details are given in the [background and design](#background-and-design) section below.
+This makes the graph generation process modular (every step outputs a `networkx.DiGraph`), easy to debug (visualise the graph at any step) and allows output to different file-formats and file-structures to be easily implemented. More details are given in the [background](https://mllam.github.io/weather-model-graphs/background.html) and [design](https://mllam.github.io/weather-model-graphs/design.html) section of the online [documentation](https://mllam.github.io/weather-model-graphs/).
 
 
 ## Installation
@@ -31,8 +31,7 @@ pdm install --group pytorch
 
 # Usage
 
-The best way to understand how to use `weather-model-graphs` is to look at the [notebooks/constructing_the_graph.ipynb](notebooks/constructing_the_graph.ipynb) notebook, to have look at the tests in [tests/](tests/) or simply to read through the source code.
-In addition you can read the [background and design](#background-and-design) section below to understand the design principles of `weather-model-graphs`.
+The best way to understand how to use `weather-model-graphs` is to look at the [documentation](https://mllam.github.io/weather-model-graphs) (which are executable Jupyter notebooks!), to have look at the tests in [tests/](tests/) or simply to read through the source code.
 
 ## Example, Keisler 2021 flat graph architecture
 
