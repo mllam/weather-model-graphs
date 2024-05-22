@@ -1,6 +1,6 @@
 # weather-model-graphs
 
-[![linting](https://github.com/mllam/weather-model-graphs/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/mllam/weather-model-graphs/actions/workflows/pre-commit.yml) [![Jupyter Book Badge](https://jupyterbook.org/badge.svg)](https://mllam.github.io/weather-model-graphs)
+[![tests](https://github.com/mllam/weather-model-graphs/actions/workflows/ci-tests.yml/badge.svg)](https://github.com/mllam/weather-model-graphs/actions/workflows/ci-tests.yml) [![linting](https://github.com/mllam/weather-model-graphs/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/mllam/weather-model-graphs/actions/workflows/pre-commit.yml) [![Jupyter Book Badge](https://jupyterbook.org/badge.svg)](https://mllam.github.io/weather-model-graphs)
 
 `weather-model-graphs` is a package for creating, visualising and storing graphs used in message-passing graph-based data-driven weather models.
 
