@@ -1,10 +1,13 @@
 runners:
-  - name: "cpu-runner"
+  - name: "aws-runner"
+    # Cloud Provider: AWS
     cloud: "aws"
-    gpu: "nvidia-tesla-t4"
-    instance_type: "t3.nano"
+    # Cheapest VM on AWS
+    instance_type: "t2.nano"
+    # Ubuntu-20.4, ami image
     machine_image: "ami-06fd8a495a537da8b"
-    preemptible: true
-    region: "eu-central-1"
+    preemptible: false
+    # Add this label in the "runs-on" param in .github/workflows/<workflow-name>.yml
+    # So that this runner is created for running the workflow
     labels:
-      - "cirun-cpu-runner"
+      - "cirun-aws-runner"
