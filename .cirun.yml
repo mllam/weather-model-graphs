@@ -1,0 +1,10 @@
+runners:
+  - name: "cpu-runner"
+    cloud: "aws"
+    gpu: "nvidia-tesla-t4"
+    instance_type: "t3.nano"
+    machine_image: "ami-06fd8a495a537da8b"
+    preemptible: true
+    region: "eu-central-1"
+    labels:
+      - "cirun-cpu-runner"
