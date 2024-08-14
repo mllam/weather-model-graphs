@@ -133,6 +133,7 @@ def connect_nodes_across_graphs(
     G_target,
     method="nearest_neighbour",
     max_dist=None,
+    rel_max_dist=None,
     max_num_neighbours=None,
 ):
     """
@@ -174,38 +175,60 @@ def connect_nodes_across_graphs(
     xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
     kdt_s = scipy.spatial.KDTree(xy_source)
 
-    def _find_neighbour_node_idxs_in_source_mesh(from_node):
-        xy_target = G_target.nodes[from_node]["pos"]
-
-        if method == "nearest_neighbour":
+    # Determine method and perform checks once
+    # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in
+    # loop later
+    if method == "nearest_neighbour":
+        if max_dist is not None or max_num_neighbours is not None:
+            raise Exception(
+                "to use `nearest_neighbour` you should not set `max_dist` or `max_num_neighbours`"
+            )
+        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
             neigh_idx = kdt_s.query(xy_target, 1)[1]
-            if max_dist is not None or max_num_neighbours is not None:
-                raise Exception(
-                    "to use `nearest_neighbour` you should not set `max_dist` or `max_num_neighbours`"
-                )
             return [neigh_idx]
-        elif method == "nearest_neighbours":
-            if max_num_neighbours is None:
-                raise Exception(
-                    "to use `nearest_neighbours` you should set the max number with `max_num_neighbours`"
-                )
-            if max_dist is not None:
-                raise Exception(
-                    "to use `nearest_neighbours` you should not set `max_dist`"
-                )
+    elif method == "nearest_neighbours":
+        if max_num_neighbours is None:
+            raise Exception(
+                "to use `nearest_neighbours` you should set the max number with `max_num_neighbours`"
+            )
+        if max_dist is not None:
+            raise Exception(
+                "to use `nearest_neighbours` you should not set `max_dist`"
+            )
+        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
             neigh_idxs = kdt_s.query(xy_target, max_num_neighbours)[1]
             return neigh_idxs
-        elif method == "within_radius":
-            if max_dist is None:
-                raise Exception("to use `witin_radius` method you shold set `max_dist`")
-            if max_num_neighbours is not None:
-                raise Exception(
-                    "to use `within_radius` method you should not set `max_num_neighbours`"
-                )
-            neigh_idxs = kdt_s.query_ball_point(xy_target, max_dist)
-            return neigh_idxs
+    elif method == "within_radius":
+        if max_num_neighbours is not None:
+            raise Exception(
+                "to use `within_radius` method you should not set `max_num_neighbours`"
+            )
+        # Determine actual query length to use
+        if max_dist is not None:
+            if rel_max_dist is not None:
+                raise Exception("to use `witin_radius` method you shold only set one of `max_dist` or `rel_max_dist")
+            query_dist = max_dist
+        elif rel_max_dist is not None:
+            if max_dist is not None:
+                raise Exception("to use `witin_radius` method you shold only set one of `max_dist` or `rel_max_dist")
+            # Figure out longest edge in (lowest level) mesh graph
+            # TODO Handle for hierarchical graphs
+            longest_edge = 0.
+            for edge_check_graph in (G_source, G_target):
+                if len(edge_check_graph.edges) > 0:
+                    longest_graph_edge = max(
+                        edge_check_graph.edges(data=True),
+                        key=lambda x: x[2].get('len', 0)
+                    )[2]["len"]
+                    longest_edge = max(longest_edge, longest_graph_edge)
+            query_dist = longest_edge*rel_max_dist
         else:
-            raise NotImplementedError(method)
+            raise Exception("to use `witin_radius` method you shold set `max_dist` or `rel_max_dist")
+        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
+            neigh_idxs = kdt_s.query_ball_point(xy_target, query_dist)
+            return neigh_idxs
+    else:
+        raise NotImplementedError(method)
 
     G_connect = networkx.DiGraph()
     G_connect.add_nodes_from(sorted(G_source.nodes(data=True)))
@@ -216,7 +239,8 @@ def connect_nodes_across_graphs(
 
     # add edges
     for target_node in target_nodes_list:
-        neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(target_node)
+        xy_target = G_target.nodes[target_node]["pos"]
+        neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(xy_target)
         for i in neigh_idxs:
             source_node = source_nodes_list[i]
             # add edge from source to target

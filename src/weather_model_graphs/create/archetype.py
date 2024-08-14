@@ -28,12 +28,12 @@ def create_keisler_graph(xy_grid):
         xy=xy_grid,
         m2m_connectivity="flat",
         m2m_connectivity_kwargs=dict(refinement_factor=3),
-        m2g_connectivity="within_radius",
-        g2m_connectivity="nearest_neighbours",
-        m2g_connectivity_kwargs=dict(
-            max_dist=0.67,
-        ),
+        g2m_connectivity="within_radius",
+        m2g_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
+            rel_max_dist=0.51,
+        ),
+        m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
     )
