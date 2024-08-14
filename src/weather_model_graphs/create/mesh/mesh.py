@@ -25,7 +25,7 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
     xy : np.ndarray [2, N, M]
         Grid point coordinates, with first dimension representing
         x and y coordinates respectively. N and M are the number
-        of grid points in the x and y direction respectively
+        of grid points in the y and x direction respectively
     nx : int
         Number of nodes in x direction
     ny : int
@@ -46,10 +46,14 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
     ly = np.linspace(ym + dy / 2, yM - dy / 2, ny)
 
     mg = np.meshgrid(lx, ly)
-    g = networkx.grid_2d_graph(len(ly), len(lx))
+    g = networkx.grid_2d_graph(len(lx), len(ly))
 
     for node in g.nodes:
-        g.nodes[node]["pos"] = np.array([mg[0][node], mg[1][node]])
+        node_xi, node_yi = node # Extract x and y index from node to index mx
+        g.nodes[node]["pos"] = np.array([
+            mg[0][node_yi, node_xi],
+            mg[1][node_yi, node_xi]
+        ])
         g.nodes[node]["type"] = "mesh"
 
     # add diagonal edges

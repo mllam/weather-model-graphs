@@ -27,9 +27,12 @@ def create_keisler_graph(xy_grid):
     return create_all_graph_components(
         xy=xy_grid,
         m2m_connectivity="flat",
-        m2m_connectivity_kwargs={},
-        m2g_connectivity="nearest_neighbour",
+        m2m_connectivity_kwargs=dict(refinement_factor=3),
+        m2g_connectivity="within_radius",
         g2m_connectivity="nearest_neighbours",
+        m2g_connectivity_kwargs=dict(
+            max_dist=0.67,
+        ),
         g2m_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
@@ -77,9 +80,9 @@ def create_graphcast_graph(xy_grid, refinement_factor=3, max_num_levels=None):
     )
 
 
-def create_oscarsson_hierarchical_graph(xy_grid):
+def create_oskarsson_hierarchical_graph(xy_grid):
     """
-    Create a graph following Oscarsson et al (2023, https://arxiv.org/abs/2309.17370)
+    Create a graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     hierarchical architecture.
 
     The mesh graph in this architecture is hierarchical in that each refinement of

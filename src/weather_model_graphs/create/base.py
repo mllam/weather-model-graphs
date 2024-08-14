@@ -43,9 +43,9 @@ def create_all_graph_components(
     The following methods are available for connecting nodes across graphs:
 
     g2m_connectivity:
-    - "nearest_neighbour": Find the nearest neighbour in `G_target` for each node in `G_source`
-    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in `G_target` for each node in `G_source`
-    - "within_radius": Find all neighbours in `G_target` within a distance of `max_dist` from each node in `G_source`
+    - "nearest_neighbour": Find the nearest neighbour in mesh for each node in grid
+    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in mesh for each node in grid
+    - "within_radius": Find all neighbours in mesh within a distance of `max_dist` from each node in grid
 
     m2m_connectivity:
     - "flat": Create a single-level 2D mesh graph, as in Keisler et al. (2022)
@@ -53,11 +53,9 @@ def create_all_graph_components(
     - "hierarchical": Create a hierarchical mesh graph with `refinement_factor` and `max_num_levels`, as in Oscarsson et al. (2023)
 
     m2g_connectivity:
-    - "nearest_neighbour": Find the nearest neighbour in `G_target` for each node in `G_source`
-    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in `G_target` for each node in `G_source`
-    - "within_radius": Find all neighbours in `G_target` within a distance of `max_dist` from each node in `G_source`
-
-
+    - "nearest_neighbour": Find the nearest neighbour in grid for each node in mesh
+    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in grid for each node in mesh
+    - "within_radius": Find all neighbours in grid within a distance of `max_dist` from each node in mesh
     """
     graph_components: dict[networkx.DiGraph] = {}
 
@@ -68,12 +66,12 @@ def create_all_graph_components(
         )
 
     if m2m_connectivity == "flat":
-        logger.warning(
-            "Using refinement factor 2 between grid and mesh nodes for flat mesh graph"
-        )
-        refinement_factor = 2
-        nx_g, ny_g = xy.shape[1:]
-        nx = ny = min(nx_g, ny_g) // int(refinement_factor)
+        # Compute number of mesh nodes in x and y dimensions
+        refinement_factor = m2m_connectivity_kwargs["refinement_factor"]
+        ny_g, nx_g = xy.shape[1:]
+        nx = int(nx_g / refinement_factor)
+        ny = int(ny_g / refinement_factor)
+
         graph_components["m2m"] = create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
     elif m2m_connectivity == "hierarchical":
         # hierarchical mesh graph have three sub-graphs:
