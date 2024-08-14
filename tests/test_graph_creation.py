@@ -31,7 +31,7 @@ def test_create_single_level_mesh_graph():
         fig.savefig(f.name)
 
 
-@pytest.mark.parametrize("kind", ["graphcast", "keisler", "oscarsson_hierarchical"])
+@pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
 def test_create_graph_archetype(kind):
     xy = _create_fake_xy(N=64)
     fn_name = f"create_{kind}_graph"
