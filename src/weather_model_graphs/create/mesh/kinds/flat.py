@@ -5,7 +5,7 @@ from ....networkx_utils import prepend_node_index
 from .. import mesh as mesh_graph
 
 
-def create_flat_multiscale_mesh_graph(xy, refinement_factor: int, max_num_levels: int):
+def create_flat_multiscale_mesh_graph(xy, max_num_levels: int):
     """
     Create flat mesh graph by merging the single-level mesh
     graphs across all levels in `G_all_levels`.
@@ -16,8 +16,6 @@ def create_flat_multiscale_mesh_graph(xy, refinement_factor: int, max_num_levels
         Grid point coordinates, with first dimension representing
         x and y coordinates respectively. N and M are the number
         of grid points in the x and y direction respectively
-    refinement_factor : int
-        Refinement factor for multi-scale graph-edges distance
     max_num_levels : int
         Maximum number of levels in the multi-scale graph
     Returns
@@ -29,6 +27,8 @@ def create_flat_multiscale_mesh_graph(xy, refinement_factor: int, max_num_levels
     all_mesh_nodes : networkx.NodeView
         All mesh nodes
     """
+    # 3 is the only refinement factor possible for multiscale graph
+    refinement_factor = 3
     G_all_levels: list[networkx.DiGraph] = mesh_graph.create_multirange_2d_mesh_graphs(
         max_num_levels=max_num_levels,
         xy=xy,

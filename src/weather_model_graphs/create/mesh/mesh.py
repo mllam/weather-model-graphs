@@ -103,6 +103,7 @@ def create_multirange_2d_mesh_graphs(max_num_levels, xy, refinement_factor=3):
         List of networkx graphs for each level representing the connectivity
         of the mesh within each level
     """
+    # max_coord/(refinement_factor^nlev) = 1
     nlev = int(np.log(max(xy.shape)) / np.log(refinement_factor))
     nleaf = refinement_factor**nlev  # leaves at the bottom = nleaf**2
 

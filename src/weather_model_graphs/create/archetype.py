@@ -39,7 +39,7 @@ def create_keisler_graph(xy_grid, refinement_factor=3):
     )
 
 
-def create_graphcast_graph(xy_grid, refinement_factor=3, max_num_levels=None):
+def create_graphcast_graph(xy_grid, max_num_levels=None):
     """
     Create a graph following the Lam et al (2023, https://arxiv.org/abs/2212.12794) GraphCast architecture.
 
@@ -70,7 +70,7 @@ def create_graphcast_graph(xy_grid, refinement_factor=3, max_num_levels=None):
         xy=xy_grid,
         m2m_connectivity="flat_multiscale",
         m2m_connectivity_kwargs=dict(
-            refinement_factor=refinement_factor, max_num_levels=max_num_levels
+            max_num_levels=max_num_levels
         ),
         g2m_connectivity="within_radius",
         m2g_connectivity="nearest_neighbour",
@@ -112,7 +112,7 @@ def create_oskarsson_hierarchical_graph(xy_grid):
     return create_all_graph_components(
         xy=xy_grid,
         m2m_connectivity="hierarchical",
-        m2m_connectivity_kwargs=dict(refinement_factor=2, max_num_levels=3),
+        m2m_connectivity_kwargs=dict(refinement_factor=3, max_num_levels=3),
         g2m_connectivity="within_radius",
         m2g_connectivity="nearest_neighbour",
         g2m_connectivity_kwargs=dict(
