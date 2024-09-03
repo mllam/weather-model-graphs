@@ -7,7 +7,7 @@ from .. import mesh as mesh_graph
 
 
 def create_hierarchical_multiscale_mesh_graph(
-    xy, refinement_factor: int, max_num_levels: int
+    xy, grid_refinement_factor: int, level_refinement_factor: int, max_num_levels: int
 ):
     """
     Create a hierarchical multiscale mesh graph with nearest neighbour
@@ -34,7 +34,8 @@ def create_hierarchical_multiscale_mesh_graph(
     Gs_all_levels: list[networkx.DiGraph] = mesh_graph.create_multirange_2d_mesh_graphs(
         max_num_levels=max_num_levels,
         xy=xy,
-        refinement_factor=refinement_factor,
+        grid_refinement_factor=grid_refinement_factor,
+        level_refinement_factor=level_refinement_factor,
     )
     n_mesh_levels = len(Gs_all_levels)
 

@@ -80,7 +80,7 @@ def create_graphcast_graph(xy_grid, max_num_levels=None):
     )
 
 
-def create_oskarsson_hierarchical_graph(xy_grid):
+def create_oskarsson_hierarchical_graph(xy_grid, grid_refinement_factor=3, level_refinement_factor=3):
     """
     Create a graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     hierarchical architecture.
@@ -112,7 +112,11 @@ def create_oskarsson_hierarchical_graph(xy_grid):
     return create_all_graph_components(
         xy=xy_grid,
         m2m_connectivity="hierarchical",
-        m2m_connectivity_kwargs=dict(refinement_factor=3, max_num_levels=3),
+        m2m_connectivity_kwargs=dict(
+            grid_refinement_factor=grid_refinement_factor,
+            level_refinement_factor=level_refinement_factor,
+            max_num_levels=None
+        ),
         g2m_connectivity="within_radius",
         m2g_connectivity="nearest_neighbour",
         g2m_connectivity_kwargs=dict(
