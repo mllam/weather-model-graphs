@@ -14,7 +14,8 @@ import numpy as np
 import scipy.spatial
 from loguru import logger
 
-from ..networkx_utils import replace_node_labels_with_unique_ids
+from ..networkx_utils import replace_node_labels_with_unique_ids, \
+    graph_has_levels, split_graph_by_edge_attribute
 from .grid import create_grid_graph_nodes
 from .mesh.kinds.flat import create_flat_multiscale_mesh_graph
 from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
@@ -67,6 +68,10 @@ def create_all_graph_components(
 
     if m2m_connectivity == "flat":
         # Compute number of mesh nodes in x and y dimensions
+        # Note that the ratio between grid and mesh nodes here is closer to the
+        # requested refinement factor, as for the flat graph we are not restrictedis
+        # to creating a "collapsable" graph with nodes at the same locations across
+        # levels.
         refinement_factor = m2m_connectivity_kwargs["refinement_factor"]
         ny_g, nx_g = xy.shape[1:]
         nx = int(nx_g / refinement_factor)
@@ -206,18 +211,28 @@ def connect_nodes_across_graphs(
         # Determine actual query length to use
         if max_dist is not None:
             if rel_max_dist is not None:
-                raise Exception("to use `witin_radius` method you shold only set one of `max_dist` or `rel_max_dist")
+                raise Exception("to use `witin_radius` method you should only set one of `max_dist` or `rel_max_dist")
             query_dist = max_dist
         elif rel_max_dist is not None:
             if max_dist is not None:
-                raise Exception("to use `witin_radius` method you shold only set one of `max_dist` or `rel_max_dist")
+                raise Exception("to use `witin_radius` method you should only set one of `max_dist` or `rel_max_dist")
             # Figure out longest edge in (lowest level) mesh graph
-            # TODO Handle for hierarchical graphs
+            # TODO Handle for hierarchical graphs (don't count up-down levels?)
             longest_edge = 0.
             for edge_check_graph in (G_source, G_target):
+                # Check if graph has edges
                 if len(edge_check_graph.edges) > 0:
+                    # Check if graph has levels (hierarchical or multi-scale edges)
+                    if graph_has_levels(edge_check_graph):
+                        # Only consider edges in level 1 graph
+                        first_level_graph = split_graph_by_edge_attribute(
+                                edge_check_graph, "level"
+                        )[1]
+                    else:
+                        # Consider edges in whole graph (whole graph is level 1)
+                        first_level_graph = edge_check_graph
                     longest_graph_edge = max(
-                        edge_check_graph.edges(data=True),
+                        first_level_graph.edges(data=True),
                         key=lambda x: x[2].get('len', 0)
                     )[2]["len"]
                     longest_edge = max(longest_edge, longest_graph_edge)

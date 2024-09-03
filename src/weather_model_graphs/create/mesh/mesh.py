@@ -118,9 +118,12 @@ def create_multirange_2d_mesh_graphs(max_num_levels, xy, refinement_factor=3):
     for lev in range(1, mesh_levels + 1):
         n = int(nleaf / (refinement_factor**lev))
         g = create_single_level_2d_mesh_graph(xy, n, n)
+        # Add level information to nodes, edges and full graph
         for node in g.nodes:
             g.nodes[node]["level"] = lev
-            g.graph["level"] = lev
+        for edge in g.edges:
+            g.edges[edge]["level"] = lev
+        g.graph["level"] = lev
         G_all_levels.append(g)
 
     return G_all_levels

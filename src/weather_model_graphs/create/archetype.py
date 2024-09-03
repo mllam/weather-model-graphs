@@ -1,7 +1,7 @@
 from .base import create_all_graph_components
 
 
-def create_keisler_graph(xy_grid):
+def create_keisler_graph(xy_grid, refinement_factor=3):
     """
     Create a graph following Keisler (2022, https://arxiv.org/abs/2202.07575) architecture.
 
@@ -27,7 +27,7 @@ def create_keisler_graph(xy_grid):
     return create_all_graph_components(
         xy=xy_grid,
         m2m_connectivity="flat",
-        m2m_connectivity_kwargs=dict(refinement_factor=3),
+        m2m_connectivity_kwargs=dict(refinement_factor=refinement_factor),
         g2m_connectivity="within_radius",
         m2g_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
@@ -72,10 +72,10 @@ def create_graphcast_graph(xy_grid, refinement_factor=3, max_num_levels=None):
         m2m_connectivity_kwargs=dict(
             refinement_factor=refinement_factor, max_num_levels=max_num_levels
         ),
+        g2m_connectivity="within_radius",
         m2g_connectivity="nearest_neighbour",
-        g2m_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
-            max_num_neighbours=4,
+            rel_max_dist=0.51,
         ),
     )
 
@@ -113,9 +113,9 @@ def create_oskarsson_hierarchical_graph(xy_grid):
         xy=xy_grid,
         m2m_connectivity="hierarchical",
         m2m_connectivity_kwargs=dict(refinement_factor=2, max_num_levels=3),
+        g2m_connectivity="within_radius",
         m2g_connectivity="nearest_neighbour",
-        g2m_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
-            max_num_neighbours=4,
+            rel_max_dist=0.51,
         ),
     )
