@@ -148,6 +148,23 @@ def replace_node_labels_with_unique_ids(graph):
 
 
 def split_on_edge_attribute_existance(graph, attr):
+    """
+    Split up graph based on if edges have specific attribute.
+
+    Parameters
+    ----------
+    graph : networkx.Graph
+        Graph to check for levels
+    attr : str
+        Attribute to split on existance of
+
+    Returns
+    -------
+    graph_with_attr : networkx.Graph
+        Subgraph with edges with attribute
+    graph_without_attr : networkx.Graph
+        Subgraph with edges without the attribute
+    """
     edges = list(graph.edges(data=True))
     edges_with_attr = [e[:2] for e in edges if attr in e[2]]
     edges_without_attr = [e[:2] for e in edges if attr not in e[2]]
@@ -156,22 +173,3 @@ def split_on_edge_attribute_existance(graph, attr):
     graph_without_attr = graph.edge_subgraph(edges_without_attr)
 
     return graph_with_attr, graph_without_attr
-
-def graph_has_levels(graph):
-    """
-    Check if networkx graph contains level information, and thus is a multiscale
-    or hierarchical graph.
-
-    Parameters
-    ----------
-    graph : networkx.Graph
-        Graph to check for levels
-
-    Returns
-    -------
-    bool
-        If the graph contains level information
-    """
-    # Check on first edge
-    return "level" in list(graph.edges(data=True))[0][2].keys()
-

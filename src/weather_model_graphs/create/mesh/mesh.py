@@ -115,8 +115,8 @@ def create_multirange_2d_mesh_graphs(max_num_levels, xy, refinement_factor=3):
 
     # multi resolution tree levels
     G_all_levels = []
-    for lev in range(1, mesh_levels + 1):
-        n = int(nleaf / (refinement_factor**lev))
+    for lev in range(mesh_levels): # 0-index mesh levels
+        n = int(nleaf / (refinement_factor**(lev + 1)))
         g = create_single_level_2d_mesh_graph(xy, n, n)
         # Add level information to nodes, edges and full graph
         for node in g.nodes:

@@ -13,9 +13,10 @@ import networkx
 import numpy as np
 import scipy.spatial
 from loguru import logger
+import networkx as nx
 
 from ..networkx_utils import replace_node_labels_with_unique_ids, \
-    graph_has_levels, split_graph_by_edge_attribute
+    split_graph_by_edge_attribute, split_on_edge_attribute_existance
 from .grid import create_grid_graph_nodes
 from .mesh.kinds.flat import create_flat_multiscale_mesh_graph
 from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
@@ -217,20 +218,23 @@ def connect_nodes_across_graphs(
             if max_dist is not None:
                 raise Exception("to use `witin_radius` method you should only set one of `max_dist` or `rel_max_dist")
             # Figure out longest edge in (lowest level) mesh graph
-            # TODO Handle for hierarchical graphs (don't count up-down levels?)
             longest_edge = 0.
             for edge_check_graph in (G_source, G_target):
                 # Check if graph has edges
                 if len(edge_check_graph.edges) > 0:
+                    level_subgraph, no_level_subgraph = split_on_edge_attribute_existance(
+                            edge_check_graph, "level"
+                    )
+
                     # Check if graph has levels (hierarchical or multi-scale edges)
-                    if graph_has_levels(edge_check_graph):
-                        # Only consider edges in level 1 graph
-                        first_level_graph = split_graph_by_edge_attribute(
-                                edge_check_graph, "level"
-                        )[1]
-                    else:
+                    if nx.is_empty(level_subgraph):
                         # Consider edges in whole graph (whole graph is level 1)
-                        first_level_graph = edge_check_graph
+                        first_level_graph = edge_check_graph # == no_level_subgraph
+                    else:
+                        # Has levels, only consider edges in level 1 graph
+                        first_level_graph = split_graph_by_edge_attribute(
+                                level_subgraph, "level"
+                        )[0]
                     longest_graph_edge = max(
                         first_level_graph.edges(data=True),
                         key=lambda x: x[2].get('len', 0)
