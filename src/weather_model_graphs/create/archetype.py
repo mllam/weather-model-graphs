@@ -78,9 +78,12 @@ def create_graphcast_graph(
             max_num_levels=max_num_levels,
         ),
         g2m_connectivity="within_radius",
-        m2g_connectivity="nearest_neighbour",
+        m2g_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
             rel_max_dist=0.51,
+        ),
+        m2g_connectivity_kwargs=dict(
+            max_num_neighbours=4,
         ),
     )
 
@@ -129,8 +132,11 @@ def create_oskarsson_hierarchical_graph(
             max_num_levels=max_num_levels,
         ),
         g2m_connectivity="within_radius",
-        m2g_connectivity="nearest_neighbour",
+        m2g_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
             rel_max_dist=0.51,
+        ),
+        m2g_connectivity_kwargs=dict(
+            max_num_neighbours=4,
         ),
     )
