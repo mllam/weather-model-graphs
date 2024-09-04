@@ -78,7 +78,13 @@ def split_graph_by_edge_attribute(graph, attr):
     subgraphs = {}
     for edge_value in edge_values:
         subgraphs[edge_value] = graph.copy().edge_subgraph(
-            [edge for edge in graph.edges if graph.edges[edge][attr] == edge_value]
+            # Subgraphs only contain edges that actually has attribute,
+            # and where it is correct value
+            [
+                edge
+                for edge in graph.edges
+                if attr in graph.edges[edge] and graph.edges[edge][attr] == edge_value
+            ]
         )
 
     # copy node attributes
