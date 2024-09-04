@@ -13,7 +13,6 @@ import networkx
 import networkx as nx
 import numpy as np
 import scipy.spatial
-from loguru import logger
 
 from ..networkx_utils import (
     replace_node_labels_with_unique_ids,
@@ -48,19 +47,26 @@ def create_all_graph_components(
     The following methods are available for connecting nodes across graphs:
 
     g2m_connectivity:
-    - "nearest_neighbour": Find the nearest neighbour in mesh for each node in grid
-    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in mesh for each node in grid
-    - "within_radius": Find all neighbours in mesh within a distance of `max_dist` from each node in grid
-
-    m2m_connectivity:
-    - "flat": Create a single-level 2D mesh graph, as in Keisler et al. (2022)
-    - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels` and `refinement_factor`, as in GraphCast, Lam et al. (2023)
-    - "hierarchical": Create a hierarchical mesh graph with `refinement_factor` and `max_num_levels`, as in Oscarsson et al. (2023)
-
-    m2g_connectivity:
     - "nearest_neighbour": Find the nearest neighbour in grid for each node in mesh
     - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in grid for each node in mesh
-    - "within_radius": Find all neighbours in grid within a distance of `max_dist` from each node in mesh
+    - "within_radius": Find all neighbours in grid within an absolute distance
+        of `max_dist` or relative distance of `rel_max_dist` from each node in mesh
+
+    m2m_connectivity:
+    - "flat": Create a single-level 2D mesh graph with `grid_refinement_factor`,
+        similar to Keisler et al. (2022)
+    - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels`,
+        `grid_refinement_factor` and `mesh_refinement_factor`,
+        similar to GraphCast, Lam et al. (2023)
+    - "hierarchical": Create a hierarchical mesh graph with `max_num_levels`,
+        `grid_refinement_factor` and `mesh_refinement_factor`,
+        similar to Okcarsson et al. (2023)
+
+    m2g_connectivity:
+    - "nearest_neighbour": Find the nearest neighbour in mesh for each node in grid
+    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in mesh for each node in grid
+    - "within_radius": Find all neighbours in mesh within an absolute distance
+        of `max_dist` or relative distance of `rel_max_dist` from each node in grid
     """
     graph_components: dict[networkx.DiGraph] = {}
 
@@ -76,7 +82,7 @@ def create_all_graph_components(
         # requested refinement factor, as for the flat graph we are not restrictedis
         # to creating a "collapsable" graph with nodes at the same locations across
         # levels.
-        refinement_factor = m2m_connectivity_kwargs["refinement_factor"]
+        refinement_factor = m2m_connectivity_kwargs["grid_refinement_factor"]
         ny_g, nx_g = xy.shape[1:]
         nx = int(nx_g / refinement_factor)
         ny = int(ny_g / refinement_factor)
