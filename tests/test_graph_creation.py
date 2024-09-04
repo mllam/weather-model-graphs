@@ -44,7 +44,12 @@ def test_create_graph_archetype(kind):
 G2M_M2G_CONNECTIVITY_OPTIONS = dict(
     nearest_neighbour=[],
     nearest_neighbours=[dict(max_num_neighbours=4), dict(max_num_neighbours=8)],
-    within_radius=[dict(max_dist=0.1), dict(max_dist=0.2)],
+    within_radius=[
+        dict(max_dist=0.1),
+        dict(max_dist=0.2),
+        dict(rel_max_dist=0.51),
+        dict(rel_max_dist=1.0),
+    ],
 )
 
 # list the connectivity options for m2m and the kwargs to test
