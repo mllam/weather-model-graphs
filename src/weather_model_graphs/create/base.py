@@ -199,9 +199,13 @@ def connect_nodes_across_graphs(
     # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in
     # loop later
     if method == "nearest_neighbour":
-        if max_dist is not None or max_num_neighbours is not None:
+        if (
+            max_dist is not None
+            or rel_max_dist is not None
+            or max_num_neighbours is not None
+        ):
             raise Exception(
-                "to use `nearest_neighbour` you should not set `max_dist` or `max_num_neighbours`"
+                "to use `nearest_neighbour` you should not set `max_dist`, `rel_max_dist`or `max_num_neighbours`"
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
@@ -213,8 +217,10 @@ def connect_nodes_across_graphs(
             raise Exception(
                 "to use `nearest_neighbours` you should set the max number with `max_num_neighbours`"
             )
-        if max_dist is not None:
-            raise Exception("to use `nearest_neighbours` you should not set `max_dist`")
+        if max_dist is not None or rel_max_dist is not None:
+            raise Exception(
+                "to use `nearest_neighbours` you should not set `max_dist` or `rel_max_dist`"
+            )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
             neigh_idxs = kdt_s.query(xy_target, max_num_neighbours)[1]

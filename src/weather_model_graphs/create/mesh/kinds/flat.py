@@ -34,6 +34,7 @@ def create_flat_multiscale_mesh_graph(
     all_mesh_nodes : networkx.NodeView
         All mesh nodes
     """
+    # Check that level_refinement_factor is an odd integer
     if (
         int(level_refinement_factor) != level_refinement_factor
         or level_refinement_factor % 2 != 1
