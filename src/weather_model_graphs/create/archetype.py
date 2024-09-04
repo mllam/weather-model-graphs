@@ -39,7 +39,9 @@ def create_keisler_graph(xy_grid, refinement_factor=3):
     )
 
 
-def create_graphcast_graph(xy_grid, max_num_levels=None):
+def create_graphcast_graph(
+    xy_grid, grid_refinement_factor=3, level_refinement_factor=3, max_num_levels=None
+):
     """
     Create a graph following the Lam et al (2023, https://arxiv.org/abs/2212.12794) GraphCast architecture.
 
@@ -54,10 +56,11 @@ def create_graphcast_graph(xy_grid, max_num_levels=None):
     ----------
     xy_grid: np.ndarray
         2D array of grid point positions.
-    refinement_factor: int
-        Refinement factor for longer-range connections in the mesh graph, the
-        reduction factor in the number of mesh points between levels (in both
-        x and y directions).
+    grid_refinement_factor: float
+        Refinement factor between grid points and bottom level of mesh hierarchy
+    level_refinement_factor: int
+        Refinement factor between grid points and bottom level of mesh hierarchy
+        NOTE: Must be an odd integer >1 to create proper multiscale graph
     max_num_levels: int
         The number of levels of longer-range connections in the mesh graph.
 
@@ -70,7 +73,9 @@ def create_graphcast_graph(xy_grid, max_num_levels=None):
         xy=xy_grid,
         m2m_connectivity="flat_multiscale",
         m2m_connectivity_kwargs=dict(
-            max_num_levels=max_num_levels
+            grid_refinement_factor=grid_refinement_factor,
+            level_refinement_factor=level_refinement_factor,
+            max_num_levels=max_num_levels,
         ),
         g2m_connectivity="within_radius",
         m2g_connectivity="nearest_neighbour",
@@ -80,7 +85,9 @@ def create_graphcast_graph(xy_grid, max_num_levels=None):
     )
 
 
-def create_oskarsson_hierarchical_graph(xy_grid, grid_refinement_factor=3, level_refinement_factor=3):
+def create_oskarsson_hierarchical_graph(
+    xy_grid, grid_refinement_factor=3, level_refinement_factor=3, max_num_levels=None
+):
     """
     Create a graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     hierarchical architecture.
@@ -103,6 +110,10 @@ def create_oskarsson_hierarchical_graph(xy_grid, grid_refinement_factor=3, level
     ----------
     xy_grid: np.ndarray
         2D array of grid point positions.
+    grid_refinement_factor: float
+        Refinement factor between grid points and bottom level of mesh hierarchy
+    level_refinement_factor: float
+        Refinement factor between grid points and bottom level of mesh hierarchy
 
     Returns
     -------
@@ -115,7 +126,7 @@ def create_oskarsson_hierarchical_graph(xy_grid, grid_refinement_factor=3, level
         m2m_connectivity_kwargs=dict(
             grid_refinement_factor=grid_refinement_factor,
             level_refinement_factor=level_refinement_factor,
-            max_num_levels=None
+            max_num_levels=max_num_levels,
         ),
         g2m_connectivity="within_radius",
         m2g_connectivity="nearest_neighbour",

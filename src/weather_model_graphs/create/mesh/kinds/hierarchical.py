@@ -7,7 +7,10 @@ from .. import mesh as mesh_graph
 
 
 def create_hierarchical_multiscale_mesh_graph(
-    xy, grid_refinement_factor: int, level_refinement_factor: int, max_num_levels: int
+    xy,
+    grid_refinement_factor: float,
+    level_refinement_factor: float,
+    max_num_levels: int,
 ):
     """
     Create a hierarchical multiscale mesh graph with nearest neighbour
@@ -42,7 +45,7 @@ def create_hierarchical_multiscale_mesh_graph(
     if n_mesh_levels < 2:
         raise ValueError(
             "At least two mesh levels are required for hierarchical mesh graph. "
-            f"You may need to reduce the refinement factor ({refinement_factor}) "
+            f"You may need to reduce the refinement factors"
             f"or increase the max number of levels {max_num_levels} "
             f"or number of grid points {xy.shape[1:]}."
         )
