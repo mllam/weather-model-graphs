@@ -51,12 +51,12 @@ G2M_M2G_CONNECTIVITY_OPTIONS = dict(
 M2M_CONNECTIVITY_OPTIONS = dict(
     flat=[],
     flat_multiscale=[
-        dict(max_num_levels=3, refinement_factor=3),
-        dict(max_num_levels=1, refinement_factor=5),
+        dict(max_num_levels=3, grid_refinement_factor=3, level_refinement_factor=3),
+        dict(max_num_levels=1, grid_refinement_factor=5, level_refinement_factor=5),
     ],
     hierarchical=[
-        dict(max_num_levels=3, refinement_factor=3),
-        dict(max_num_levels=None, refinement_factor=3),
+        dict(max_num_levels=3, grid_refinement_factor=3, level_refinement_factor=3),
+        dict(max_num_levels=None, grid_refinement_factor=3, level_refinement_factor=3),
     ],
 )
 
