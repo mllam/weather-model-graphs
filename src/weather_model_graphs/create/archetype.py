@@ -7,10 +7,14 @@ def create_keisler_graph(xy_grid, grid_refinement_factor=3):
     This graph setup is inspired by the global graph used by Keisler (2022, https://arxiv.org/abs/2202.07575).
 
     This graph is a flat single scale graph with nearest neighbour connectivity
-    (8 neighbours) within the mesh. The grid to mesh connectivity connects each mesh node to
-    grid nodes withing distance 0.51d, where d is the length of diagonal edges
-    between neighbouring mesh nodes. The mesh to grid connectivity connects each grid point to the
-    4 nearest mesh nodes.
+    (8 neighbours) within the mesh.
+
+    The grid to mesh connectivity connects each mesh node to grid nodes withing
+    distance 0.51d, where d is the length of diagonal edges between neighbouring
+    mesh nodes. The choice of 0.51 makes sure that all grid node positions will
+    be connected to at least one mesh node (see
+    https://www.desmos.com/calculator/sqqz0ka4ho for a visualization).
+    The mesh to grid connectivity connects each grid point to the 4 nearest mesh nodes.
 
     Parameters
     ----------
@@ -47,10 +51,13 @@ def create_graphcast_graph(
     This graph setup is inspired by the global GraphCast graph used by Lam et al (2023, https://arxiv.org/abs/2212.12794)
 
     This graph is a flat multiscale graph with neighbour connectivity and longer multi-scale edges.
-    The grid to mesh connectivity connects each mesh node to
-    grid nodes withing distance 0.51d, where d is the length of diagonal edges
-    between neighbouring mesh nodes. The mesh to grid connectivity connects each grid point to the
-    4 nearest mesh nodes.
+
+    The grid to mesh connectivity connects each mesh node to grid nodes withing
+    distance 0.51d, where d is the length of diagonal edges between neighbouring
+    mesh nodes. The choice of 0.51 makes sure that all grid node positions will
+    be connected to at least one mesh node (see
+    https://www.desmos.com/calculator/sqqz0ka4ho for a visualization).
+    The mesh to grid connectivity connects each grid point to the 4 nearest mesh nodes.
 
     Parameters
     ----------
@@ -103,10 +110,12 @@ def create_oskarsson_hierarchical_graph(
     "down", or "same"). In addition, the `levels` attribute indicates which two levels
     are connected for cross-level edges (e.g. "1>2" for edges between level 1 and 2).
 
-    The grid to mesh connectivity connects each mesh node to
-    grid nodes withing distance 0.51d, where d is the length of diagonal edges
-    between neighbouring mesh nodes. The mesh to grid connectivity connects each grid point to the
-    4 nearest mesh nodes.
+    The grid to mesh connectivity connects each mesh node to grid nodes withing
+    distance 0.51d, where d is the length of diagonal edges between neighbouring
+    mesh nodes. The choice of 0.51 makes sure that all grid node positions will
+    be connected to at least one mesh node (see
+    https://www.desmos.com/calculator/sqqz0ka4ho for a visualization).
+    The mesh to grid connectivity connects each grid point to the 4 nearest mesh nodes.
 
     Parameters
     ----------
