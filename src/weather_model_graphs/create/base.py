@@ -79,7 +79,7 @@ def create_all_graph_components(
     if m2m_connectivity == "flat":
         # Compute number of mesh nodes in x and y dimensions
         # Note that the ratio between grid and mesh nodes here is closer to the
-        # requested refinement factor, as for the flat graph we are not restrictedis
+        # requested refinement factor, as for the flat graph we are not restricted
         # to creating a "collapsable" graph with nodes at the same locations across
         # levels.
         refinement_factor = m2m_connectivity_kwargs["grid_refinement_factor"]

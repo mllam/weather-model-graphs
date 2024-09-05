@@ -46,7 +46,7 @@ def create_graphcast_graph(
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     This graph setup is inspired by the global GraphCast graph used by Lam et al (2023, https://arxiv.org/abs/2212.12794)
 
-    This graph is a flat multiscale graph with neighbour connectivity and longer multis-scale edges.
+    This graph is a flat multiscale graph with neighbour connectivity and longer multi-scale edges.
     The grid to mesh connectivity connects each mesh node to
     grid nodes withing distance 0.51d, where d is the length of diagonal edges
     between neighbouring mesh nodes. The mesh to grid connectivity connects each grid point to the
@@ -100,7 +100,7 @@ def create_oskarsson_hierarchical_graph(
     connections the mesh graph contains nearest neighbour connections between
     levels (up and down). To distinguish between these these three types of
     edge connections each edge has a `direction` attribute (with value "up",
-    "down", or "same"). In addition the `levels` attribute indicates which two levels
+    "down", or "same"). In addition, the `levels` attribute indicates which two levels
     are connected for cross-level edges (e.g. "1>2" for edges between level 1 and 2).
 
     The grid to mesh connectivity connects each mesh node to
