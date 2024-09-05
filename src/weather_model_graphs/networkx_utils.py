@@ -162,7 +162,8 @@ def split_on_edge_attribute_existance(graph, attr):
     graph : networkx.Graph
         Graph to check for levels
     attr : str
-        Attribute to split on existance of
+        Attribute to consider, split the graph depending on if this attribute
+        exists or not
 
     Returns
     -------
