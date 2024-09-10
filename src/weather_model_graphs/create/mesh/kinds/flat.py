@@ -57,15 +57,17 @@ def create_flat_multiscale_mesh_graph(
     level_offset = level_refinement_factor // 2
     for lev in range(1, len(G_all_levels)):
         nodes = list(G_all_levels[lev - 1].nodes)
-        n = int(np.sqrt(len(nodes)))
+        # Last nodes always has pos (nx-1, ny-1)
+        num_nodes_x = nodes[-1][0] + 1
+        num_nodes_y = nodes[-1][1] + 1
         ij = (
             np.array(nodes)
-            .reshape((n, n, 2))[
+            .reshape((num_nodes_x, num_nodes_y, 2))[
                 level_offset::level_refinement_factor,
                 level_offset::level_refinement_factor,
                 :,
             ]
-            .reshape(int(n / level_refinement_factor) ** 2, 2)
+            .reshape(int(num_nodes_x * num_nodes_y / (level_refinement_factor**2)), 2)
         )
         ij = [tuple(x) for x in ij]
         G_all_levels[lev] = networkx.relabel_nodes(
