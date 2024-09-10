@@ -14,10 +14,10 @@ def create_flat_multiscale_mesh_graph(
 
     Parameters
     ----------
-    xy : np.ndarray [2, N, M]
+    xy : np.ndarray [2, M, N]
         Grid point coordinates, with first dimension representing
-        x and y coordinates respectively. N and M are the number
-        of grid points in the x and y direction respectively
+        x and y coordinates respectively. M and N are the number
+        of grid points in the y and x direction respectively
     grid_refinement_factor: float
         Refinement factor between grid points and bottom level of mesh hierarchy
     level_refinement_factor: int
