@@ -94,10 +94,11 @@ def create_multirange_2d_mesh_graphs(
     max_num_levels : int
         Number of edge-distance levels in mesh graph
     xy : np.ndarray
-        Grid point coordinates
+        Grid point coordinates, shaped [2, M, N]
     refinement_factor : int
         Degree of refinement between successive mesh graphs, the number of nodes
-        grows by refinement_factor**2 between successive mesh graphs
+        grows by approximately refinement_factor**2 between successive
+        mesh graphs.
 
     Returns
     -------
@@ -105,12 +106,13 @@ def create_multirange_2d_mesh_graphs(
         List of networkx graphs for each level representing the connectivity
         of the mesh within each level
     """
-    # max_coord/(grid_refinement_factor*level_refinement_factor^mesh_levels) = 1
-    # Compute the size along y and x direction of area to cover with graph
-    coord_extent = np.max(xy, axis=(1, 2)) - np.min(xy, axis=(1, 2))  # (2,)
+    # Compute the size (grid nodes) along x and y direction of area
+    # to cover with graph
+    coord_extent = np.array((xy.shape[2], xy.shape[1]))
 
     # Find the number of mesh levels possible in x- and y-direction,
     # and the number of leaf nodes that would correspond to
+    # max_coord/(grid_refinement_factor*level_refinement_factor^mesh_levels) = 1
     max_mesh_levels = (
         (np.log(coord_extent) - np.log(grid_refinement_factor))
         / np.log(level_refinement_factor)
