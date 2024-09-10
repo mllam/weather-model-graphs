@@ -22,9 +22,9 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
 
     Parameters
     ----------
-    xy : np.ndarray [2, N, M]
+    xy : np.ndarray [2, M, N]
         Grid point coordinates, with first dimension representing
-        x and y coordinates respectively. N and M are the number
+        x and y coordinates respectively. M and N are the number
         of grid points in the y and x direction respectively
     nx : int
         Number of nodes in x direction
@@ -48,6 +48,7 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
     mg = np.meshgrid(lx, ly)
     g = networkx.grid_2d_graph(len(lx), len(ly))
 
+    # Node name and `pos` attribute takes form (x, y)
     for node in g.nodes:
         node_xi, node_yi = node  # Extract x and y index from node to index mx
         g.nodes[node]["pos"] = np.array(
