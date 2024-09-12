@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.1.0...HEAD)
 
 ### Added
+
+- added github pull-request template to ease contribution and review process
+  [\#18](https://github.com/mllam/weather-model-graphs/pull/18), @joeloskarsson
+
 - Allow for specifying relative distance as `rel_max_dist` when connecting nodes using `within_radius` method.
   [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
   @joeloskarsson
