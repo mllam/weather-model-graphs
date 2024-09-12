@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.1.0...HEAD)
+
+### Added
+- Allow for specifying relative distance as `rel_max_dist` when connecting nodes using `within_radius` method.
+  [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
+  @joeloskarsson
+
+### Changed
+
+- Changed the `refinement_factor` argument into two: a `grid_refinement_factor` and a `level_refinement_factor`.
+  [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
+  @joeloskarsson
+
+- Connect grid nodes only to the bottom level of hierarchical mesh graphs.
+  [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
+  @joeloskarsson
+
+- Change default archetypes to match the graph creation from neural-lam.
+  [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
+  @joeloskarsson
+
 ## [v0.1.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.1.0)
 
 First tagged release of `weather-model-graphs` which includes functionality to
