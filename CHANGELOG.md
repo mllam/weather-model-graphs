@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Create different number of mesh nodes in x- and y-direction.
+  [\#21](https://github.com/mllam/weather-model-graphs/pull/21)
+  @joeloskarsson
+
 - Changed the `refinement_factor` argument into two: a `grid_refinement_factor` and a `level_refinement_factor`.
   [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
   @joeloskarsson
