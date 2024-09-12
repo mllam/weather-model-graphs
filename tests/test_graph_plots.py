@@ -23,7 +23,8 @@ def test_plot():
         xy=xy,
         m2m_connectivity_kwargs=dict(
             max_num_levels=3,
-            refinement_factor=2,
+            grid_refinement_factor=2,
+            level_refinement_factor=3,
         ),
         g2m_connectivity="nearest_neighbour",
         m2g_connectivity="nearest_neighbour",

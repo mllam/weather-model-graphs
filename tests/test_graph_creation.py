@@ -31,7 +31,7 @@ def test_create_single_level_mesh_graph():
         fig.savefig(f.name)
 
 
-@pytest.mark.parametrize("kind", ["graphcast", "keisler", "oscarsson_hierarchical"])
+@pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
 def test_create_graph_archetype(kind):
     xy = _create_fake_xy(N=64)
     fn_name = f"create_{kind}_graph"
@@ -44,19 +44,24 @@ def test_create_graph_archetype(kind):
 G2M_M2G_CONNECTIVITY_OPTIONS = dict(
     nearest_neighbour=[],
     nearest_neighbours=[dict(max_num_neighbours=4), dict(max_num_neighbours=8)],
-    within_radius=[dict(max_dist=0.1), dict(max_dist=0.2)],
+    within_radius=[
+        dict(max_dist=0.1),
+        dict(max_dist=0.2),
+        dict(rel_max_dist=0.51),
+        dict(rel_max_dist=1.0),
+    ],
 )
 
 # list the connectivity options for m2m and the kwargs to test
 M2M_CONNECTIVITY_OPTIONS = dict(
     flat=[],
     flat_multiscale=[
-        dict(max_num_levels=3, refinement_factor=3),
-        dict(max_num_levels=1, refinement_factor=5),
+        dict(max_num_levels=3, grid_refinement_factor=3, level_refinement_factor=3),
+        dict(max_num_levels=1, grid_refinement_factor=5, level_refinement_factor=5),
     ],
     hierarchical=[
-        dict(max_num_levels=3, refinement_factor=3),
-        dict(max_num_levels=None, refinement_factor=3),
+        dict(max_num_levels=3, grid_refinement_factor=3, level_refinement_factor=3),
+        dict(max_num_levels=None, grid_refinement_factor=3, level_refinement_factor=3),
     ],
 )
 

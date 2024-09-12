@@ -78,7 +78,13 @@ def split_graph_by_edge_attribute(graph, attr):
     subgraphs = {}
     for edge_value in edge_values:
         subgraphs[edge_value] = graph.copy().edge_subgraph(
-            [edge for edge in graph.edges if graph.edges[edge][attr] == edge_value]
+            # Subgraphs only contain edges that actually has attribute,
+            # and where it is correct value
+            [
+                edge
+                for edge in graph.edges
+                if attr in graph.edges[edge] and graph.edges[edge][attr] == edge_value
+            ]
         )
 
     # copy node attributes
@@ -148,11 +154,27 @@ def replace_node_labels_with_unique_ids(graph):
 
 
 def split_on_edge_attribute_existance(graph, attr):
+    """
+    Split up graph based on if edges have specific attribute.
+
+    Parameters
+    ----------
+    graph : networkx.Graph
+        Graph to check for levels
+    attr : str
+        Attribute to consider, split the graph depending on if this attribute
+        exists or not
+
+    Returns
+    -------
+    graph_with_attr : networkx.Graph
+        Subgraph with edges with attribute
+    graph_without_attr : networkx.Graph
+        Subgraph with edges without the attribute
+    """
     edges = list(graph.edges(data=True))
     edges_with_attr = [e[:2] for e in edges if attr in e[2]]
     edges_without_attr = [e[:2] for e in edges if attr not in e[2]]
-
-    print(edges_without_attr)
 
     graph_with_attr = graph.edge_subgraph(edges_with_attr)
     graph_without_attr = graph.edge_subgraph(edges_without_attr)

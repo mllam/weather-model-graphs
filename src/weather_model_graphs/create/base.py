@@ -10,11 +10,15 @@ function uses `connect_nodes_across_graphs` to connect nodes across the componen
 
 
 import networkx
+import networkx as nx
 import numpy as np
 import scipy.spatial
-from loguru import logger
 
-from ..networkx_utils import replace_node_labels_with_unique_ids
+from ..networkx_utils import (
+    replace_node_labels_with_unique_ids,
+    split_graph_by_edge_attribute,
+    split_on_edge_attribute_existance,
+)
 from .grid import create_grid_graph_nodes
 from .mesh.kinds.flat import create_flat_multiscale_mesh_graph
 from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
@@ -43,21 +47,26 @@ def create_all_graph_components(
     The following methods are available for connecting nodes across graphs:
 
     g2m_connectivity:
-    - "nearest_neighbour": Find the nearest neighbour in `G_target` for each node in `G_source`
-    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in `G_target` for each node in `G_source`
-    - "within_radius": Find all neighbours in `G_target` within a distance of `max_dist` from each node in `G_source`
+    - "nearest_neighbour": Find the nearest neighbour in grid for each node in mesh
+    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in grid for each node in mesh
+    - "within_radius": Find all neighbours in grid within an absolute distance
+        of `max_dist` or relative distance of `rel_max_dist` from each node in mesh
 
     m2m_connectivity:
-    - "flat": Create a single-level 2D mesh graph, as in Keisler et al. (2022)
-    - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels` and `refinement_factor`, as in GraphCast, Lam et al. (2023)
-    - "hierarchical": Create a hierarchical mesh graph with `refinement_factor` and `max_num_levels`, as in Oscarsson et al. (2023)
+    - "flat": Create a single-level 2D mesh graph with `grid_refinement_factor`,
+        similar to Keisler et al. (2022)
+    - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels`,
+        `grid_refinement_factor` and `mesh_refinement_factor`,
+        similar to GraphCast, Lam et al. (2023)
+    - "hierarchical": Create a hierarchical mesh graph with `max_num_levels`,
+        `grid_refinement_factor` and `mesh_refinement_factor`,
+        similar to Okcarsson et al. (2023)
 
     m2g_connectivity:
-    - "nearest_neighbour": Find the nearest neighbour in `G_target` for each node in `G_source`
-    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in `G_target` for each node in `G_source`
-    - "within_radius": Find all neighbours in `G_target` within a distance of `max_dist` from each node in `G_source`
-
-
+    - "nearest_neighbour": Find the nearest neighbour in mesh for each node in grid
+    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in mesh for each node in grid
+    - "within_radius": Find all neighbours in mesh within an absolute distance
+        of `max_dist` or relative distance of `rel_max_dist` from each node in grid
     """
     graph_components: dict[networkx.DiGraph] = {}
 
@@ -68,13 +77,18 @@ def create_all_graph_components(
         )
 
     if m2m_connectivity == "flat":
-        logger.warning(
-            "Using refinement factor 2 between grid and mesh nodes for flat mesh graph"
-        )
-        refinement_factor = 2
-        nx_g, ny_g = xy.shape[1:]
-        nx = ny = min(nx_g, ny_g) // int(refinement_factor)
+        # Compute number of mesh nodes in x and y dimensions
+        # Note that the ratio between grid and mesh nodes here is closer to the
+        # requested refinement factor, as for the flat graph we are not restricted
+        # to creating a "collapsable" graph with nodes at the same locations across
+        # levels.
+        refinement_factor = m2m_connectivity_kwargs["grid_refinement_factor"]
+        ny_g, nx_g = xy.shape[1:]
+        nx = int(nx_g / refinement_factor)
+        ny = int(ny_g / refinement_factor)
+
         graph_components["m2m"] = create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
+        grid_connect_graph = graph_components["m2m"]
     elif m2m_connectivity == "hierarchical":
         # hierarchical mesh graph have three sub-graphs:
         # `m2m` (mesh-to-mesh), `mesh_up` (up edge connections) and `mesh_down` (down edge connections)
@@ -82,11 +96,16 @@ def create_all_graph_components(
             xy=xy,
             **m2m_connectivity_kwargs,
         )
+        # Only connect grid to bottom level of hierarchy
+        grid_connect_graph = split_graph_by_edge_attribute(
+            graph_components["m2m"], "level"
+        )[0]
     elif m2m_connectivity == "flat_multiscale":
         graph_components["m2m"] = create_flat_multiscale_mesh_graph(
             xy=xy,
             **m2m_connectivity_kwargs,
         )
+        grid_connect_graph = graph_components["m2m"]
     else:
         raise NotImplementedError(f"Kind {m2m_connectivity} not implemented")
 
@@ -94,15 +113,14 @@ def create_all_graph_components(
 
     G_g2m = connect_nodes_across_graphs(
         G_source=G_grid,
-        G_target=graph_components["m2m"],
+        G_target=grid_connect_graph,
         method=g2m_connectivity,
         **g2m_connectivity_kwargs,
     )
     graph_components["g2m"] = G_g2m
 
-    # TODO: for the hierarchical mesh graph, we might want to only connect to the bottom layer here
     G_m2g = connect_nodes_across_graphs(
-        G_source=graph_components["m2m"],
+        G_source=grid_connect_graph,
         G_target=G_grid,
         method=m2g_connectivity,
         **m2g_connectivity_kwargs,
@@ -135,6 +153,7 @@ def connect_nodes_across_graphs(
     G_target,
     method="nearest_neighbour",
     max_dist=None,
+    rel_max_dist=None,
     max_num_neighbours=None,
 ):
     """
@@ -176,38 +195,90 @@ def connect_nodes_across_graphs(
     xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
     kdt_s = scipy.spatial.KDTree(xy_source)
 
-    def _find_neighbour_node_idxs_in_source_mesh(from_node):
-        xy_target = G_target.nodes[from_node]["pos"]
+    # Determine method and perform checks once
+    # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in
+    # loop later
+    if method == "nearest_neighbour":
+        if (
+            max_dist is not None
+            or rel_max_dist is not None
+            or max_num_neighbours is not None
+        ):
+            raise Exception(
+                "to use `nearest_neighbour` you should not set `max_dist`, `rel_max_dist`or `max_num_neighbours`"
+            )
 
-        if method == "nearest_neighbour":
+        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
             neigh_idx = kdt_s.query(xy_target, 1)[1]
-            if max_dist is not None or max_num_neighbours is not None:
-                raise Exception(
-                    "to use `nearest_neighbour` you should not set `max_dist` or `max_num_neighbours`"
-                )
             return [neigh_idx]
-        elif method == "nearest_neighbours":
-            if max_num_neighbours is None:
-                raise Exception(
-                    "to use `nearest_neighbours` you should set the max number with `max_num_neighbours`"
-                )
-            if max_dist is not None:
-                raise Exception(
-                    "to use `nearest_neighbours` you should not set `max_dist`"
-                )
+
+    elif method == "nearest_neighbours":
+        if max_num_neighbours is None:
+            raise Exception(
+                "to use `nearest_neighbours` you should set the max number with `max_num_neighbours`"
+            )
+        if max_dist is not None or rel_max_dist is not None:
+            raise Exception(
+                "to use `nearest_neighbours` you should not set `max_dist` or `rel_max_dist`"
+            )
+
+        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
             neigh_idxs = kdt_s.query(xy_target, max_num_neighbours)[1]
             return neigh_idxs
-        elif method == "within_radius":
-            if max_dist is None:
-                raise Exception("to use `witin_radius` method you shold set `max_dist`")
-            if max_num_neighbours is not None:
+
+    elif method == "within_radius":
+        if max_num_neighbours is not None:
+            raise Exception(
+                "to use `within_radius` method you should not set `max_num_neighbours`"
+            )
+        # Determine actual query length to use
+        if max_dist is not None:
+            if rel_max_dist is not None:
                 raise Exception(
-                    "to use `within_radius` method you should not set `max_num_neighbours`"
+                    "to use `witin_radius` method you should only set one of `max_dist` or `rel_max_dist"
                 )
-            neigh_idxs = kdt_s.query_ball_point(xy_target, max_dist)
-            return neigh_idxs
+            query_dist = max_dist
+        elif rel_max_dist is not None:
+            if max_dist is not None:
+                raise Exception(
+                    "to use `witin_radius` method you should only set one of `max_dist` or `rel_max_dist"
+                )
+            # Figure out longest edge in (lowest level) mesh graph
+            longest_edge = 0.0
+            for edge_check_graph in (G_source, G_target):
+                # Check if graph has edges
+                if len(edge_check_graph.edges) > 0:
+                    (
+                        level_subgraph,
+                        no_level_subgraph,
+                    ) = split_on_edge_attribute_existance(edge_check_graph, "level")
+
+                    # Check if graph has levels (hierarchical or multi-scale edges)
+                    if nx.is_empty(level_subgraph):
+                        # Consider edges in whole graph (whole graph is level 1)
+                        first_level_graph = edge_check_graph  # == no_level_subgraph
+                    else:
+                        # Has levels, only consider edges in level 1 graph
+                        first_level_graph = split_graph_by_edge_attribute(
+                            level_subgraph, "level"
+                        )[0]
+                    longest_graph_edge = max(
+                        first_level_graph.edges(data=True),
+                        key=lambda x: x[2].get("len", 0),
+                    )[2]["len"]
+                    longest_edge = max(longest_edge, longest_graph_edge)
+            query_dist = longest_edge * rel_max_dist
         else:
-            raise NotImplementedError(method)
+            raise Exception(
+                "to use `witin_radius` method you shold set `max_dist` or `rel_max_dist"
+            )
+
+        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
+            neigh_idxs = kdt_s.query_ball_point(xy_target, query_dist)
+            return neigh_idxs
+
+    else:
+        raise NotImplementedError(method)
 
     G_connect = networkx.DiGraph()
     G_connect.add_nodes_from(sorted(G_source.nodes(data=True)))
@@ -218,7 +289,8 @@ def connect_nodes_across_graphs(
 
     # add edges
     for target_node in target_nodes_list:
-        neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(target_node)
+        xy_target = G_target.nodes[target_node]["pos"]
+        neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(xy_target)
         for i in neigh_idxs:
             source_node = source_nodes_list[i]
             # add edge from source to target
