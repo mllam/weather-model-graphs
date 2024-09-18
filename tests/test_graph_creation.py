@@ -16,6 +16,14 @@ def _create_fake_xy(N=10):
     return xy
 
 
+def _create_rectangular_fake_xy(Nx=10, Ny=20):
+    x = np.linspace(0, 1, Nx)
+    y = np.linspace(0, 1, Ny)
+    xy = np.meshgrid(x, y)
+    xy = np.stack(xy, axis=0)
+    return xy
+
+
 def test_create_single_level_mesh_graph():
     xy = _create_fake_xy(N=4)
     mesh_graph = wmg.create.mesh.create_single_level_2d_mesh_graph(xy=xy, nx=5, ny=5)
@@ -94,3 +102,21 @@ def test_create_graph_generic(m2g_connectivity, g2m_connectivity, m2m_connectivi
                     isinstance(graph, nx.DiGraph) for graph in graph_components.values()
                 )
                 assert set(graph_components.keys()) == {"m2m", "m2g", "g2m"}
+
+
+@pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
+def test_create_rectangular_graph(kind):
+    """
+    Tests that graphs can be created for non-square areas, both thin and wide
+    """
+    # Test thin
+    xy = _create_rectangular_fake_xy(Nx=20, Ny=64)
+    fn_name = f"create_{kind}_graph"
+    fn = getattr(wmg.create.archetype, fn_name)
+    fn(xy_grid=xy, grid_refinement_factor=2)
+
+    # Test wide
+    xy = _create_rectangular_fake_xy(Nx=64, Ny=20)
+    fn_name = f"create_{kind}_graph"
+    fn = getattr(wmg.create.archetype, fn_name)
+    fn(xy_grid=xy, grid_refinement_factor=2)

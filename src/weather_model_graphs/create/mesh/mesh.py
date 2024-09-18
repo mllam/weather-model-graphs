@@ -94,10 +94,11 @@ def create_multirange_2d_mesh_graphs(
     max_num_levels : int
         Number of edge-distance levels in mesh graph
     xy : np.ndarray
-        Grid point coordinates
+        Grid point coordinates, shaped [2, M, N]
     refinement_factor : int
         Degree of refinement between successive mesh graphs, the number of nodes
-        grows by refinement_factor**2 between successive mesh graphs
+        grows by approximately refinement_factor**2 between successive
+        mesh graphs.
 
     Returns
     -------
@@ -105,26 +106,41 @@ def create_multirange_2d_mesh_graphs(
         List of networkx graphs for each level representing the connectivity
         of the mesh within each level
     """
+    # Compute the size (grid nodes) along x and y direction of area
+    # to cover with graph
+    coord_extent = np.array((xy.shape[2], xy.shape[1]))
+
+    # Find the number of mesh levels possible in x- and y-direction,
+    # and the number of leaf nodes that would correspond to
     # max_coord/(grid_refinement_factor*level_refinement_factor^mesh_levels) = 1
-    mesh_levels = int(
-        (np.log(max(xy.shape)) - np.log(grid_refinement_factor))
+    max_mesh_levels = (
+        (np.log(coord_extent) - np.log(grid_refinement_factor))
         / np.log(level_refinement_factor)
-    )
+    ).astype(
+        int
+    )  # (2,)
     nleaf = grid_refinement_factor * (
-        level_refinement_factor**mesh_levels
-    )  # leaves at the bottom = nleaf**2
+        level_refinement_factor**max_mesh_levels
+    )  # leaves at the bottom in each direction, if using max_mesh_levels
+
+    # As we can not instantiate different number of mesh levels in each
+    # direction, create mesh levels corresponding to the minimum of the two
+    mesh_levels_to_create = max_mesh_levels.min()
 
     if max_num_levels:
         # Limit the levels in mesh graph
-        mesh_levels = min(mesh_levels, max_num_levels)
+        mesh_levels_to_create = min(mesh_levels_to_create, max_num_levels)
 
-    logger.debug(f"mesh_levels: {mesh_levels}, nleaf: {nleaf}")
+    logger.debug(f"mesh_levels: {mesh_levels_to_create}, nleaf: {nleaf}")
 
     # multi resolution tree levels
     G_all_levels = []
-    for lev in range(mesh_levels):  # 0-index mesh levels
-        n = int(nleaf / (grid_refinement_factor * (level_refinement_factor**lev)))
-        g = create_single_level_2d_mesh_graph(xy, n, n)
+    for lev in range(mesh_levels_to_create):  # 0-index mesh levels
+        # Compute number of nodes on level separate for each direction
+        nodes_x, nodes_y = (
+            nleaf / (grid_refinement_factor * (level_refinement_factor**lev))
+        ).astype(int)
+        g = create_single_level_2d_mesh_graph(xy, nodes_x, nodes_y)
         # Add level information to nodes, edges and full graph
         for node in g.nodes:
             g.nodes[node]["level"] = lev
