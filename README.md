@@ -79,9 +79,10 @@ import weather_model_graphs as wmg
 
 # define your (x,y) grid coodinates
 xy_grid = np.meshgrid(np.linspace(0, 1, 32), np.linspace(0, 1, 32), indexing='ij')
+xy_grid = np.stack(xy_grid, axis=0)
 
 # create the full graph
-graph = wmg.create.archetype.create_keisler_graph(xy=xy_grid)
+graph = wmg.create.archetype.create_keisler_graph(xy_grid=xy_grid)
 
 # split the graph by component
 graph_components = wmg.split_graph_by_edge_attribute(graph=graph, attr='component')
