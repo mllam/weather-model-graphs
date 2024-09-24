@@ -58,6 +58,7 @@ G2M_M2G_CONNECTIVITY_OPTIONS = dict(
         dict(rel_max_dist=0.51),
         dict(rel_max_dist=1.0),
     ],
+    containing_rectangle=[dict()]
 )
 
 # list the connectivity options for m2m and the kwargs to test

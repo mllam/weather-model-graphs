@@ -56,10 +56,10 @@ def create_all_graph_components(
     - "flat": Create a single-level 2D mesh graph with `grid_refinement_factor`,
         similar to Keisler et al. (2022)
     - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels`,
-        `grid_refinement_factor` and `mesh_refinement_factor`,
+        `grid_refinement_factor` and `level_refinement_factor`,
         similar to GraphCast, Lam et al. (2023)
     - "hierarchical": Create a hierarchical mesh graph with `max_num_levels`,
-        `grid_refinement_factor` and `mesh_refinement_factor`,
+        `grid_refinement_factor` and `level_refinement_factor`,
         similar to Okcarsson et al. (2023)
 
     m2g_connectivity:
@@ -177,6 +177,7 @@ def connect_nodes_across_graphs(
         - "nearest_neighbour": Find the nearest neighbour in `G_target` for each node in `G_source`
         - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in `G_target` for each node in `G_source`
         - "within_radius": Find all neighbours in `G_target` within a distance of `max_dist` from each node in `G_source`
+        - "containing_rectangle": TODO
     max_dist : float
         Maximum distance to search for neighbours in `G_target` for each node in `G_source`
     max_num_neighbours : int
@@ -198,7 +199,42 @@ def connect_nodes_across_graphs(
     # Determine method and perform checks once
     # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in
     # loop later
-    if method == "nearest_neighbour":
+    if method == "containing_rectangle":
+        if (
+            max_dist is not None
+            or rel_max_dist is not None
+            or max_num_neighbours is not None
+        ):
+            raise Exception(
+                "to use `containing_rectangle` you should not set `max_dist`, `rel_max_dist`or `max_num_neighbours`"
+            )
+
+        # Connect to all nodes that could potentially be close enough,
+        # which is at a relative distance of 1
+        rad_graph = connect_nodes_across_graphs(
+            G_source, G_target, method="within_radius", rel_max_dist=1.)
+
+        # Filter edges to those that fit within a rectangle of measurements dx,dy
+        mesh_node_dx = G_source.graph["dx"]
+        mesh_node_dy = G_source.graph["dy"]
+
+        if isinstance(mesh_node_dx, dict):
+            # In hierarchical graph these properties are dicts, in that case use
+            # values for bottom level.
+            mesh_node_dx = mesh_node_dx[0]
+            mesh_node_dy = mesh_node_dy[0]
+
+        def _edge_filter(edge_prop):
+            abs_diffs = np.abs(edge_prop["vdiff"])
+            return abs_diffs[0] < mesh_node_dx and abs_diffs[1] < mesh_node_dy
+
+        filtered_edges = [(u, v) for u, v, edge_prop in rad_graph.edges(data=True)
+                if _edge_filter(edge_prop)]
+
+        filtered_graph = rad_graph.edge_subgraph(filtered_edges)
+        return filtered_graph
+
+    elif method == "nearest_neighbour":
         if (
             max_dist is not None
             or rel_max_dist is not None
