@@ -212,7 +212,8 @@ def connect_nodes_across_graphs(
         # Connect to all nodes that could potentially be close enough,
         # which is at a relative distance of 1
         rad_graph = connect_nodes_across_graphs(
-            G_source, G_target, method="within_radius", rel_max_dist=1.)
+            G_source, G_target, method="within_radius", rel_max_dist=1.0
+        )
 
         # Filter edges to those that fit within a rectangle of measurements dx,dy
         mesh_node_dx = G_source.graph["dx"]
@@ -228,8 +229,11 @@ def connect_nodes_across_graphs(
             abs_diffs = np.abs(edge_prop["vdiff"])
             return abs_diffs[0] < mesh_node_dx and abs_diffs[1] < mesh_node_dy
 
-        filtered_edges = [(u, v) for u, v, edge_prop in rad_graph.edges(data=True)
-                if _edge_filter(edge_prop)]
+        filtered_edges = [
+            (u, v)
+            for u, v, edge_prop in rad_graph.edges(data=True)
+            if _edge_filter(edge_prop)
+        ]
 
         filtered_graph = rad_graph.edge_subgraph(filtered_edges)
         return filtered_graph
