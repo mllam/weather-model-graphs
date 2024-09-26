@@ -120,3 +120,23 @@ def test_create_rectangular_graph(kind):
     fn_name = f"create_{kind}_graph"
     fn = getattr(wmg.create.archetype, fn_name)
     fn(xy_grid=xy, grid_refinement_factor=2)
+
+
+@pytest.mark.parametrize("grid_refinement_factor", (2, 3))
+@pytest.mark.parametrize("level_refinement_factor", (2, 3, 5))
+def test_create_exact_refinement(grid_refinement_factor, level_refinement_factor):
+    """
+    This test is to check that it is possible to create graph hierarchies when
+    the refinement factors are an exact multiple of the number of nodes. In these
+    situations it should be possible to create multi-level graphs, but it was not
+    earlier due to numerical issues.
+    """
+    N = grid_refinement_factor * (level_refinement_factor**2)
+    xy = _create_rectangular_fake_xy(Nx=N, Ny=N)
+
+    # Build hierarchical graph, should have 2 levels and not give error
+    wmg.create.archetype.create_oskarsson_hierarchical_graph(
+        xy,
+        grid_refinement_factor=grid_refinement_factor,
+        level_refinement_factor=level_refinement_factor,
+    )
