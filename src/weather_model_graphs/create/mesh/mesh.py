@@ -117,7 +117,7 @@ def create_multirange_2d_mesh_graphs(
         np.log(coord_extent) - np.log(grid_refinement_factor)
     ) / np.log(level_refinement_factor)
 
-    # Need to add a small epsilon before rounding to int, due to numerical
+    # Need to add a small epsilon before flooring to int, due to numerical
     # issues with the computation above
     eps = 1e-8
     max_mesh_levels = (max_mesh_levels_float + eps).astype(int)  # (2,)
