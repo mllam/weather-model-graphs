@@ -208,6 +208,9 @@ def connect_nodes_across_graphs(
             raise Exception(
                 "to use `containing_rectangle` you should not set `max_dist`, `rel_max_dist`or `max_num_neighbours`"
             )
+        assert "dx" in G_source.graph and "dy" in G_source.graph, (
+            "Source graph must have dx and dy properties to connect nodes using method containing_rectangle"
+        )
 
         # Connect to all nodes that could potentially be close enough,
         # which is at a relative distance of 1

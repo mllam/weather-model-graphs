@@ -49,7 +49,7 @@ def test_create_graph_archetype(kind):
 
 
 # list the connectivity options for g2m and m2g and the kwargs to test
-G2M_M2G_CONNECTIVITY_OPTIONS = dict(
+G2M_CONNECTIVITY_OPTIONS = dict(
     nearest_neighbour=[],
     nearest_neighbours=[dict(max_num_neighbours=4), dict(max_num_neighbours=8)],
     within_radius=[
@@ -58,8 +58,10 @@ G2M_M2G_CONNECTIVITY_OPTIONS = dict(
         dict(rel_max_dist=0.51),
         dict(rel_max_dist=1.0),
     ],
-    containing_rectangle=[dict()],
 )
+# containing_rectangle option should only be used for m2g
+M2G_CONNECTIVITY_OPTIONS = G2M_CONNECTIVITY_OPTIONS.copy()
+M2G_CONNECTIVITY_OPTIONS["containing_rectangle"] = [dict()]
 
 # list the connectivity options for m2m and the kwargs to test
 M2M_CONNECTIVITY_OPTIONS = dict(
@@ -75,14 +77,14 @@ M2M_CONNECTIVITY_OPTIONS = dict(
 )
 
 
-@pytest.mark.parametrize("g2m_connectivity", G2M_M2G_CONNECTIVITY_OPTIONS.keys())
-@pytest.mark.parametrize("m2g_connectivity", G2M_M2G_CONNECTIVITY_OPTIONS.keys())
+@pytest.mark.parametrize("g2m_connectivity", G2M_CONNECTIVITY_OPTIONS.keys())
+@pytest.mark.parametrize("m2g_connectivity", M2G_CONNECTIVITY_OPTIONS.keys())
 @pytest.mark.parametrize("m2m_connectivity", M2M_CONNECTIVITY_OPTIONS.keys())
 def test_create_graph_generic(m2g_connectivity, g2m_connectivity, m2m_connectivity):
     xy = _create_fake_xy(N=32)
 
-    for g2m_kwargs in G2M_M2G_CONNECTIVITY_OPTIONS[g2m_connectivity]:
-        for m2g_kwargs in G2M_M2G_CONNECTIVITY_OPTIONS[m2g_connectivity]:
+    for g2m_kwargs in G2M_CONNECTIVITY_OPTIONS[g2m_connectivity]:
+        for m2g_kwargs in M2G_CONNECTIVITY_OPTIONS[m2g_connectivity]:
             for m2m_kwargs in M2M_CONNECTIVITY_OPTIONS[m2m_connectivity]:
                 graph = wmg.create.create_all_graph_components(
                     xy=xy,
