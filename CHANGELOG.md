@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
   @joeloskarsson
 
+- Add containing_rectangle graph connection method for m2g edges
+  [\#28](https://github.com/mllam/weather-model-graphs/pull/28)
+  @joeloskarsson
+
 ### Changed
 
 - Create different number of mesh nodes in x- and y-direction.
