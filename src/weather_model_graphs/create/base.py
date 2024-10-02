@@ -67,6 +67,9 @@ def create_all_graph_components(
     - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in mesh for each node in grid
     - "within_radius": Find all neighbours in mesh within an absolute distance
         of `max_dist` or relative distance of `rel_max_dist` from each node in grid
+    - "containing_rectangle": For each grid node, find the rectangle with 4 mesh nodes as corners
+        such that the grid node is contained within it. Connect these 4 (or less along edges)
+        mesh nodes to the grid node.
     """
     graph_components: dict[networkx.DiGraph] = {}
 
@@ -177,7 +180,10 @@ def connect_nodes_across_graphs(
         - "nearest_neighbour": Find the nearest neighbour in `G_target` for each node in `G_source`
         - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in `G_target` for each node in `G_source`
         - "within_radius": Find all neighbours in `G_target` within a distance of `max_dist` from each node in `G_source`
-        - "containing_rectangle": TODO
+        - "containing_rectangle": For each node in `G_target`, find the rectangle in `G_source`
+            with 4 nodes as corners such that the `G_target` node is contained within it.
+            Connect these 4 (or less along edges) corner nodes to the `G_target` node.
+            Requires that `G_source` has dx and dy properties, i.e. is a quadrilateral mesh graph.
     max_dist : float
         Maximum distance to search for neighbours in `G_target` for each node in `G_source`
     max_num_neighbours : int
