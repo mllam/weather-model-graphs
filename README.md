@@ -78,7 +78,7 @@ import numpy as np
 import weather_model_graphs as wmg
 
 # define your (x,y) grid coodinates
-xy_grid = np.meshgrid(np.linspace(0, 1, 32), np.linspace(0, 1, 32), indexing='ij')
+xy_grid = np.meshgrid(np.linspace(0, 1, 32), np.linspace(0, 1, 32))
 xy_grid = np.stack(xy_grid, axis=0)
 
 # create the full graph

@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
   @joeloskarsson
 
+### Maintenance
+
+- Ensure that cell execution doesn't time out when building jupyterbook based
+  documentation [\#25](https://github.com/mllam/weather-model-graphs/pull/25),
+  @leifdenby
+
 ## [v0.1.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.1.0)
 
 First tagged release of `weather-model-graphs` which includes functionality to

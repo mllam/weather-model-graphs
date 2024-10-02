@@ -9,6 +9,12 @@ author: The ML LAM Community
 # See https://jupyterbook.org/content/execute.html
 execute:
   execute_notebooks: force
+  # ensure that cell execution doesn't timeout (this is necessary because
+  # creating some of the figures takes a long time)
+  # see https://github.com/jupyter-book/jupyter-book/issues/948 and
+  # https://jupyterbook.org/en/stable/content/execute.html#setting-execution-timeout
+  # for details
+  timeout: -1
 
 # Define the name of the latex output file for PDF builds
 latex:
