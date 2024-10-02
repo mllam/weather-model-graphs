@@ -70,11 +70,9 @@ def create_all_graph_components(
     """
     graph_components: dict[networkx.DiGraph] = {}
 
-    if len(xy.shape) != 3:
-        raise NotImplementedError(
-            "Mesh coordinates are assumed to lie on a regular grid so that "
-            "the coordinates values are given with an array of shape [2, nx, ny]"
-        )
+    assert (
+        len(xy.shape) == 2 and xy.shape[1] == 2
+    ), "Grid node coordinates should be given as an array of shape [2, num_grid_nodes]."
 
     if m2m_connectivity == "flat":
         # Compute number of mesh nodes in x and y dimensions
@@ -83,6 +81,7 @@ def create_all_graph_components(
         # to creating a "collapsable" graph with nodes at the same locations across
         # levels.
         refinement_factor = m2m_connectivity_kwargs["grid_refinement_factor"]
+        # TODO adapt to new xy shape (also below)
         ny_g, nx_g = xy.shape[1:]
         nx = int(nx_g / refinement_factor)
         ny = int(ny_g / refinement_factor)

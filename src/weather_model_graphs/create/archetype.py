@@ -1,7 +1,7 @@
 from .base import create_all_graph_components
 
 
-def create_keisler_graph(xy_grid, grid_refinement_factor=3):
+def create_keisler_graph(xy, grid_refinement_factor=3):
     """
     Create a flat LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     This graph setup is inspired by the global graph used by Keisler (2022, https://arxiv.org/abs/2202.07575).
@@ -18,7 +18,7 @@ def create_keisler_graph(xy_grid, grid_refinement_factor=3):
 
     Parameters
     ----------
-    xy_grid: np.ndarray
+    xy: np.ndarray
         2D array of grid point positions.
     grid_refinement_factor: float
         Refinement factor between grid points and mesh
@@ -29,7 +29,7 @@ def create_keisler_graph(xy_grid, grid_refinement_factor=3):
         The graph or graph components.
     """
     return create_all_graph_components(
-        xy=xy_grid,
+        xy=xy,
         m2m_connectivity="flat",
         m2m_connectivity_kwargs=dict(grid_refinement_factor=grid_refinement_factor),
         g2m_connectivity="within_radius",
@@ -44,7 +44,7 @@ def create_keisler_graph(xy_grid, grid_refinement_factor=3):
 
 
 def create_graphcast_graph(
-    xy_grid, grid_refinement_factor=3, level_refinement_factor=3, max_num_levels=None
+    xy, grid_refinement_factor=3, level_refinement_factor=3, max_num_levels=None
 ):
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -61,7 +61,7 @@ def create_graphcast_graph(
 
     Parameters
     ----------
-    xy_grid: np.ndarray
+    xy: np.ndarray
         2D array of grid point positions.
     grid_refinement_factor: float
         Refinement factor between grid points and bottom level of mesh hierarchy
@@ -77,7 +77,7 @@ def create_graphcast_graph(
         The graph or graph components.
     """
     return create_all_graph_components(
-        xy=xy_grid,
+        xy=xy,
         m2m_connectivity="flat_multiscale",
         m2m_connectivity_kwargs=dict(
             grid_refinement_factor=grid_refinement_factor,
@@ -96,7 +96,7 @@ def create_graphcast_graph(
 
 
 def create_oskarsson_hierarchical_graph(
-    xy_grid, grid_refinement_factor=3, level_refinement_factor=3, max_num_levels=None
+    xy, grid_refinement_factor=3, level_refinement_factor=3, max_num_levels=None
 ):
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -119,7 +119,7 @@ def create_oskarsson_hierarchical_graph(
 
     Parameters
     ----------
-    xy_grid: np.ndarray
+    xy: np.ndarray
         2D array of grid point positions.
     grid_refinement_factor: float
         Refinement factor between grid points and bottom level of mesh hierarchy
@@ -132,7 +132,7 @@ def create_oskarsson_hierarchical_graph(
         The graph or graph components.
     """
     return create_all_graph_components(
-        xy=xy_grid,
+        xy=xy,
         m2m_connectivity="hierarchical",
         m2m_connectivity_kwargs=dict(
             grid_refinement_factor=grid_refinement_factor,
