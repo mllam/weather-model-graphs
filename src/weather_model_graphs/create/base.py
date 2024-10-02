@@ -234,6 +234,9 @@ def connect_nodes_across_graphs(
             mesh_node_dx = mesh_node_dx[0]
             mesh_node_dy = mesh_node_dy[0]
 
+        # This function is a filter that applies to edges, represented as vectors (vx, vy) in R^ 2.
+        # The filter is True if |vx| < dx & |vy| < dy, where dx and dy are the distance between
+        # rows and columns in source quadrilateral graph.
         def _edge_filter(edge_prop):
             abs_diffs = np.abs(edge_prop["vdiff"])
             return abs_diffs[0] < mesh_node_dx and abs_diffs[1] < mesh_node_dy
