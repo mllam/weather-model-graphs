@@ -47,7 +47,7 @@ def create_hierarchical_multiscale_mesh_graph(
             "At least two mesh levels are required for hierarchical mesh graph. "
             f"You may need to reduce the refinement factors"
             f"or increase the max number of levels {max_num_levels} "
-            f"or number of grid points {xy.shape[1:]}."
+            f"or number of grid points {xy.shape[0]}."
         )
 
     # Relabel nodes of each level with level index first

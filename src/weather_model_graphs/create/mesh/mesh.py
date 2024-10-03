@@ -22,10 +22,10 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
 
     Parameters
     ----------
-    xy : np.ndarray [2, M, N]
-        Grid point coordinates, with first dimension representing
-        x and y coordinates respectively. M and N are the number
-        of grid points in the y and x direction respectively
+    xy : np.ndarray [N_grid_points, 2]
+        Grid point coordinates, with first column representing
+        x coordinates and second column y coordinates. N_grid_points is the
+        total number of grid points.
     nx : int
         Number of nodes in x direction
     ny : int
@@ -94,7 +94,7 @@ def create_multirange_2d_mesh_graphs(
     max_num_levels : int
         Number of edge-distance levels in mesh graph
     xy : np.ndarray
-        Grid point coordinates, shaped [2, M, N]
+        Grid point coordinates, shaped [N_grid_points, 2]
     refinement_factor : int
         Degree of refinement between successive mesh graphs, the number of nodes
         grows by approximately refinement_factor**2 between successive
