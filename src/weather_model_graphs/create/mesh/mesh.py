@@ -36,8 +36,8 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
     networkx.DiGraph
         Graph representing the 2D grid
     """
-    xm, xM = np.amin(xy[0][0, :]), np.amax(xy[0][0, :])
-    ym, yM = np.amin(xy[1][:, 0]), np.amax(xy[1][:, 0])
+    xm, xM = np.amin(xy[:, 0]), np.amax(xy[:, 0])
+    ym, yM = np.amin(xy[:, 1]), np.amax(xy[:, 1])
 
     # avoid nodes on border
     dx = (xM - xm) / nx

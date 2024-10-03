@@ -27,12 +27,8 @@ def create_flat_multiscale_mesh_graph(
         Maximum number of levels in the multi-scale graph
     Returns
     -------
-    m2m_graphs : list
-        List of PyTorch geometric graphs for each level
-    G_bottom_mesh : networkx.Graph
-        Graph representing the bottom mesh level
-    all_mesh_nodes : networkx.NodeView
-        All mesh nodes
+    G_tot : networkx.Graph
+        The merged mesh graph
     """
     # Check that level_refinement_factor is an odd integer
     if (
@@ -83,3 +79,28 @@ def create_flat_multiscale_mesh_graph(
     G_tot.graph["dy"] = {i: g.graph["dy"] for i, g in enumerate(G_all_levels)}
 
     return G_tot
+
+
+def create_flat_singlescale_mesh_graph(xy, grid_refinement_factor: float):
+    """
+    Create flat mesh graph of single level
+
+    Parameters
+    ----------
+    xy : np.ndarray [N_grid_points, 2]
+        Grid point coordinates, with first column representing
+        x coordinates and second column y coordinates. N_grid_points is the
+        total number of grid points.
+    grid_refinement_factor: float
+        Refinement factor between grid points and bottom level of mesh hierarchy
+    Returns
+    -------
+    G_flat : networkx.Graph
+        The flat mesh graph
+    """
+    # Compute number of mesh nodes in x and y dimensions
+    ny_g, nx_g = np.ptp(xy, axis=0)  # xy.shape[1:]
+    nx = int(nx_g / grid_refinement_factor)
+    ny = int(ny_g / grid_refinement_factor)
+
+    return mesh_graph.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)

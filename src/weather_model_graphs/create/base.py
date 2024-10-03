@@ -20,9 +20,11 @@ from ..networkx_utils import (
     split_on_edge_attribute_existance,
 )
 from .grid import create_grid_graph_nodes
-from .mesh.kinds.flat import create_flat_multiscale_mesh_graph
+from .mesh.kinds.flat import (
+    create_flat_multiscale_mesh_graph,
+    create_flat_singlescale_mesh_graph,
+)
 from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
-from .mesh.mesh import create_single_level_2d_mesh_graph
 
 
 def create_all_graph_components(
@@ -75,18 +77,10 @@ def create_all_graph_components(
     ), "Grid node coordinates should be given as an array of shape [2, num_grid_nodes]."
 
     if m2m_connectivity == "flat":
-        # Compute number of mesh nodes in x and y dimensions
-        # Note that the ratio between grid and mesh nodes here is closer to the
-        # requested refinement factor, as for the flat graph we are not restricted
-        # to creating a "collapsable" graph with nodes at the same locations across
-        # levels.
-        refinement_factor = m2m_connectivity_kwargs["grid_refinement_factor"]
-        # TODO adapt to new xy shape (also below)
-        ny_g, nx_g = xy.shape[1:]
-        nx = int(nx_g / refinement_factor)
-        ny = int(ny_g / refinement_factor)
-
-        graph_components["m2m"] = create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
+        graph_components["m2m"] = create_flat_singlescale_mesh_graph(
+            xy,
+            **m2m_connectivity_kwargs,
+        )
         grid_connect_graph = graph_components["m2m"]
     elif m2m_connectivity == "hierarchical":
         # hierarchical mesh graph have three sub-graphs:
