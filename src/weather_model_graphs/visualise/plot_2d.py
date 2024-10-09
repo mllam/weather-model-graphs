@@ -13,7 +13,7 @@ def nx_draw_with_pos(g, with_labels=False, **kwargs):
     if ax is None:
         _, ax = plt.subplots(figsize=(10, 10))
     networkx.draw_networkx(
-        ax=ax, G=g, pos=pos, hide_ticks=False, with_labels=with_labels, **kwargs
+        ax=ax, G=g, pos=pos, with_labels=with_labels, **kwargs
     )
 
     return ax
