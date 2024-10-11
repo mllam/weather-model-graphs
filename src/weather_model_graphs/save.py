@@ -9,8 +9,8 @@ from .networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attri
 
 try:
     import torch
-    import torch_geometric.utils.convert as pyg_convert
     import torch_geometric as pyg
+    import torch_geometric.utils.convert as pyg_convert
 
     HAS_PYG = True
 except ImportError:
@@ -18,12 +18,12 @@ except ImportError:
 
 
 def to_pyg(
-        graph: networkx.DiGraph,
-        output_directory: str,
-        name: str,
-        edge_features: List[str] | None = None,
-        node_features: List[str] | None = None,
-        list_from_attribute=None,
+    graph: networkx.DiGraph,
+    output_directory: str,
+    name: str,
+    edge_features: List[str] | None = None,
+    node_features: List[str] | None = None,
+    list_from_attribute=None,
 ):
     """
     Save the networkx graph to PyTorch Geometric format that matches what the
@@ -86,14 +86,16 @@ def to_pyg(
     def _get_edge_indecies(pyg_g):
         return pyg_g.edge_index
 
-    def _concat_pyg_features(pyg_g: "pyg.data.Data", features: List[str]) -> torch.Tensor:
+    def _concat_pyg_features(
+        pyg_g: "pyg.data.Data", features: List[str]
+    ) -> torch.Tensor:
         """Convert features from pyg.Data object to torch.Tensor.
-        Each feature should be column in the resulting 2D tensor (n_features, n_edges or n_nodes).
+        Each feature should be column in the resulting 2D tensor (n_edges or n_nodes, n_features).
         Note, this function can handle node AND edge features.
         """
         v_concat = []
         for f in features:
-            v = torch.tensor(pyg_g[f])  # make sure we have torch tensor
+            v = pyg_g[f]
             # Convert 1D features into 1xN tensor
             if v.ndim == 1:
                 v = v.unsqueeze(1)
@@ -117,9 +119,13 @@ def to_pyg(
     else:
         pyg_graphs = [pyg_convert.from_networkx(graph)]
 
-    edge_features_values = [_concat_pyg_features(pyg_g, features=edge_features) for pyg_g in pyg_graphs]
+    edge_features_values = [
+        _concat_pyg_features(pyg_g, features=edge_features) for pyg_g in pyg_graphs
+    ]
     edge_indecies = [_get_edge_indecies(pyg_g) for pyg_g in pyg_graphs]
-    node_features_values = [_concat_pyg_features(pyg_g, features=node_features) for pyg_g in pyg_graphs]
+    node_features_values = [
+        _concat_pyg_features(pyg_g, features=node_features) for pyg_g in pyg_graphs
+    ]
 
     if list_from_attribute is None:
         edge_features_values = edge_features_values[0]
