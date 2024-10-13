@@ -124,3 +124,16 @@ def test_create_exact_refinement(mesh_node_distance, level_refinement_factor):
         mesh_node_distance=mesh_node_distance,
         level_refinement_factor=level_refinement_factor,
     )
+
+
+@pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
+def test_create_irregular_grid(kind):
+    """
+    Tests that graphs can be created for irregular layouts of grid points
+    """
+    xy = test_utils.create_fake_irregular_coords(100)
+    fn_name = f"create_{kind}_graph"
+    fn = getattr(wmg.create.archetype, fn_name)
+
+    # ~= 20 mesh nodes in bottom layer in each direction
+    fn(xy=xy, mesh_node_distance=0.05)
