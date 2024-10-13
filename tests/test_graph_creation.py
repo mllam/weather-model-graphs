@@ -2,30 +2,14 @@ import tempfile
 
 import matplotlib.pyplot as plt
 import networkx as nx
-import numpy as np
 import pytest
 
+import tests.utils as test_utils
 import weather_model_graphs as wmg
 
 
-def _create_fake_xy(N=10):
-    x = np.linspace(0, 1, N)
-    y = np.linspace(0, 1, N)
-    xy = np.meshgrid(x, y)
-    xy = np.stack(xy, axis=0)
-    return xy
-
-
-def _create_rectangular_fake_xy(Nx=10, Ny=20):
-    x = np.linspace(0, 1, Nx)
-    y = np.linspace(0, 1, Ny)
-    xy = np.meshgrid(x, y)
-    xy = np.stack(xy, axis=0)
-    return xy
-
-
 def test_create_single_level_mesh_graph():
-    xy = _create_fake_xy(N=4)
+    xy = test_utils.create_fake_xy(N=4)
     mesh_graph = wmg.create.mesh.create_single_level_2d_mesh_graph(xy=xy, nx=5, ny=5)
 
     pos = {node: mesh_graph.nodes[node]["pos"] for node in mesh_graph.nodes()}
@@ -41,11 +25,11 @@ def test_create_single_level_mesh_graph():
 
 @pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
 def test_create_graph_archetype(kind):
-    xy = _create_fake_xy(N=64)
+    xy = test_utils.create_fake_xy(N=64)
     fn_name = f"create_{kind}_graph"
     fn = getattr(wmg.create.archetype, fn_name)
 
-    fn(xy_grid=xy)
+    fn(xy=xy)
 
 
 # list the connectivity options for g2m and m2g and the kwargs to test
@@ -53,8 +37,8 @@ G2M_M2G_CONNECTIVITY_OPTIONS = dict(
     nearest_neighbour=[],
     nearest_neighbours=[dict(max_num_neighbours=4), dict(max_num_neighbours=8)],
     within_radius=[
-        dict(max_dist=0.1),
-        dict(max_dist=0.2),
+        dict(max_dist=3.2),
+        dict(max_dist=6.4),
         dict(rel_max_dist=0.51),
         dict(rel_max_dist=1.0),
     ],
@@ -64,12 +48,12 @@ G2M_M2G_CONNECTIVITY_OPTIONS = dict(
 M2M_CONNECTIVITY_OPTIONS = dict(
     flat=[],
     flat_multiscale=[
-        dict(max_num_levels=3, grid_refinement_factor=3, level_refinement_factor=3),
-        dict(max_num_levels=1, grid_refinement_factor=5, level_refinement_factor=5),
+        dict(max_num_levels=3, mesh_node_distance=3, level_refinement_factor=3),
+        dict(max_num_levels=1, mesh_node_distance=5, level_refinement_factor=5),
     ],
     hierarchical=[
-        dict(max_num_levels=3, grid_refinement_factor=3, level_refinement_factor=3),
-        dict(max_num_levels=None, grid_refinement_factor=3, level_refinement_factor=3),
+        dict(max_num_levels=3, mesh_node_distance=3, level_refinement_factor=3),
+        dict(max_num_levels=None, mesh_node_distance=3, level_refinement_factor=3),
     ],
 )
 
@@ -78,7 +62,7 @@ M2M_CONNECTIVITY_OPTIONS = dict(
 @pytest.mark.parametrize("m2g_connectivity", G2M_M2G_CONNECTIVITY_OPTIONS.keys())
 @pytest.mark.parametrize("m2m_connectivity", M2M_CONNECTIVITY_OPTIONS.keys())
 def test_create_graph_generic(m2g_connectivity, g2m_connectivity, m2m_connectivity):
-    xy = _create_fake_xy(N=32)
+    xy = test_utils.create_fake_xy(N=32)
 
     for g2m_kwargs in G2M_M2G_CONNECTIVITY_OPTIONS[g2m_connectivity]:
         for m2g_kwargs in G2M_M2G_CONNECTIVITY_OPTIONS[m2g_connectivity]:
@@ -110,33 +94,33 @@ def test_create_rectangular_graph(kind):
     Tests that graphs can be created for non-square areas, both thin and wide
     """
     # Test thin
-    xy = _create_rectangular_fake_xy(Nx=20, Ny=64)
+    xy = test_utils.create_rectangular_fake_xy(Nx=20, Ny=64)
     fn_name = f"create_{kind}_graph"
     fn = getattr(wmg.create.archetype, fn_name)
-    fn(xy_grid=xy, grid_refinement_factor=2)
+    fn(xy=xy, mesh_node_distance=2)
 
     # Test wide
-    xy = _create_rectangular_fake_xy(Nx=64, Ny=20)
+    xy = test_utils.create_rectangular_fake_xy(Nx=64, Ny=20)
     fn_name = f"create_{kind}_graph"
     fn = getattr(wmg.create.archetype, fn_name)
-    fn(xy_grid=xy, grid_refinement_factor=2)
+    fn(xy=xy, mesh_node_distance=2)
 
 
-@pytest.mark.parametrize("grid_refinement_factor", (2, 3))
+@pytest.mark.parametrize("mesh_node_distance", (2, 3))
 @pytest.mark.parametrize("level_refinement_factor", (2, 3, 5))
-def test_create_exact_refinement(grid_refinement_factor, level_refinement_factor):
+def test_create_exact_refinement(mesh_node_distance, level_refinement_factor):
     """
     This test is to check that it is possible to create graph hierarchies when
     the refinement factors are an exact multiple of the number of nodes. In these
     situations it should be possible to create multi-level graphs, but it was not
     earlier due to numerical issues.
     """
-    N = grid_refinement_factor * (level_refinement_factor**2)
-    xy = _create_rectangular_fake_xy(Nx=N, Ny=N)
+    N = mesh_node_distance * (level_refinement_factor**2)
+    xy = test_utils.create_rectangular_fake_xy(Nx=N, Ny=N)
 
     # Build hierarchical graph, should have 2 levels and not give error
     wmg.create.archetype.create_oskarsson_hierarchical_graph(
         xy,
-        grid_refinement_factor=grid_refinement_factor,
+        mesh_node_distance=mesh_node_distance,
         level_refinement_factor=level_refinement_factor,
     )
