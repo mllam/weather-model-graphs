@@ -99,8 +99,8 @@ def create_flat_singlescale_mesh_graph(xy, grid_refinement_factor: float):
         The flat mesh graph
     """
     # Compute number of mesh nodes in x and y dimensions
-    ny_g, nx_g = np.ptp(xy, axis=0)  # xy.shape[1:]
-    nx = int(nx_g / grid_refinement_factor)
-    ny = int(ny_g / grid_refinement_factor)
+    range_y, range_x = np.ptp(xy, axis=0)
+    nx = int(range_x / grid_refinement_factor)
+    ny = int(range_y / grid_refinement_factor)
 
     return mesh_graph.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
