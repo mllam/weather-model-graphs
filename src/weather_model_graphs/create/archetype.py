@@ -1,7 +1,7 @@
 from .base import create_all_graph_components
 
 
-def create_keisler_graph(xy, grid_refinement_factor=3):
+def create_keisler_graph(xy, mesh_node_distance=3):
     """
     Create a flat LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     This graph setup is inspired by the global graph used by Keisler (2022, https://arxiv.org/abs/2202.07575).
@@ -20,8 +20,9 @@ def create_keisler_graph(xy, grid_refinement_factor=3):
     ----------
     xy: np.ndarray
         2D array of grid point positions.
-    grid_refinement_factor: float
-        Refinement factor between grid points and mesh
+    mesh_node_distance: float
+        Distance (in x- and y-direction) between created mesh nodes,
+        in coordinate system of xy
 
     Returns
     -------
@@ -31,7 +32,7 @@ def create_keisler_graph(xy, grid_refinement_factor=3):
     return create_all_graph_components(
         xy=xy,
         m2m_connectivity="flat",
-        m2m_connectivity_kwargs=dict(grid_refinement_factor=grid_refinement_factor),
+        m2m_connectivity_kwargs=dict(mesh_node_distance=mesh_node_distance),
         g2m_connectivity="within_radius",
         m2g_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
@@ -44,7 +45,7 @@ def create_keisler_graph(xy, grid_refinement_factor=3):
 
 
 def create_graphcast_graph(
-    xy, grid_refinement_factor=3, level_refinement_factor=3, max_num_levels=None
+    xy, mesh_node_distance=3, level_refinement_factor=3, max_num_levels=None
 ):
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -63,8 +64,9 @@ def create_graphcast_graph(
     ----------
     xy: np.ndarray
         2D array of grid point positions.
-    grid_refinement_factor: float
-        Refinement factor between grid points and bottom level of mesh hierarchy
+    mesh_node_distance: float
+        Distance (in x- and y-direction) between created mesh nodes,
+        in coordinate system of xy
     level_refinement_factor: int
         Refinement factor between grid points and bottom level of mesh hierarchy
         NOTE: Must be an odd integer >1 to create proper multiscale graph
@@ -80,7 +82,7 @@ def create_graphcast_graph(
         xy=xy,
         m2m_connectivity="flat_multiscale",
         m2m_connectivity_kwargs=dict(
-            grid_refinement_factor=grid_refinement_factor,
+            mesh_node_distance=mesh_node_distance,
             level_refinement_factor=level_refinement_factor,
             max_num_levels=max_num_levels,
         ),
@@ -96,7 +98,7 @@ def create_graphcast_graph(
 
 
 def create_oskarsson_hierarchical_graph(
-    xy, grid_refinement_factor=3, level_refinement_factor=3, max_num_levels=None
+    xy, mesh_node_distance=3, level_refinement_factor=3, max_num_levels=None
 ):
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -121,8 +123,9 @@ def create_oskarsson_hierarchical_graph(
     ----------
     xy: np.ndarray
         2D array of grid point positions.
-    grid_refinement_factor: float
-        Refinement factor between grid points and bottom level of mesh hierarchy
+    mesh_node_distance: float
+        Distance (in x- and y-direction) between created mesh nodes in bottom level,
+        in coordinate system of xy
     level_refinement_factor: float
         Refinement factor between grid points and bottom level of mesh hierarchy
 
@@ -135,7 +138,7 @@ def create_oskarsson_hierarchical_graph(
         xy=xy,
         m2m_connectivity="hierarchical",
         m2m_connectivity_kwargs=dict(
-            grid_refinement_factor=grid_refinement_factor,
+            mesh_node_distance=mesh_node_distance,
             level_refinement_factor=level_refinement_factor,
             max_num_levels=max_num_levels,
         ),

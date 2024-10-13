@@ -55,13 +55,13 @@ def create_all_graph_components(
         of `max_dist` or relative distance of `rel_max_dist` from each node in mesh
 
     m2m_connectivity:
-    - "flat": Create a single-level 2D mesh graph with `grid_refinement_factor`,
+    - "flat": Create a single-level 2D mesh graph with `mesh_node_distance`,
         similar to Keisler et al. (2022)
     - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels`,
-        `grid_refinement_factor` and `mesh_refinement_factor`,
+        `mesh_node_distance` and `mesh_refinement_factor`,
         similar to GraphCast, Lam et al. (2023)
     - "hierarchical": Create a hierarchical mesh graph with `max_num_levels`,
-        `grid_refinement_factor` and `mesh_refinement_factor`,
+        `mesh_node_distance` and `mesh_refinement_factor`,
         similar to Okcarsson et al. (2023)
 
     m2g_connectivity:
