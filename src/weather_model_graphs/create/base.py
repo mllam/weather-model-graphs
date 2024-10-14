@@ -9,12 +9,12 @@ function uses `connect_nodes_across_graphs` to connect nodes across the componen
 """
 
 
+import cartopy.crs as ccrs
 import networkx
 import networkx as nx
 import numpy as np
 import scipy.spatial
 from loguru import logger
-import cartopy.crs as ccrs
 
 from ..networkx_utils import (
     replace_node_labels_with_unique_ids,
@@ -37,7 +37,7 @@ def create_all_graph_components(
     m2m_connectivity_kwargs={},
     m2g_connectivity_kwargs={},
     g2m_connectivity_kwargs={},
-    projection: ccrs.CRS | None=None
+    projection: ccrs.CRS | None = None,
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -89,9 +89,7 @@ def create_all_graph_components(
         )
         xy = coords
     else:
-        logger.debug(
-            "`projection` {} given, `coords` treated as lat-lons."
-        )
+        logger.debug("`projection` {} given, `coords` treated as lat-lons.")
         # TODO Convert lat-lon coords to euclidean xy
         # xy = projection.transform_points()
         pass

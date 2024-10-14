@@ -48,7 +48,11 @@ def create_keisler_graph(coords, mesh_node_distance=3, projection=None):
 
 
 def create_graphcast_graph(
-    coords, mesh_node_distance=3, level_refinement_factor=3, max_num_levels=None, projection=None
+    coords,
+    mesh_node_distance=3,
+    level_refinement_factor=3,
+    max_num_levels=None,
+    projection=None,
 ):
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -104,7 +108,11 @@ def create_graphcast_graph(
 
 
 def create_oskarsson_hierarchical_graph(
-    coords, mesh_node_distance=3, level_refinement_factor=3, max_num_levels=None, projection=None
+    coords,
+    mesh_node_distance=3,
+    level_refinement_factor=3,
+    max_num_levels=None,
+    projection=None,
 ):
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
