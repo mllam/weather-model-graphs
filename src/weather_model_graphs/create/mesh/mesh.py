@@ -119,10 +119,7 @@ def create_multirange_2d_mesh_graphs(
         level_refinement_factor
     )
 
-    # Need to add a small epsilon before flooring to int, due to numerical
-    # issues with the computation above
-    eps = 1e-8
-    max_mesh_levels = (max_mesh_levels_float + eps).astype(int)  # (2,)
+    max_mesh_levels = max_mesh_levels_float.astype(int)  # (2,)
     nleaf = level_refinement_factor**max_mesh_levels
     # leaves at the bottom in each direction, if using max_mesh_levels
 

@@ -116,7 +116,7 @@ def test_create_exact_refinement(mesh_node_distance, level_refinement_factor):
     earlier due to numerical issues.
     """
     N = mesh_node_distance * (level_refinement_factor**2)
-    xy = test_utils.create_rectangular_fake_xy(Nx=N, Ny=N)
+    xy = test_utils.create_fake_xy(N)
 
     # Build hierarchical graph, should have 2 levels and not give error
     wmg.create.archetype.create_oskarsson_hierarchical_graph(
