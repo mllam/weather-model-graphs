@@ -29,7 +29,7 @@ def test_create_graph_archetype(kind):
     fn_name = f"create_{kind}_graph"
     fn = getattr(wmg.create.archetype, fn_name)
 
-    fn(xy=xy)
+    fn(coords=xy)
 
 
 # list the connectivity options for g2m and m2g and the kwargs to test
@@ -68,7 +68,7 @@ def test_create_graph_generic(m2g_connectivity, g2m_connectivity, m2m_connectivi
         for m2g_kwargs in G2M_M2G_CONNECTIVITY_OPTIONS[m2g_connectivity]:
             for m2m_kwargs in M2M_CONNECTIVITY_OPTIONS[m2m_connectivity]:
                 graph = wmg.create.create_all_graph_components(
-                    xy=xy,
+                    coords=xy,
                     m2m_connectivity=m2m_connectivity,
                     m2m_connectivity_kwargs=m2m_kwargs,
                     g2m_connectivity=g2m_connectivity,
@@ -97,13 +97,13 @@ def test_create_rectangular_graph(kind):
     xy = test_utils.create_rectangular_fake_xy(Nx=20, Ny=64)
     fn_name = f"create_{kind}_graph"
     fn = getattr(wmg.create.archetype, fn_name)
-    fn(xy=xy, mesh_node_distance=2)
+    fn(coords=xy, mesh_node_distance=2)
 
     # Test wide
     xy = test_utils.create_rectangular_fake_xy(Nx=64, Ny=20)
     fn_name = f"create_{kind}_graph"
     fn = getattr(wmg.create.archetype, fn_name)
-    fn(xy=xy, mesh_node_distance=2)
+    fn(coords=xy, mesh_node_distance=2)
 
 
 @pytest.mark.parametrize("mesh_node_distance", (2, 3))
@@ -136,4 +136,4 @@ def test_create_irregular_grid(kind):
     fn = getattr(wmg.create.archetype, fn_name)
 
     # ~= 20 mesh nodes in bottom layer in each direction
-    fn(xy=xy, mesh_node_distance=0.05)
+    fn(coords=xy, mesh_node_distance=0.05)

@@ -4,7 +4,7 @@ import weather_model_graphs as wmg
 
 def test_graph_splitting():
     xy = test_utils.create_fake_xy(N=64)
-    graph = wmg.create.archetype.create_oskarsson_hierarchical_graph(xy=xy)
+    graph = wmg.create.archetype.create_oskarsson_hierarchical_graph(coords=xy)
 
     graph_components = wmg.split_graph_by_edge_attribute(graph=graph, attr="component")
 
