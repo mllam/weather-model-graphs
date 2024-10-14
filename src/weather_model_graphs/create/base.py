@@ -13,6 +13,8 @@ import networkx
 import networkx as nx
 import numpy as np
 import scipy.spatial
+from loguru import logger
+import cartopy.crs as ccrs
 
 from ..networkx_utils import (
     replace_node_labels_with_unique_ids,
@@ -28,13 +30,14 @@ from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
 
 
 def create_all_graph_components(
-    xy: np.ndarray,
+    coords: np.ndarray,
     m2m_connectivity: str,
     m2g_connectivity: str,
     g2m_connectivity: str,
     m2m_connectivity_kwargs={},
     m2g_connectivity_kwargs={},
     g2m_connectivity_kwargs={},
+    projection: ccrs.CRS | None=None
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -75,6 +78,17 @@ def create_all_graph_components(
     assert (
         len(xy.shape) == 2 and xy.shape[1] == 2
     ), "Grid node coordinates should be given as an array of shape [2, num_grid_nodes]."
+
+    if projection is None:
+        logger.debug(
+            "No `projection` given: Assuming `xy` contains in-projection euclidean coordinates"
+        )
+        xy = coords
+    else:
+        # TODO Convert lat-lon coords to euclidean xy
+        # xy = projection.transform_points()
+        # TODO Rename xy to coords
+        pass
 
     if m2m_connectivity == "flat":
         graph_components["m2m"] = create_flat_singlescale_mesh_graph(
