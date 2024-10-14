@@ -186,6 +186,9 @@ def connect_nodes_across_graphs(
             Requires that `G_source` has dx and dy properties, i.e. is a quadrilateral mesh graph.
     max_dist : float
         Maximum distance to search for neighbours in `G_target` for each node in `G_source`
+    rel_max_dist : float
+        Maximum distance to search for neighbours in `G_target` for each node in `G_source`,
+        relative to longest edge in (bottom level of) `G_source` and `G_target`.
     max_num_neighbours : int
         Maximum number of neighbours to search for in `G_target` for each node in `G_source`
 
@@ -219,7 +222,8 @@ def connect_nodes_across_graphs(
         ), "Source graph must have dx and dy properties to connect nodes using method containing_rectangle"
 
         # Connect to all nodes that could potentially be close enough,
-        # which is at a relative distance of 1
+        # which is at a relative distance of 1. This relative distance is equal
+        # to the diagonal of one rectangle.
         rad_graph = connect_nodes_across_graphs(
             G_source, G_target, method="within_radius", rel_max_dist=1.0
         )
