@@ -1,7 +1,7 @@
 from .base import create_all_graph_components
 
 
-def create_keisler_graph(xy, mesh_node_distance=3):
+def create_keisler_graph(coords, mesh_node_distance=3, projection=None):
     """
     Create a flat LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     This graph setup is inspired by the global graph used by Keisler (2022, https://arxiv.org/abs/2202.07575).
@@ -18,11 +18,14 @@ def create_keisler_graph(xy, mesh_node_distance=3):
 
     Parameters
     ----------
-    xy: np.ndarray
-        2D array of grid point positions.
+    coords: np.ndarray
+        2D array of grid point positions, either in-projection euclidean coordinates or lat-lons
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
-        in coordinate system of xy
+        in coordinate system of coords
+    projection: cartopy.crs.CRS or None
+        Projection instance used to transform given lat-lon coords to in-projection
+        euclidean coordinates. If None the coords are assumed to already be euclidean.
 
     Returns
     -------
@@ -30,7 +33,7 @@ def create_keisler_graph(xy, mesh_node_distance=3):
         The graph or graph components.
     """
     return create_all_graph_components(
-        xy=xy,
+        coords=coords,
         m2m_connectivity="flat",
         m2m_connectivity_kwargs=dict(mesh_node_distance=mesh_node_distance),
         g2m_connectivity="within_radius",
@@ -45,7 +48,7 @@ def create_keisler_graph(xy, mesh_node_distance=3):
 
 
 def create_graphcast_graph(
-    xy, mesh_node_distance=3, level_refinement_factor=3, max_num_levels=None
+    coords, mesh_node_distance=3, level_refinement_factor=3, max_num_levels=None, projection=None
 ):
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -62,16 +65,19 @@ def create_graphcast_graph(
 
     Parameters
     ----------
-    xy: np.ndarray
-        2D array of grid point positions.
+    coords: np.ndarray
+        2D array of grid point positions, either in-projection euclidean coordinates or lat-lons
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
-        in coordinate system of xy
+        in coordinate system of coords
     level_refinement_factor: int
         Refinement factor between grid points and bottom level of mesh hierarchy
         NOTE: Must be an odd integer >1 to create proper multiscale graph
     max_num_levels: int
         The number of levels of longer-range connections in the mesh graph.
+    projection: cartopy.crs.CRS or None
+        Projection instance used to transform given lat-lon coords to in-projection
+        euclidean coordinates. If None the coords are assumed to already be euclidean.
 
     Returns
     -------
@@ -79,7 +85,7 @@ def create_graphcast_graph(
         The graph or graph components.
     """
     return create_all_graph_components(
-        xy=xy,
+        coords=coords,
         m2m_connectivity="flat_multiscale",
         m2m_connectivity_kwargs=dict(
             mesh_node_distance=mesh_node_distance,
@@ -98,7 +104,7 @@ def create_graphcast_graph(
 
 
 def create_oskarsson_hierarchical_graph(
-    xy, mesh_node_distance=3, level_refinement_factor=3, max_num_levels=None
+    coords, mesh_node_distance=3, level_refinement_factor=3, max_num_levels=None, projection=None
 ):
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -121,13 +127,16 @@ def create_oskarsson_hierarchical_graph(
 
     Parameters
     ----------
-    xy: np.ndarray
-        2D array of grid point positions.
+    coords: np.ndarray
+        2D array of grid point positions, either in-projection euclidean coordinates or lat-lons
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes in bottom level,
-        in coordinate system of xy
+        in coordinate system of coords
     level_refinement_factor: float
         Refinement factor between grid points and bottom level of mesh hierarchy
+    projection: cartopy.crs.CRS or None
+        Projection instance used to transform given lat-lon coords to in-projection
+        euclidean coordinates. If None the coords are assumed to already be euclidean.
 
     Returns
     -------
@@ -135,7 +144,7 @@ def create_oskarsson_hierarchical_graph(
         The graph or graph components.
     """
     return create_all_graph_components(
-        xy=xy,
+        coords=coords,
         m2m_connectivity="hierarchical",
         m2m_connectivity_kwargs=dict(
             mesh_node_distance=mesh_node_distance,

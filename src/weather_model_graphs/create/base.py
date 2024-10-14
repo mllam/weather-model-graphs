@@ -72,22 +72,28 @@ def create_all_graph_components(
     - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in mesh for each node in grid
     - "within_radius": Find all neighbours in mesh within an absolute distance
         of `max_dist` or relative distance of `rel_max_dist` from each node in grid
+
+    `projection` should either be a cartopy.crs.CRS or None. This is the projection
+    instance used to transform given lat-lon coords to in-projection euclidean coordinates.
+    If None the coords are assumed to already be euclidean.
     """
     graph_components: dict[networkx.DiGraph] = {}
 
     assert (
-        len(xy.shape) == 2 and xy.shape[1] == 2
+        len(coords.shape) == 2 and coords.shape[1] == 2
     ), "Grid node coordinates should be given as an array of shape [2, num_grid_nodes]."
 
     if projection is None:
         logger.debug(
-            "No `projection` given: Assuming `xy` contains in-projection euclidean coordinates"
+            "No `projection` given: Assuming `coords` contains in-projection euclidean coordinates."
         )
         xy = coords
     else:
+        logger.debug(
+            "`projection` {} given, `coords` treated as lat-lons."
+        )
         # TODO Convert lat-lon coords to euclidean xy
         # xy = projection.transform_points()
-        # TODO Rename xy to coords
         pass
 
     if m2m_connectivity == "flat":
