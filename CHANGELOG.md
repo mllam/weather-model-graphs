@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `save.to_pyg` can now handle any number of 1D or 2D edge or node features when
   converting pytorch-geometric `Data` objects to `torch.Tensor` objects.
+  [\#31](https://github.com/mllam/weather-model-graphs/pull/31)
+  @maxiimilian
 
 ### Changed
 
