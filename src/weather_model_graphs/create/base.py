@@ -89,10 +89,15 @@ def create_all_graph_components(
         )
         xy = coords
     else:
-        logger.debug("`projection` {} given, `coords` treated as lat-lons.")
-        # TODO Convert lat-lon coords to euclidean xy
-        # xy = projection.transform_points()
-        pass
+        logger.debug(
+            f"`projection` Proj({projection}) given, `coords` treated as lat-lons."
+        )
+        # Convert lat-lon coords to euclidean xy
+        xyz = projection.transform_points(
+            src_crs=ccrs.PlateCarree(), x=coords[:, 0], y=coords[:, 1]
+        )
+        # Remove z-dim
+        xy = xyz[:, :2]
 
     if m2m_connectivity == "flat":
         graph_components["m2m"] = create_flat_singlescale_mesh_graph(

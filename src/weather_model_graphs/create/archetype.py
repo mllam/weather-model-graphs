@@ -44,6 +44,7 @@ def create_keisler_graph(coords, mesh_node_distance=3, projection=None):
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
+        projection=projection,
     )
 
 
@@ -104,6 +105,7 @@ def create_graphcast_graph(
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
+        projection=projection,
     )
 
 
@@ -167,4 +169,5 @@ def create_oskarsson_hierarchical_graph(
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
+        projection=projection,
     )
