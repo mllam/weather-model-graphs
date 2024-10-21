@@ -1,7 +1,9 @@
 from .base import create_all_graph_components
 
 
-def create_keisler_graph(coords, mesh_node_distance=3, projection=None):
+def create_keisler_graph(
+    coords, mesh_node_distance=3, projection=None, decode_mask=None
+):
     """
     Create a flat LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     This graph setup is inspired by the global graph used by Keisler (2022, https://arxiv.org/abs/2202.07575).
@@ -26,6 +28,11 @@ def create_keisler_graph(coords, mesh_node_distance=3, projection=None):
     projection: cartopy.crs.CRS or None
         Projection instance used to transform given lat-lon coords to in-projection
         euclidean coordinates. If None the coords are assumed to already be euclidean.
+    decode_mask: Iterator or None
+        Mask describing which grid positions should be decoded to (included in the m2g subgraph).
+        It should have the same length as the number of grid position coordinates given in `coords`.
+        The mask being set to True means that corresponding grid nodes should be included in g2m.
+        If `decode_mask=None` (default), all grid nodes are included.
 
     Returns
     -------
@@ -45,6 +52,7 @@ def create_keisler_graph(coords, mesh_node_distance=3, projection=None):
             max_num_neighbours=4,
         ),
         projection=projection,
+        decode_mask=decode_mask,
     )
 
 
@@ -54,6 +62,7 @@ def create_graphcast_graph(
     level_refinement_factor=3,
     max_num_levels=None,
     projection=None,
+    decode_mask=None,
 ):
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -83,6 +92,11 @@ def create_graphcast_graph(
     projection: cartopy.crs.CRS or None
         Projection instance used to transform given lat-lon coords to in-projection
         euclidean coordinates. If None the coords are assumed to already be euclidean.
+    decode_mask: Iterator or None
+        Mask describing which grid positions should be decoded to (included in the m2g subgraph).
+        It should have the same length as the number of grid position coordinates given in `coords`.
+        The mask being set to True means that corresponding grid nodes should be included in g2m.
+        If `decode_mask=None` (default), all grid nodes are included.
 
     Returns
     -------
@@ -106,6 +120,7 @@ def create_graphcast_graph(
             max_num_neighbours=4,
         ),
         projection=projection,
+        decode_mask=decode_mask,
     )
 
 
@@ -115,6 +130,7 @@ def create_oskarsson_hierarchical_graph(
     level_refinement_factor=3,
     max_num_levels=None,
     projection=None,
+    decode_mask=None,
 ):
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -147,6 +163,11 @@ def create_oskarsson_hierarchical_graph(
     projection: cartopy.crs.CRS or None
         Projection instance used to transform given lat-lon coords to in-projection
         euclidean coordinates. If None the coords are assumed to already be euclidean.
+    decode_mask: Iterator or None
+        Mask describing which grid positions should be decoded to (included in the m2g subgraph).
+        It should have the same length as the number of grid position coordinates given in `coords`.
+        The mask being set to True means that corresponding grid nodes should be included in g2m.
+        If `decode_mask=None` (default), all grid nodes are included.
 
     Returns
     -------
@@ -170,4 +191,5 @@ def create_oskarsson_hierarchical_graph(
             max_num_neighbours=4,
         ),
         projection=projection,
+        decode_mask=decode_mask,
     )

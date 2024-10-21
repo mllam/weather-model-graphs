@@ -9,6 +9,8 @@ function uses `connect_nodes_across_graphs` to connect nodes across the componen
 """
 
 
+from typing import Iterable
+
 import cartopy.crs as ccrs
 import networkx
 import networkx as nx
@@ -38,6 +40,7 @@ def create_all_graph_components(
     m2g_connectivity_kwargs={},
     g2m_connectivity_kwargs={},
     projection: ccrs.CRS | None = None,
+    decode_mask: Iterable | None = None,
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -76,6 +79,11 @@ def create_all_graph_components(
     `projection` should either be a cartopy.crs.CRS or None. This is the projection
     instance used to transform given lat-lon coords to in-projection euclidean coordinates.
     If None the coords are assumed to already be euclidean.
+
+    `decode_mask` should be an Iterable of booleans, masking which grid positions should be
+    decoded to (included in the m2g subgraph). It should have the same length as the number of
+    grid position coordinates given in `coords`.  The mask being set to True means that corresponding
+    grid nodes should be included in g2m. If `decode_mask=None` (default), all grid nodes are included.
     """
     graph_components: dict[networkx.DiGraph] = {}
 
@@ -135,9 +143,19 @@ def create_all_graph_components(
     )
     graph_components["g2m"] = G_g2m
 
+    if decode_mask is None:
+        # decode to all grid nodes
+        decode_grid = G_grid
+    else:
+        # Select subset of grid nodes to decode to, where m2g should connect
+        filter_nodes = [
+            n for n, include in zip(G_grid.nodes, decode_mask, strict=True) if include
+        ]
+        decode_grid = G_grid.subgraph(filter_nodes)
+
     G_m2g = connect_nodes_across_graphs(
         G_source=grid_connect_graph,
-        G_target=G_grid,
+        G_target=decode_grid,
         method=m2g_connectivity,
         **m2g_connectivity_kwargs,
     )
