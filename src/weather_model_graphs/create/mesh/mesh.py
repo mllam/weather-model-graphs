@@ -96,7 +96,7 @@ def create_multirange_2d_mesh_graphs(
     xy : np.ndarray
         Grid point coordinates, shaped [N_grid_points, 2]
     mesh_node_distance: float
-        Distance (in x- and y-direction) between created mesh nodes ,
+        Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of xy
     level_refinement_factor: float
         Refinement factor between grid points and bottom level of mesh hierarchy

@@ -30,7 +30,7 @@ def create_grid_graph_nodes(xy, level_id=-1):
     """
     assert (
         len(xy.shape) == 2 and xy.shape[1] == 2
-    ), "Grid node coordinates should be given as an array of shape [2, num_grid_nodes]."
+    ), "Grid node coordinates should be given as an array of shape [num_grid_nodes, 2]."
 
     # Create graph
     G_grid = networkx.Graph()

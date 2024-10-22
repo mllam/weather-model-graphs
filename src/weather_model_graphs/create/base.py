@@ -81,7 +81,7 @@ def create_all_graph_components(
 
     assert (
         len(coords.shape) == 2 and coords.shape[1] == 2
-    ), "Grid node coordinates should be given as an array of shape [2, num_grid_nodes]."
+    ), "Grid node coordinates should be given as an array of shape [num_grid_nodes, 2]."
 
     if projection is None:
         logger.debug(
