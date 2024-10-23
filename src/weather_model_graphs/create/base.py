@@ -61,17 +61,20 @@ def create_all_graph_components(
     - "flat": Create a single-level 2D mesh graph with `mesh_node_distance`,
         similar to Keisler et al. (2022)
     - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels`,
-        `mesh_node_distance` and `mesh_refinement_factor`,
+        `mesh_node_distance` and `level_refinement_factor`,
         similar to GraphCast, Lam et al. (2023)
     - "hierarchical": Create a hierarchical mesh graph with `max_num_levels`,
-        `mesh_node_distance` and `mesh_refinement_factor`,
-        similar to Okcarsson et al. (2023)
+        `mesh_node_distance` and `level_refinement_factor`,
+        similar to Oskarsson et al. (2023)
 
     m2g_connectivity:
     - "nearest_neighbour": Find the nearest neighbour in mesh for each node in grid
     - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in mesh for each node in grid
     - "within_radius": Find all neighbours in mesh within an absolute distance
         of `max_dist` or relative distance of `rel_max_dist` from each node in grid
+    - "containing_rectangle": For each grid node, find the rectangle with 4 mesh nodes as corners
+        such that the grid node is contained within it. Connect these 4 (or less along edges)
+        mesh nodes to the grid node.
 
     `projection` should either be a cartopy.crs.CRS or None. This is the projection
     instance used to transform given lat-lon coords to in-projection Cartesian coordinates.
@@ -193,8 +196,15 @@ def connect_nodes_across_graphs(
         - "nearest_neighbour": Find the nearest neighbour in `G_target` for each node in `G_source`
         - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in `G_target` for each node in `G_source`
         - "within_radius": Find all neighbours in `G_target` within a distance of `max_dist` from each node in `G_source`
+        - "containing_rectangle": For each node in `G_target`, find the rectangle in `G_source`
+            with 4 nodes as corners such that the `G_target` node is contained within it.
+            Connect these 4 (or less along edges) corner nodes to the `G_target` node.
+            Requires that `G_source` has dx and dy properties, i.e. is a quadrilateral mesh graph.
     max_dist : float
         Maximum distance to search for neighbours in `G_target` for each node in `G_source`
+    rel_max_dist : float
+        Maximum distance to search for neighbours in `G_target` for each node in `G_source`,
+        relative to longest edge in (bottom level of) `G_source` and `G_target`.
     max_num_neighbours : int
         Maximum number of neighbours to search for in `G_target` for each node in `G_source`
 
@@ -214,7 +224,53 @@ def connect_nodes_across_graphs(
     # Determine method and perform checks once
     # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in
     # loop later
-    if method == "nearest_neighbour":
+    if method == "containing_rectangle":
+        if (
+            max_dist is not None
+            or rel_max_dist is not None
+            or max_num_neighbours is not None
+        ):
+            raise Exception(
+                "to use `containing_rectangle` you should not set `max_dist`, `rel_max_dist`or `max_num_neighbours`"
+            )
+        assert (
+            "dx" in G_source.graph and "dy" in G_source.graph
+        ), "Source graph must have dx and dy properties to connect nodes using method containing_rectangle"
+
+        # Connect to all nodes that could potentially be close enough,
+        # which is at a relative distance of 1. This relative distance is equal
+        # to the diagonal of one rectangle.
+        rad_graph = connect_nodes_across_graphs(
+            G_source, G_target, method="within_radius", rel_max_dist=1.0
+        )
+
+        # Filter edges to those that fit within a rectangle of measurements dx,dy
+        mesh_node_dx = G_source.graph["dx"]
+        mesh_node_dy = G_source.graph["dy"]
+
+        if isinstance(mesh_node_dx, dict):
+            # In hierarchical graph these properties are dicts, in that case use
+            # values for bottom level.
+            mesh_node_dx = mesh_node_dx[0]
+            mesh_node_dy = mesh_node_dy[0]
+
+        # This function is a filter that applies to edges, represented as vectors (vx, vy) in R^ 2.
+        # The filter is True if |vx| < dx & |vy| < dy, where dx and dy are the distance between
+        # rows and columns in source quadrilateral graph.
+        def _edge_filter(edge_prop):
+            abs_diffs = np.abs(edge_prop["vdiff"])
+            return abs_diffs[0] < mesh_node_dx and abs_diffs[1] < mesh_node_dy
+
+        filtered_edges = [
+            (u, v)
+            for u, v, edge_prop in rad_graph.edges(data=True)
+            if _edge_filter(edge_prop)
+        ]
+
+        filtered_graph = rad_graph.edge_subgraph(filtered_edges)
+        return filtered_graph
+
+    elif method == "nearest_neighbour":
         if (
             max_dist is not None
             or rel_max_dist is not None
