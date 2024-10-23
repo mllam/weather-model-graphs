@@ -113,12 +113,14 @@ def create_multirange_2d_mesh_graphs(
     # Find the number of mesh levels possible in x- and y-direction,
     # and the number of leaf nodes that would correspond to
     # max_coord/(grid_refinement_factor*level_refinement_factor^mesh_levels) = 1
-    max_mesh_levels = (
-        (np.log(coord_extent) - np.log(grid_refinement_factor))
-        / np.log(level_refinement_factor)
-    ).astype(
-        int
-    )  # (2,)
+    max_mesh_levels_float = (
+        np.log(coord_extent) - np.log(grid_refinement_factor)
+    ) / np.log(level_refinement_factor)
+
+    # Need to add a small epsilon before flooring to int, due to numerical
+    # issues with the computation above
+    eps = 1e-8
+    max_mesh_levels = (max_mesh_levels_float + eps).astype(int)  # (2,)
     nleaf = grid_refinement_factor * (
         level_refinement_factor**max_mesh_levels
     )  # leaves at the bottom in each direction, if using max_mesh_levels
