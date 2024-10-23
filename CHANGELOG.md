@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [\#31](https://github.com/mllam/weather-model-graphs/pull/31)
   @maxiimilian
 
+- Add containing_rectangle graph connection method for m2g edges
+  [\#28](https://github.com/mllam/weather-model-graphs/pull/28)
+  @joeloskarsson
+
 ### Changed
 
 - Fix wrong number of mesh levels when grid is multiple of refinement factor

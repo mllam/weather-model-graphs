@@ -125,4 +125,8 @@ def create_hierarchical_multiscale_mesh_graph(
 
     G_m2m = networkx.compose_all([G_all_levels, G_up_all, G_down_all])
 
+    # add dx and dy to graph
+    for prop in ("dx", "dy"):
+        G_m2m.graph[prop] = {i: g.graph[prop] for i, g in enumerate(Gs_all_levels)}
+
     return G_m2m
