@@ -74,8 +74,8 @@ def create_all_graph_components(
         of `max_dist` or relative distance of `rel_max_dist` from each node in grid
 
     `projection` should either be a cartopy.crs.CRS or None. This is the projection
-    instance used to transform given lat-lon coords to in-projection euclidean coordinates.
-    If None the coords are assumed to already be euclidean.
+    instance used to transform given lat-lon coords to in-projection Cartesian coordinates.
+    If None the coords are assumed to already be Cartesian.
     """
     graph_components: dict[networkx.DiGraph] = {}
 
@@ -85,14 +85,14 @@ def create_all_graph_components(
 
     if projection is None:
         logger.debug(
-            "No `projection` given: Assuming `coords` contains in-projection euclidean coordinates."
+            "No `projection` given: Assuming `coords` contains in-projection Cartesian coordinates."
         )
         xy = coords
     else:
         logger.debug(
             f"`projection` Proj({projection}) given, `coords` treated as lat-lons."
         )
-        # Convert lat-lon coords to euclidean xy
+        # Convert lat-lon coords to Cartesian xy
         xyz = projection.transform_points(
             src_crs=ccrs.PlateCarree(), x=coords[:, 0], y=coords[:, 1]
         )

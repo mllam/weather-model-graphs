@@ -108,7 +108,7 @@ def create_multirange_2d_mesh_graphs(
         of the mesh within each level
     """
     # Compute the size along x and y direction of area to cover with graph
-    # This is measured in the euclidean coordiantes of xy
+    # This is measured in the Cartesian coordiantes of xy
     coord_extent = np.ptp(xy, axis=0)
     extent_nodes_bottom_mesh = (coord_extent / mesh_node_distance).astype(int)
 

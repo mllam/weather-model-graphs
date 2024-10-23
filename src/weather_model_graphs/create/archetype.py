@@ -19,13 +19,13 @@ def create_keisler_graph(coords, mesh_node_distance=3, projection=None):
     Parameters
     ----------
     coords: np.ndarray
-        2D array of grid point positions, either in-projection euclidean coordinates or lat-lons
+        2D array of grid point positions, either in-projection Cartesian coordinates or lat-lons
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of coords
     projection: cartopy.crs.CRS or None
         Projection instance used to transform given lat-lon coords to in-projection
-        euclidean coordinates. If None the coords are assumed to already be euclidean.
+        Cartesian coordinates. If None the coords are assumed to already be Cartesian.
 
     Returns
     -------
@@ -71,7 +71,7 @@ def create_graphcast_graph(
     Parameters
     ----------
     coords: np.ndarray
-        2D array of grid point positions, either in-projection euclidean coordinates or lat-lons
+        2D array of grid point positions, either in-projection Cartesian coordinates or lat-lons
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of coords
@@ -82,7 +82,7 @@ def create_graphcast_graph(
         The number of levels of longer-range connections in the mesh graph.
     projection: cartopy.crs.CRS or None
         Projection instance used to transform given lat-lon coords to in-projection
-        euclidean coordinates. If None the coords are assumed to already be euclidean.
+        Cartesian coordinates. If None the coords are assumed to already be Cartesian.
 
     Returns
     -------
@@ -138,7 +138,7 @@ def create_oskarsson_hierarchical_graph(
     Parameters
     ----------
     coords: np.ndarray
-        2D array of grid point positions, either in-projection euclidean coordinates or lat-lons
+        2D array of grid point positions, either in-projection Cartesian coordinates or lat-lons
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes in bottom level,
         in coordinate system of coords
@@ -146,7 +146,7 @@ def create_oskarsson_hierarchical_graph(
         Refinement factor between grid points and bottom level of mesh hierarchy
     projection: cartopy.crs.CRS or None
         Projection instance used to transform given lat-lon coords to in-projection
-        euclidean coordinates. If None the coords are assumed to already be euclidean.
+        Cartesian coordinates. If None the coords are assumed to already be Cartesian.
 
     Returns
     -------
