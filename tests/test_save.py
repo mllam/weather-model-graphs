@@ -1,6 +1,7 @@
 import tempfile
 
 import numpy as np
+import pytest
 from loguru import logger
 
 import weather_model_graphs as wmg
@@ -15,7 +16,8 @@ def _create_fake_xy(N=10):
     return xy
 
 
-def test_save_to_pyg():
+@pytest.mark.parametrize("list_from_attribute", [None, "level"])
+def test_save_to_pyg(list_from_attribute):
     if not HAS_PYG:
         logger.warning(
             "Skipping test_save_to_pyg because weather-model-graphs[pytorch] is not installed."
@@ -40,4 +42,9 @@ def test_save_to_pyg():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for name, graph in graph_components.items():
-            wmg.save.to_pyg(graph=graph, output_directory=tmpdir, name=name)
+            wmg.save.to_pyg(
+                graph=graph,
+                output_directory=tmpdir,
+                name=name,
+                list_from_attribute=list_from_attribute,
+            )
