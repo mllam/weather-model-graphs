@@ -106,11 +106,11 @@ def to_pyg(
     if list_from_attribute is not None:
         # create a list of graph objects by splitting the graph by the list_from_attribute
         try:
-            sub_graphs = list(
-                split_graph_by_edge_attribute(
+            sub_graphs = [kv[1] for kv in
+                sorted(split_graph_by_edge_attribute(
                     graph=graph, attr=list_from_attribute
-                ).values()
-            )
+                ).items())
+            ]
         except MissingEdgeAttributeError:
             # neural-lam still expects a list of graphs, so if the attribute is missing
             # we just return the original graph as a list
