@@ -108,7 +108,7 @@ def to_pyg(
         try:
             sub_graphs = list(
                 split_graph_by_edge_attribute(
-                    graph=graph, attribute=list_from_attribute
+                    graph=graph, attr=list_from_attribute
                 ).values()
             )
         except MissingEdgeAttributeError:

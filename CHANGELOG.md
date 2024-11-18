@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
   @joeloskarsson
 
+### Fixed
+
+- Fix `attribute` keyword bug in save function
+  [\#35](https://github.com/mllam/weather-model-graphs/pull/35)
+  @joeloskarsson
+
 ### Maintenance
 
 - Ensure that cell execution doesn't time out when building jupyterbook based
