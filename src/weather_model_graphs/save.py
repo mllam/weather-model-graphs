@@ -107,8 +107,8 @@ def to_pyg(
         # create a list of graph objects by splitting the graph by the list_from_attribute
         try:
             sub_graphs = [
-                kv[1]
-                for kv in sorted(
+                value
+                for key, value in sorted(
                     split_graph_by_edge_attribute(
                         graph=graph, attr=list_from_attribute
                     ).items()

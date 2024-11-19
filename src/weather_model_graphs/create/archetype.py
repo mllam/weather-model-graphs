@@ -28,8 +28,8 @@ def create_keisler_graph(
     projection: cartopy.crs.CRS or None
         Projection instance used to transform given lat-lon coords to in-projection
         Cartesian coordinates. If None the coords are assumed to already be Cartesian.
-    decode_mask: Iterator or None
-        Mask describing which grid positions should be decoded to (included in the m2g subgraph).
+    decode_mask: Iterable or None
+        Mask describing which grid positions should be decoded to (included in the m2g subgraph), i.e. which positions should be output.
         It should have the same length as the number of grid position coordinates given in `coords`.
         The mask being set to True means that corresponding grid nodes should be included in g2m.
         If `decode_mask=None` (default), all grid nodes are included.
@@ -92,8 +92,8 @@ def create_graphcast_graph(
     projection: cartopy.crs.CRS or None
         Projection instance used to transform given lat-lon coords to in-projection
         Cartesian coordinates. If None the coords are assumed to already be Cartesian.
-    decode_mask: Iterator or None
-        Mask describing which grid positions should be decoded to (included in the m2g subgraph).
+    decode_mask: Iterable or None
+        Mask describing which grid positions should be decoded to (included in the m2g subgraph), i.e. which positions should be output.
         It should have the same length as the number of grid position coordinates given in `coords`.
         The mask being set to True means that corresponding grid nodes should be included in g2m.
         If `decode_mask=None` (default), all grid nodes are included.
@@ -163,8 +163,8 @@ def create_oskarsson_hierarchical_graph(
     projection: cartopy.crs.CRS or None
         Projection instance used to transform given lat-lon coords to in-projection
         Cartesian coordinates. If None the coords are assumed to already be Cartesian.
-    decode_mask: Iterator or None
-        Mask describing which grid positions should be decoded to (included in the m2g subgraph).
+    decode_mask: Iterable or None
+        Mask describing which grid positions should be decoded to (included in the m2g subgraph), i.e. which positions should be output.
         It should have the same length as the number of grid position coordinates given in `coords`.
         The mask being set to True means that corresponding grid nodes should be included in g2m.
         If `decode_mask=None` (default), all grid nodes are included.

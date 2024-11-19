@@ -84,7 +84,7 @@ def create_all_graph_components(
     If None the coords are assumed to already be Cartesian.
 
     `decode_mask` should be an Iterable of booleans, masking which grid positions should be
-    decoded to (included in the m2g subgraph). It should have the same length as the number of
+    decoded to (included in the m2g subgraph), i.e. which positions should be output. It should have the same length as the number of
     grid position coordinates given in `coords`.  The mask being set to True means that corresponding
     grid nodes should be included in g2m. If `decode_mask=None` (default), all grid nodes are included.
     """
