@@ -1,6 +1,6 @@
 [project]
 name = "weather-model-graphs"
-version = "0.1.0"
+version = "0.2.0"
 description = "Tools for creating and visualising data-driven weather model graphs"
 authors = [
     {name = "Leif Denby", email = "lcd@dmi.dk"},
