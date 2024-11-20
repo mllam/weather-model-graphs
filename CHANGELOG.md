@@ -30,10 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Fix wrong number of mesh levels when grid is multiple of refinement factor
-  [\#26](https://github.com/mllam/weather-model-graphs/pull/26)
-  @joeloskarsson
-
 - Create different number of mesh nodes in x- and y-direction.
   [\#21](https://github.com/mllam/weather-model-graphs/pull/21)
   @joeloskarsson
@@ -54,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix `attribute` keyword bug in save function
   [\#35](https://github.com/mllam/weather-model-graphs/pull/35)
+  @joeloskarsson
+
+- Fix wrong number of mesh levels when grid is multiple of refinement factor
+  [\#26](https://github.com/mllam/weather-model-graphs/pull/26)
   @joeloskarsson
 
 ### Maintenance
