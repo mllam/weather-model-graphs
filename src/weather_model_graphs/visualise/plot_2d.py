@@ -7,8 +7,11 @@ from matplotlib.colors import Normalize
 from .. import networkx_utils as nx_utils
 
 
-def nx_draw_with_pos(g, with_labels=False, **kwargs):
-    pos = {node: g.nodes[node]["pos"] for node in g.nodes()}
+def nx_draw_with_pos(g, with_labels=False, posn_func=None, **kwargs):
+    if posn_func is not None:
+        pos = {node: posn_func(g.nodes[node]) for node in g.nodes()}
+    else:
+        pos = {node: g.nodes[node]["pos"] for node in g.nodes()}
     ax = kwargs.pop("ax", None)
     if ax is None:
         _, ax = plt.subplots(figsize=(10, 10))

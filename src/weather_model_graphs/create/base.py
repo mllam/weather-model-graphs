@@ -9,10 +9,13 @@ function uses `connect_nodes_across_graphs` to connect nodes across the componen
 """
 
 
+import cartopy.crs as ccrs
 import networkx
 import networkx as nx
 import numpy as np
 import scipy.spatial
+import sklearn.neighbors
+from loguru import logger
 
 from ..networkx_utils import (
     replace_node_labels_with_unique_ids,
@@ -20,19 +23,23 @@ from ..networkx_utils import (
     split_on_edge_attribute_existance,
 )
 from .grid import create_grid_graph_nodes
-from .mesh.kinds.flat import create_flat_multiscale_mesh_graph
+from .mesh.kinds.flat import (
+    create_flat_multiscale_mesh_graph,
+    create_flat_singlescale_mesh_graph,
+)
 from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
-from .mesh.mesh import create_single_level_2d_mesh_graph
 
 
 def create_all_graph_components(
-    xy: np.ndarray,
+    coords: np.ndarray,
     m2m_connectivity: str,
     m2g_connectivity: str,
     g2m_connectivity: str,
     m2m_connectivity_kwargs={},
     m2g_connectivity_kwargs={},
     g2m_connectivity_kwargs={},
+    projection: ccrs.CRS | None = None,
+    distance_metric: str = "euclidean",
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -53,14 +60,14 @@ def create_all_graph_components(
         of `max_dist` or relative distance of `rel_max_dist` from each node in mesh
 
     m2m_connectivity:
-    - "flat": Create a single-level 2D mesh graph with `grid_refinement_factor`,
+    - "flat": Create a single-level 2D mesh graph with `mesh_node_distance`,
         similar to Keisler et al. (2022)
     - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels`,
-        `grid_refinement_factor` and `level_refinement_factor`,
+        `mesh_node_distance` and `level_refinement_factor`,
         similar to GraphCast, Lam et al. (2023)
     - "hierarchical": Create a hierarchical mesh graph with `max_num_levels`,
-        `grid_refinement_factor` and `level_refinement_factor`,
-        similar to Okcarsson et al. (2023)
+        `mesh_node_distance` and `level_refinement_factor`,
+        similar to Oskarsson et al. (2023)
 
     m2g_connectivity:
     - "nearest_neighbour": Find the nearest neighbour in mesh for each node in grid
@@ -70,27 +77,38 @@ def create_all_graph_components(
     - "containing_rectangle": For each grid node, find the rectangle with 4 mesh nodes as corners
         such that the grid node is contained within it. Connect these 4 (or less along edges)
         mesh nodes to the grid node.
+
+    `projection` should either be a cartopy.crs.CRS or None. This is the projection
+    instance used to transform given lat-lon coords to in-projection Cartesian coordinates.
+    If None the coords are assumed to already be Cartesian.
     """
     graph_components: dict[networkx.DiGraph] = {}
 
-    if len(xy.shape) != 3:
-        raise NotImplementedError(
-            "Mesh coordinates are assumed to lie on a regular grid so that "
-            "the coordinates values are given with an array of shape [2, nx, ny]"
+    assert (
+        len(coords.shape) == 2 and coords.shape[1] == 2
+    ), "Grid node coordinates should be given as an array of shape [num_grid_nodes, 2]."
+
+    if projection is None:
+        logger.debug(
+            "No `projection` given: will apply distance metric directly to provided coordinates."
         )
+        xy = coords
+    else:
+        logger.debug(
+            f"`projection` Proj({projection}) given, `coords` treated as lat-lons."
+        )
+        # Convert lat-lon coords to Cartesian xy
+        xyz = projection.transform_points(
+            src_crs=ccrs.PlateCarree(), x=coords[:, 0], y=coords[:, 1]
+        )
+        # Remove z-dim
+        xy = xyz[:, :2]
 
     if m2m_connectivity == "flat":
-        # Compute number of mesh nodes in x and y dimensions
-        # Note that the ratio between grid and mesh nodes here is closer to the
-        # requested refinement factor, as for the flat graph we are not restricted
-        # to creating a "collapsable" graph with nodes at the same locations across
-        # levels.
-        refinement_factor = m2m_connectivity_kwargs["grid_refinement_factor"]
-        ny_g, nx_g = xy.shape[1:]
-        nx = int(nx_g / refinement_factor)
-        ny = int(ny_g / refinement_factor)
-
-        graph_components["m2m"] = create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
+        graph_components["m2m"] = create_flat_singlescale_mesh_graph(
+            xy,
+            **m2m_connectivity_kwargs,
+        )
         grid_connect_graph = graph_components["m2m"]
     elif m2m_connectivity == "hierarchical":
         # hierarchical mesh graph have three sub-graphs:
@@ -114,10 +132,14 @@ def create_all_graph_components(
 
     G_grid = create_grid_graph_nodes(xy=xy)
 
+    if len(grid_connect_graph.nodes) == 0:
+        raise ValueError("No mesh nodes, return only grid graph")
+
     G_g2m = connect_nodes_across_graphs(
         G_source=G_grid,
         G_target=grid_connect_graph,
         method=g2m_connectivity,
+        distance_metric=distance_metric,
         **g2m_connectivity_kwargs,
     )
     graph_components["g2m"] = G_g2m
@@ -126,6 +148,7 @@ def create_all_graph_components(
         G_source=grid_connect_graph,
         G_target=G_grid,
         method=m2g_connectivity,
+        distance_metric=distance_metric,
         **m2g_connectivity_kwargs,
     )
     graph_components["m2g"] = G_m2g
@@ -151,6 +174,44 @@ def create_all_graph_components(
     return G_tot
 
 
+class DistanceMeasurer:
+    def __init__(self, distance_metric, xy_source):
+        self.distance_metric = distance_metric
+
+        if distance_metric == "euclidean":
+            self._tree = scipy.spatial.KDTree(xy_source)
+        elif distance_metric == "haversine":
+            self._tree = sklearn.neighbors.BallTree(
+                np.radians(xy_source), metric="haversine"
+            )
+        else:
+            raise NotImplementedError(
+                f"Distance metric {distance_metric} not implemented"
+            )
+
+    def query(self, xy_target, k):
+        if self.distance_metric == "euclidean":
+            return self._tree.query(xy_target, k)[1]
+        elif self.distance_metric == "haversine":
+            return self._tree.query([np.radians(xy_target)], k, return_distance=False)[
+                0
+            ]
+        else:
+            raise NotImplementedError(
+                f"Distance metric {self.distance_metric} not implemented"
+            )
+
+    def query_radius(self, xy_target, r):
+        if self.distance_metric == "euclidean":
+            return self._tree.query_ball_point(xy_target, r)
+        elif self.distance_metric == "haversine":
+            return self._tree.query_radius([np.radians(xy_target)], np.radians(r))[0]
+        else:
+            raise NotImplementedError(
+                f"Distance metric {self.distance_metric} not implemented"
+            )
+
+
 def connect_nodes_across_graphs(
     G_source,
     G_target,
@@ -158,6 +219,7 @@ def connect_nodes_across_graphs(
     max_dist=None,
     rel_max_dist=None,
     max_num_neighbours=None,
+    distance_metric="euclidean",
 ):
     """
     Create a new graph containing the nodes in `G_source` and `G_target` and add
@@ -203,7 +265,9 @@ def connect_nodes_across_graphs(
 
     # build kd tree for source nodes (e.g. the mesh nodes when constructing m2g)
     xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
-    kdt_s = scipy.spatial.KDTree(xy_source)
+    distance_measurer = DistanceMeasurer(
+        distance_metric=distance_metric, xy_source=xy_source
+    )
 
     # Determine method and perform checks once
     # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in
@@ -265,7 +329,7 @@ def connect_nodes_across_graphs(
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idx = kdt_s.query(xy_target, 1)[1]
+            neigh_idx = distance_measurer.query(xy_target, 1)
             return [neigh_idx]
 
     elif method == "nearest_neighbours":
@@ -279,7 +343,7 @@ def connect_nodes_across_graphs(
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idxs = kdt_s.query(xy_target, max_num_neighbours)[1]
+            neigh_idxs = distance_measurer.query(xy_target, max_num_neighbours)
             return neigh_idxs
 
     elif method == "within_radius":
@@ -330,7 +394,7 @@ def connect_nodes_across_graphs(
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idxs = kdt_s.query_ball_point(xy_target, query_dist)
+            neigh_idxs = distance_measurer.query_radius(xy_target, query_dist)
             return neigh_idxs
 
     else:
@@ -351,15 +415,13 @@ def connect_nodes_across_graphs(
             source_node = source_nodes_list[i]
             # add edge from source to target
             G_connect.add_edge(source_node, target_node)
-            d = np.sqrt(
-                np.sum(
-                    (
-                        G_connect.nodes[source_node]["pos"]
-                        - G_connect.nodes[target_node]["pos"]
-                    )
-                    ** 2
-                )
+
+            d = _calc_distance(
+                pos1=G_source.nodes[source_node]["pos"],
+                pos2=G_target.nodes[target_node]["pos"],
+                distance_metric=distance_metric,
             )
+
             G_connect.edges[source_node, target_node]["len"] = d
             G_connect.edges[source_node, target_node]["vdiff"] = (
                 G_connect.nodes[source_node]["pos"]
@@ -367,3 +429,14 @@ def connect_nodes_across_graphs(
             )
 
     return G_connect
+
+
+def _calc_distance(pos1, pos2, distance_metric):
+    if distance_metric == "euclidean":
+        return np.sqrt(np.sum((pos1 - pos2) ** 2))
+    elif distance_metric == "haversine":
+        return sklearn.metrics.pairwise.haversine_distances(
+            np.radians([pos1]), np.radians([pos2])
+        )[0][0]
+    else:
+        raise NotImplementedError(f"Distance metric {distance_metric} not implemented")
