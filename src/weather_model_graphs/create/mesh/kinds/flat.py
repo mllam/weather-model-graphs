@@ -102,7 +102,8 @@ def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
     """
     # Compute number of mesh nodes in x and y dimensions
     range_x, range_y = np.ptp(xy, axis=0)
-    nx = int(range_x / mesh_node_distance)
-    ny = int(range_y / mesh_node_distance)
+    # ensure we have at least one node in each direction
+    nx = max(int(range_x / mesh_node_distance), 1)
+    ny = max(int(range_y / mesh_node_distance), 1)
 
     return mesh_graph.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)

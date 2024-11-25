@@ -14,6 +14,7 @@ import networkx
 import networkx as nx
 import numpy as np
 import scipy.spatial
+import sklearn.neighbors
 from loguru import logger
 
 from ..networkx_utils import (
@@ -38,6 +39,7 @@ def create_all_graph_components(
     m2g_connectivity_kwargs={},
     g2m_connectivity_kwargs={},
     projection: ccrs.CRS | None = None,
+    distance_metric: str = "euclidean",
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -88,7 +90,7 @@ def create_all_graph_components(
 
     if projection is None:
         logger.debug(
-            "No `projection` given: Assuming `coords` contains in-projection Cartesian coordinates."
+            "No `projection` given: will apply distance metric directly to provided coordinates."
         )
         xy = coords
     else:
@@ -130,10 +132,14 @@ def create_all_graph_components(
 
     G_grid = create_grid_graph_nodes(xy=xy)
 
+    if len(grid_connect_graph.nodes) == 0:
+        raise ValueError("No mesh nodes, return only grid graph")
+
     G_g2m = connect_nodes_across_graphs(
         G_source=G_grid,
         G_target=grid_connect_graph,
         method=g2m_connectivity,
+        distance_metric=distance_metric,
         **g2m_connectivity_kwargs,
     )
     graph_components["g2m"] = G_g2m
@@ -142,6 +148,7 @@ def create_all_graph_components(
         G_source=grid_connect_graph,
         G_target=G_grid,
         method=m2g_connectivity,
+        distance_metric=distance_metric,
         **m2g_connectivity_kwargs,
     )
     graph_components["m2g"] = G_m2g
@@ -167,6 +174,44 @@ def create_all_graph_components(
     return G_tot
 
 
+class DistanceMeasurer:
+    def __init__(self, distance_metric, xy_source):
+        self.distance_metric = distance_metric
+
+        if distance_metric == "euclidean":
+            self._tree = scipy.spatial.KDTree(xy_source)
+        elif distance_metric == "haversine":
+            self._tree = sklearn.neighbors.BallTree(
+                np.radians(xy_source), metric="haversine"
+            )
+        else:
+            raise NotImplementedError(
+                f"Distance metric {distance_metric} not implemented"
+            )
+
+    def query(self, xy_target, k):
+        if self.distance_metric == "euclidean":
+            return self._tree.query(xy_target, k)[1]
+        elif self.distance_metric == "haversine":
+            return self._tree.query([np.radians(xy_target)], k, return_distance=False)[
+                0
+            ]
+        else:
+            raise NotImplementedError(
+                f"Distance metric {self.distance_metric} not implemented"
+            )
+
+    def query_radius(self, xy_target, r):
+        if self.distance_metric == "euclidean":
+            return self._tree.query_ball_point(xy_target, r)
+        elif self.distance_metric == "haversine":
+            return self._tree.query_radius([np.radians(xy_target)], np.radians(r))[0]
+        else:
+            raise NotImplementedError(
+                f"Distance metric {self.distance_metric} not implemented"
+            )
+
+
 def connect_nodes_across_graphs(
     G_source,
     G_target,
@@ -174,6 +219,7 @@ def connect_nodes_across_graphs(
     max_dist=None,
     rel_max_dist=None,
     max_num_neighbours=None,
+    distance_metric="euclidean",
 ):
     """
     Create a new graph containing the nodes in `G_source` and `G_target` and add
@@ -219,7 +265,9 @@ def connect_nodes_across_graphs(
 
     # build kd tree for source nodes (e.g. the mesh nodes when constructing m2g)
     xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
-    kdt_s = scipy.spatial.KDTree(xy_source)
+    distance_measurer = DistanceMeasurer(
+        distance_metric=distance_metric, xy_source=xy_source
+    )
 
     # Determine method and perform checks once
     # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in
@@ -281,7 +329,7 @@ def connect_nodes_across_graphs(
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idx = kdt_s.query(xy_target, 1)[1]
+            neigh_idx = distance_measurer.query(xy_target, 1)
             return [neigh_idx]
 
     elif method == "nearest_neighbours":
@@ -295,7 +343,7 @@ def connect_nodes_across_graphs(
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idxs = kdt_s.query(xy_target, max_num_neighbours)[1]
+            neigh_idxs = distance_measurer.query(xy_target, max_num_neighbours)
             return neigh_idxs
 
     elif method == "within_radius":
@@ -346,7 +394,7 @@ def connect_nodes_across_graphs(
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idxs = kdt_s.query_ball_point(xy_target, query_dist)
+            neigh_idxs = distance_measurer.query_radius(xy_target, query_dist)
             return neigh_idxs
 
     else:
@@ -367,15 +415,13 @@ def connect_nodes_across_graphs(
             source_node = source_nodes_list[i]
             # add edge from source to target
             G_connect.add_edge(source_node, target_node)
-            d = np.sqrt(
-                np.sum(
-                    (
-                        G_connect.nodes[source_node]["pos"]
-                        - G_connect.nodes[target_node]["pos"]
-                    )
-                    ** 2
-                )
+
+            d = _calc_distance(
+                pos1=G_source.nodes[source_node]["pos"],
+                pos2=G_target.nodes[target_node]["pos"],
+                distance_metric=distance_metric,
             )
+
             G_connect.edges[source_node, target_node]["len"] = d
             G_connect.edges[source_node, target_node]["vdiff"] = (
                 G_connect.nodes[source_node]["pos"]
@@ -383,3 +429,14 @@ def connect_nodes_across_graphs(
             )
 
     return G_connect
+
+
+def _calc_distance(pos1, pos2, distance_metric):
+    if distance_metric == "euclidean":
+        return np.sqrt(np.sum((pos1 - pos2) ** 2))
+    elif distance_metric == "haversine":
+        return sklearn.metrics.pairwise.haversine_distances(
+            np.radians([pos1]), np.radians([pos2])
+        )[0][0]
+    else:
+        raise NotImplementedError(f"Distance metric {distance_metric} not implemented")

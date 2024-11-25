@@ -1,7 +1,9 @@
 from .base import create_all_graph_components
 
 
-def create_keisler_graph(coords, mesh_node_distance=3, projection=None):
+def create_keisler_graph(
+    coords, mesh_node_distance=3, projection=None, distance_metric="euclidean"
+):
     """
     Create a flat LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     This graph setup is inspired by the global graph used by Keisler (2022, https://arxiv.org/abs/2202.07575).
@@ -45,6 +47,7 @@ def create_keisler_graph(coords, mesh_node_distance=3, projection=None):
             max_num_neighbours=4,
         ),
         projection=projection,
+        distance_metric=distance_metric,
     )
 
 
@@ -54,6 +57,7 @@ def create_graphcast_graph(
     level_refinement_factor=3,
     max_num_levels=None,
     projection=None,
+    distance_metric="euclidean",
 ):
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -106,6 +110,7 @@ def create_graphcast_graph(
             max_num_neighbours=4,
         ),
         projection=projection,
+        distance_metric=distance_metric,
     )
 
 
@@ -115,6 +120,7 @@ def create_oskarsson_hierarchical_graph(
     level_refinement_factor=3,
     max_num_levels=None,
     projection=None,
+    distance_metric="euclidean",
 ):
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -170,4 +176,5 @@ def create_oskarsson_hierarchical_graph(
             max_num_neighbours=4,
         ),
         projection=projection,
+        distance_metric=distance_metric,
     )
