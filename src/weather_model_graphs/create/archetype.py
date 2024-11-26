@@ -1,7 +1,12 @@
 from .base import create_all_graph_components
 
 
-def create_keisler_graph(coords, mesh_node_distance=3, projection=None):
+def create_keisler_graph(
+    coords,
+    mesh_node_distance=3,
+    coords_crs=None,
+    graph_crs=None,
+):
     """
     Create a flat LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     This graph setup is inspired by the global graph used by Keisler (2022, https://arxiv.org/abs/2202.07575).
@@ -44,7 +49,8 @@ def create_keisler_graph(coords, mesh_node_distance=3, projection=None):
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
-        projection=projection,
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
     )
 
 
@@ -53,7 +59,8 @@ def create_graphcast_graph(
     mesh_node_distance=3,
     level_refinement_factor=3,
     max_num_levels=None,
-    projection=None,
+    coords_crs=None,
+    graph_crs=None,
 ):
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -105,7 +112,8 @@ def create_graphcast_graph(
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
-        projection=projection,
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
     )
 
 
@@ -114,7 +122,8 @@ def create_oskarsson_hierarchical_graph(
     mesh_node_distance=3,
     level_refinement_factor=3,
     max_num_levels=None,
-    projection=None,
+    coords_crs=None,
+    graph_crs=None,
 ):
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -169,5 +178,6 @@ def create_oskarsson_hierarchical_graph(
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
-        projection=projection,
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
     )

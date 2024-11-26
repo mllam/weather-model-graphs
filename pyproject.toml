@@ -10,7 +10,7 @@ dependencies = [
     "loguru>=0.7.2",
     "networkx>=3.3",
     "scipy>=1.13.0",
-    "cartopy>=0.24.1",
+    "pyproj>=3.7.0",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
