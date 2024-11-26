@@ -110,14 +110,14 @@ def create_multirange_2d_mesh_graphs(
     # Compute the size along x and y direction of area to cover with graph
     # This is measured in the Cartesian coordiantes of xy
     coord_extent = np.ptp(xy, axis=0)
-    extent_nodes_bottom_mesh = (coord_extent / mesh_node_distance).astype(int)
+    # Number of nodes that would fit on bottom level of hierarchy,
+    # in both directions
+    max_nodes_bottom = (coord_extent / mesh_node_distance).astype(int)
 
     # Find the number of mesh levels possible in x- and y-direction,
     # and the number of leaf nodes that would correspond to
-    # max_mesh_coord/(level_refinement_factor^mesh_levels) = 1
-    max_mesh_levels_float = np.log(extent_nodes_bottom_mesh) / np.log(
-        level_refinement_factor
-    )
+    # max_nodes_bottom/(level_refinement_factor^mesh_levels) = 1
+    max_mesh_levels_float = np.log(max_nodes_bottom) / np.log(level_refinement_factor)
 
     max_mesh_levels = max_mesh_levels_float.astype(int)  # (2,)
     nleaf = level_refinement_factor**max_mesh_levels

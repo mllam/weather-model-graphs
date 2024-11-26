@@ -11,10 +11,10 @@ function uses `connect_nodes_across_graphs` to connect nodes across the componen
 
 from typing import Iterable
 
-import cartopy.crs as ccrs
 import networkx
 import networkx as nx
 import numpy as np
+import pyproj
 import scipy.spatial
 from loguru import logger
 
@@ -39,7 +39,8 @@ def create_all_graph_components(
     m2m_connectivity_kwargs={},
     m2g_connectivity_kwargs={},
     g2m_connectivity_kwargs={},
-    projection: ccrs.CRS | None = None,
+    coords_crs: pyproj.crs.CRS | None = None,
+    graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable | None = None,
 ):
     """
@@ -79,9 +80,11 @@ def create_all_graph_components(
         such that the grid node is contained within it. Connect these 4 (or less along edges)
         mesh nodes to the grid node.
 
-    `projection` should either be a cartopy.crs.CRS or None. This is the projection
-    instance used to transform given lat-lon coords to in-projection Cartesian coordinates.
-    If None the coords are assumed to already be Cartesian.
+    `coords_crs` and `graph_crs` should either be a pyproj.crs.CRS or None.
+    Note that this includes a cartopy.crs.CRS. If both are given the coordinates
+    will be transformed from their original Coordinate Reference System (`coords_crs`)
+    to the CRS where the graph creation should take place (`graph_crs`).
+    If any one of them is None the graph creation is corried out using the original coords.
 
     `decode_mask` should be an Iterable of booleans, masking which grid positions should be
     decoded to (included in the m2g subgraph), i.e. which positions should be output. It should have the same length as the number of
@@ -94,21 +97,29 @@ def create_all_graph_components(
         len(coords.shape) == 2 and coords.shape[1] == 2
     ), "Grid node coordinates should be given as an array of shape [num_grid_nodes, 2]."
 
-    if projection is None:
+    # Translate between coordinate crs and crs to use for graph creation
+    if coords_crs is None and coords_crs is None:
         logger.debug(
-            "No `projection` given: Assuming `coords` contains in-projection Cartesian coordinates."
+            "No `coords_crs` given: Assuming `coords` contains in-projection Cartesian coordinates."
+        )
+        xy = coords
+    elif (coords_crs is None) != (graph_crs is None):  # xor, only one is None
+        logger.warning(
+            "Only one of `coords_crs` and `graph_crs` given. Both are needed to "
+            "transform coordinates to a different crs for constructing the graph: "
+            "Assuming `coords` contains in-projection Cartesian coordinates."
         )
         xy = coords
     else:
         logger.debug(
-            f"`projection` Proj({projection}) given, `coords` treated as lat-lons."
+            f"Projecting coords from CRS({coords_crs}) to CRS({graph_crs}) for graph creation."
         )
-        # Convert lat-lon coords to Cartesian xy
-        xyz = projection.transform_points(
-            src_crs=ccrs.PlateCarree(), x=coords[:, 0], y=coords[:, 1]
+        # Convert from coords_crs to to graph_crs
+        coord_transformer = pyproj.Transformer.from_crs(
+            coords_crs, graph_crs, always_xy=True
         )
-        # Remove z-dim
-        xy = xyz[:, :2]
+        xy_tuple = coord_transformer.transform(xx=coords[:, 0], yy=coords[:, 1])
+        xy = np.stack(xy_tuple, axis=1)
 
     if m2m_connectivity == "flat":
         graph_components["m2m"] = create_flat_singlescale_mesh_graph(
