@@ -172,11 +172,12 @@ def test_create_irregular_grid(kind_and_num_mesh):
 @pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
 def test_create_lat_lon(kind):
     """
-    Tests that graphs can be created from lat-lon coordinates + projection
+    Tests that graphs can be created from lat-lon coordinates + projection spec.
     """
     lon_coords = np.linspace(10, 30, 10)
     lat_coords = np.linspace(35, 65, 10)
-    projection = ccrs.LambertConformal()
+    coords_crs = ccrs.PlateCarree()
+    graph_crs = ccrs.LambertConformal()
     mesh_node_distance = 0.2 * 10**6
 
     meshgridded = np.meshgrid(lon_coords, lat_coords)
@@ -185,4 +186,6 @@ def test_create_lat_lon(kind):
     fn_name = f"create_{kind}_graph"
     fn = getattr(wmg.create.archetype, fn_name)
 
-    fn(coords=coords, mesh_node_distance=mesh_node_distance, projection=projection)
+    fn(coords=coords, mesh_node_distance=mesh_node_distance,
+            coords_crs=coords_crs,
+            graph_crs=graph_crs)
