@@ -23,6 +23,7 @@ pytorch = [
 visualisation = [
     "matplotlib>=3.8.4",
     "ipykernel>=6.29.4",
+    "cartopy>=0.24.1",
 ]
 docs = [
     "jupyter-book>=1.0.0",
