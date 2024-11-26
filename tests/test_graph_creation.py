@@ -186,6 +186,9 @@ def test_create_lat_lon(kind):
     fn_name = f"create_{kind}_graph"
     fn = getattr(wmg.create.archetype, fn_name)
 
-    fn(coords=coords, mesh_node_distance=mesh_node_distance,
-            coords_crs=coords_crs,
-            graph_crs=graph_crs)
+    fn(
+        coords=coords,
+        mesh_node_distance=mesh_node_distance,
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
+    )
