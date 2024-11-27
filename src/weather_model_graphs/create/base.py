@@ -42,6 +42,7 @@ def create_all_graph_components(
     coords_crs: pyproj.crs.CRS | None = None,
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable | None = None,
+    return_components: bool = False,
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -179,6 +180,14 @@ def create_all_graph_components(
     for name, graph in graph_components.items():
         for edge in graph.edges:
             graph.edges[edge]["component"] = name
+
+    if return_components:
+        # Give each component unique ids
+        graph_components = {
+            comp_name: replace_node_labels_with_unique_ids(subgraph)
+            for comp_name, subgraph in graph_components.items()
+        }
+        return graph_components
 
     # merge to single graph
     G_tot = networkx.compose_all(graph_components.values())
