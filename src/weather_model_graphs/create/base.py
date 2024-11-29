@@ -9,6 +9,8 @@ function uses `connect_nodes_across_graphs` to connect nodes across the componen
 """
 
 
+from typing import Iterable
+
 import networkx
 import networkx as nx
 import numpy as np
@@ -39,6 +41,8 @@ def create_all_graph_components(
     g2m_connectivity_kwargs={},
     coords_crs: pyproj.crs.CRS | None = None,
     graph_crs: pyproj.crs.CRS | None = None,
+    decode_mask: Iterable | None = None,
+    return_components: bool = False,
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -82,6 +86,11 @@ def create_all_graph_components(
     will be transformed from their original Coordinate Reference System (`coords_crs`)
     to the CRS where the graph creation should take place (`graph_crs`).
     If any one of them is None the graph creation is carried out using the original coords.
+
+    `decode_mask` should be an Iterable of booleans, masking which grid positions should be
+    decoded to (included in the m2g subgraph), i.e. which positions should be output. It should have the same length as the number of
+    grid position coordinates given in `coords`.  The mask being set to True means that corresponding
+    grid nodes should be included in g2m. If `decode_mask=None` (default), all grid nodes are included.
     """
     graph_components: dict[networkx.DiGraph] = {}
 
@@ -149,9 +158,19 @@ def create_all_graph_components(
     )
     graph_components["g2m"] = G_g2m
 
+    if decode_mask is None:
+        # decode to all grid nodes
+        decode_grid = G_grid
+    else:
+        # Select subset of grid nodes to decode to, where m2g should connect
+        filter_nodes = [
+            n for n, include in zip(G_grid.nodes, decode_mask, strict=True) if include
+        ]
+        decode_grid = G_grid.subgraph(filter_nodes)
+
     G_m2g = connect_nodes_across_graphs(
         G_source=grid_connect_graph,
-        G_target=G_grid,
+        G_target=decode_grid,
         method=m2g_connectivity,
         **m2g_connectivity_kwargs,
     )
@@ -161,6 +180,14 @@ def create_all_graph_components(
     for name, graph in graph_components.items():
         for edge in graph.edges:
             graph.edges[edge]["component"] = name
+
+    if return_components:
+        # Give each component unique ids
+        graph_components = {
+            comp_name: replace_node_labels_with_unique_ids(subgraph)
+            for comp_name, subgraph in graph_components.items()
+        }
+        return graph_components
 
     # merge to single graph
     G_tot = networkx.compose_all(graph_components.values())

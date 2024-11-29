@@ -192,3 +192,27 @@ def test_create_lat_lon(kind):
         coords_crs=coords_crs,
         graph_crs=graph_crs,
     )
+
+
+@pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
+def test_create_decode_mask(kind):
+    """
+    Tests that the decode mask for m2g works, resulting in less edges than
+    no filtering.
+    """
+    xy = test_utils.create_fake_irregular_coords(100)
+    fn_name = f"create_{kind}_graph"
+    fn = getattr(wmg.create.archetype, fn_name)
+    # ~= 20 mesh nodes in bottom layer in each direction
+    mesh_node_distance = 0.05
+
+    unfiltered_graph = fn(coords=xy, mesh_node_distance=mesh_node_distance)
+
+    # Filter to only 20 / 100 grid nodes
+    decode_mask = np.concatenate((np.ones(20), np.zeros(80))).astype(bool)
+    filtered_graph = fn(
+        coords=xy, mesh_node_distance=mesh_node_distance, decode_mask=decode_mask
+    )
+
+    # Check that some filtering has been performed
+    assert len(filtered_graph.edges) < len(unfiltered_graph.edges)
