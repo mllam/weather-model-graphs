@@ -23,6 +23,8 @@ def create_keisler_graph(coords, mesh_node_distance=3, **kwargs):
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of coords
+    **kwargs:
+        Additional keyword arguments passed on to create_all_graph_components.
 
     Returns
     -------
@@ -77,6 +79,8 @@ def create_graphcast_graph(
         NOTE: Must be an odd integer >1 to create proper multiscale graph
     max_num_levels: int
         The number of levels of longer-range connections in the mesh graph.
+    **kwargs:
+        Additional keyword arguments passed on to create_all_graph_components.
 
     Returns
     -------
@@ -140,6 +144,8 @@ def create_oskarsson_hierarchical_graph(
         Refinement factor between grid points and bottom level of mesh hierarchy
     max_num_levels: int
         The number of levels of longer-range connections in the mesh graph.
+    **kwargs:
+        Additional keyword arguments passed on to create_all_graph_components.
 
     Returns
     -------
