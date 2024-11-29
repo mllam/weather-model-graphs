@@ -16,8 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Change coordinate input to array of shape [N_grid_points, 2], to allow for
-  non-regularly gridded coordinates
+- Change coordinate input to array of shape [N_grid_points, 2] (was previously 
+  [2, Ny, Nx]), to allow for non-regularly gridded coordinates
   [\#32](https://github.com/mllam/weather-model-graphs/pull/32), @joeloskarsson
 
 ## [v0.2.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.2.0)
