@@ -4,26 +4,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
+import tests.utils as test_utils
 import weather_model_graphs as wmg
 
 
-def _create_fake_xy(N=10):
-    x = np.linspace(0, 1, N)
-    y = np.linspace(0, 1, N)
-    xy = np.meshgrid(x, y)
-    xy = np.stack(xy, axis=0)
-    return xy
-
-
 def test_plot():
-    xy = _create_fake_xy(10)
+    xy = test_utils.create_fake_xy(10)
 
     graph = wmg.create.create_all_graph_components(
         m2m_connectivity="flat_multiscale",
-        xy=xy,
+        coords=xy,
         m2m_connectivity_kwargs=dict(
             max_num_levels=3,
-            grid_refinement_factor=2,
+            mesh_node_distance=2,
             level_refinement_factor=3,
         ),
         g2m_connectivity="nearest_neighbour",

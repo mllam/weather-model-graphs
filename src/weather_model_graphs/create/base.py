@@ -12,7 +12,9 @@ function uses `connect_nodes_across_graphs` to connect nodes across the componen
 import networkx
 import networkx as nx
 import numpy as np
+import pyproj
 import scipy.spatial
+from loguru import logger
 
 from ..networkx_utils import (
     replace_node_labels_with_unique_ids,
@@ -20,19 +22,23 @@ from ..networkx_utils import (
     split_on_edge_attribute_existance,
 )
 from .grid import create_grid_graph_nodes
-from .mesh.kinds.flat import create_flat_multiscale_mesh_graph
+from .mesh.kinds.flat import (
+    create_flat_multiscale_mesh_graph,
+    create_flat_singlescale_mesh_graph,
+)
 from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
-from .mesh.mesh import create_single_level_2d_mesh_graph
 
 
 def create_all_graph_components(
-    xy: np.ndarray,
+    coords: np.ndarray,
     m2m_connectivity: str,
     m2g_connectivity: str,
     g2m_connectivity: str,
     m2m_connectivity_kwargs={},
     m2g_connectivity_kwargs={},
     g2m_connectivity_kwargs={},
+    coords_crs: pyproj.crs.CRS | None = None,
+    graph_crs: pyproj.crs.CRS | None = None,
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -53,14 +59,14 @@ def create_all_graph_components(
         of `max_dist` or relative distance of `rel_max_dist` from each node in mesh
 
     m2m_connectivity:
-    - "flat": Create a single-level 2D mesh graph with `grid_refinement_factor`,
+    - "flat": Create a single-level 2D mesh graph with `mesh_node_distance`,
         similar to Keisler et al. (2022)
     - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels`,
-        `grid_refinement_factor` and `level_refinement_factor`,
+        `mesh_node_distance` and `level_refinement_factor`,
         similar to GraphCast, Lam et al. (2023)
     - "hierarchical": Create a hierarchical mesh graph with `max_num_levels`,
-        `grid_refinement_factor` and `level_refinement_factor`,
-        similar to Okcarsson et al. (2023)
+        `mesh_node_distance` and `level_refinement_factor`,
+        similar to Oskarsson et al. (2023)
 
     m2g_connectivity:
     - "nearest_neighbour": Find the nearest neighbour in mesh for each node in grid
@@ -70,27 +76,48 @@ def create_all_graph_components(
     - "containing_rectangle": For each grid node, find the rectangle with 4 mesh nodes as corners
         such that the grid node is contained within it. Connect these 4 (or less along edges)
         mesh nodes to the grid node.
+
+    `coords_crs` and `graph_crs` should either be a pyproj.crs.CRS or None.
+    Note that this includes a cartopy.crs.CRS. If both are given the coordinates
+    will be transformed from their original Coordinate Reference System (`coords_crs`)
+    to the CRS where the graph creation should take place (`graph_crs`).
+    If any one of them is None the graph creation is carried out using the original coords.
     """
     graph_components: dict[networkx.DiGraph] = {}
 
-    if len(xy.shape) != 3:
-        raise NotImplementedError(
-            "Mesh coordinates are assumed to lie on a regular grid so that "
-            "the coordinates values are given with an array of shape [2, nx, ny]"
+    assert (
+        len(coords.shape) == 2 and coords.shape[1] == 2
+    ), "Grid node coordinates should be given as an array of shape [num_grid_nodes, 2]."
+
+    # Translate between coordinate crs and crs to use for graph creation
+    if coords_crs is None and coords_crs is None:
+        logger.debug(
+            "No `coords_crs` given: Assuming `coords` contains in-projection Cartesian coordinates."
         )
+        xy = coords
+    elif (coords_crs is None) != (graph_crs is None):  # xor, only one is None
+        logger.warning(
+            "Only one of `coords_crs` and `graph_crs` given. Both are needed to "
+            "transform coordinates to a different crs for constructing the graph: "
+            "Assuming `coords` contains in-projection Cartesian coordinates."
+        )
+        xy = coords
+    else:
+        logger.debug(
+            f"Projecting coords from CRS({coords_crs}) to CRS({graph_crs}) for graph creation."
+        )
+        # Convert from coords_crs to to graph_crs
+        coord_transformer = pyproj.Transformer.from_crs(
+            coords_crs, graph_crs, always_xy=True
+        )
+        xy_tuple = coord_transformer.transform(xx=coords[:, 0], yy=coords[:, 1])
+        xy = np.stack(xy_tuple, axis=1)
 
     if m2m_connectivity == "flat":
-        # Compute number of mesh nodes in x and y dimensions
-        # Note that the ratio between grid and mesh nodes here is closer to the
-        # requested refinement factor, as for the flat graph we are not restricted
-        # to creating a "collapsable" graph with nodes at the same locations across
-        # levels.
-        refinement_factor = m2m_connectivity_kwargs["grid_refinement_factor"]
-        ny_g, nx_g = xy.shape[1:]
-        nx = int(nx_g / refinement_factor)
-        ny = int(ny_g / refinement_factor)
-
-        graph_components["m2m"] = create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
+        graph_components["m2m"] = create_flat_singlescale_mesh_graph(
+            xy,
+            **m2m_connectivity_kwargs,
+        )
         grid_connect_graph = graph_components["m2m"]
     elif m2m_connectivity == "hierarchical":
         # hierarchical mesh graph have three sub-graphs:

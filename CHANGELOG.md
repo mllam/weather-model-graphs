@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.2.0...HEAD)
 
+### Added
+
+- Add coords_crs and graph_crs arguments to allow for using lat-lons coordinates
+  or other CRSs as input. These are then converted to the specific CRS used when
+  constructing the graph.
+  [\#32](https://github.com/mllam/weather-model-graphs/pull/32), @joeloskarsson
+
+### Changed
+
+- Change coordinate input to array of shape [N_grid_points, 2] (was previously
+  [2, Ny, Nx]), to allow for non-regularly gridded coordinates
+  [\#32](https://github.com/mllam/weather-model-graphs/pull/32), @joeloskarsson
 
 ## [v0.2.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.2.0)
 

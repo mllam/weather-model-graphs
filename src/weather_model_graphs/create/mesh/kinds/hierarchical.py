@@ -8,7 +8,7 @@ from .. import mesh as mesh_graph
 
 def create_hierarchical_multiscale_mesh_graph(
     xy,
-    grid_refinement_factor: float,
+    mesh_node_distance: float,
     level_refinement_factor: float,
     max_num_levels: int,
 ):
@@ -22,9 +22,13 @@ def create_hierarchical_multiscale_mesh_graph(
     ----------
     xy: np.ndarray
         2D array of mesh point positions.
-    refinement_factor: int
-        Refinement factor between mesh levels, the reduction factor in the number of
-        mesh points between levels (in both x and y directions).
+        Distance (in x- and y-direction) between created mesh nodes in bottom level,
+        in coordinate system of xy
+    mesh_node_distance: float
+        Distance (in x- and y-direction) between created mesh nodes in bottom level,
+        in coordinate system of xy
+    level_refinement_factor: float
+        Refinement factor between grid points and bottom level of mesh hierarchy
     max_num_levels: int
         The number of levels in the hierarchical mesh graph.
 
@@ -37,7 +41,7 @@ def create_hierarchical_multiscale_mesh_graph(
     Gs_all_levels: list[networkx.DiGraph] = mesh_graph.create_multirange_2d_mesh_graphs(
         max_num_levels=max_num_levels,
         xy=xy,
-        grid_refinement_factor=grid_refinement_factor,
+        mesh_node_distance=mesh_node_distance,
         level_refinement_factor=level_refinement_factor,
     )
     n_mesh_levels = len(Gs_all_levels)
@@ -45,9 +49,9 @@ def create_hierarchical_multiscale_mesh_graph(
     if n_mesh_levels < 2:
         raise ValueError(
             "At least two mesh levels are required for hierarchical mesh graph. "
-            f"You may need to reduce the refinement factors"
+            "You may need to reduce the level refinement factor "
             f"or increase the max number of levels {max_num_levels} "
-            f"or number of grid points {xy.shape[1:]}."
+            f"or number of grid points {xy.shape[0]}."
         )
 
     # Relabel nodes of each level with level index first
