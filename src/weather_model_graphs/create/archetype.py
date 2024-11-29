@@ -24,13 +24,15 @@ def create_keisler_graph(
     Parameters
     ----------
     coords: np.ndarray
-        2D array of grid point positions, either in-projection Cartesian coordinates or lat-lons
+        2D array of grid point positions, in coordinate CRS
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of coords
-    projection: cartopy.crs.CRS or None
-        Projection instance used to transform given lat-lon coords to in-projection
-        Cartesian coordinates. If None the coords are assumed to already be Cartesian.
+    coords_crs: pyproj.crs.CRS or None
+        CRS of the given coordinates
+    graph_crs:
+        CRS to build graph in. If given, coords will be transformed from
+        coords_crs to graph_crs before graph construction
 
     Returns
     -------
@@ -78,7 +80,7 @@ def create_graphcast_graph(
     Parameters
     ----------
     coords: np.ndarray
-        2D array of grid point positions, either in-projection Cartesian coordinates or lat-lons
+        2D array of grid point positions, in coordinate CRS
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of coords
@@ -87,9 +89,11 @@ def create_graphcast_graph(
         NOTE: Must be an odd integer >1 to create proper multiscale graph
     max_num_levels: int
         The number of levels of longer-range connections in the mesh graph.
-    projection: cartopy.crs.CRS or None
-        Projection instance used to transform given lat-lon coords to in-projection
-        Cartesian coordinates. If None the coords are assumed to already be Cartesian.
+    coords_crs: pyproj.crs.CRS or None
+        CRS of the given coordinates
+    graph_crs:
+        CRS to build graph in. If given, coords will be transformed from
+        coords_crs to graph_crs before graph construction
 
     Returns
     -------
@@ -147,15 +151,17 @@ def create_oskarsson_hierarchical_graph(
     Parameters
     ----------
     coords: np.ndarray
-        2D array of grid point positions, either in-projection Cartesian coordinates or lat-lons
+        2D array of grid point positions, in coordinate CRS
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes in bottom level,
         in coordinate system of coords
     level_refinement_factor: float
         Refinement factor between grid points and bottom level of mesh hierarchy
-    projection: cartopy.crs.CRS or None
-        Projection instance used to transform given lat-lon coords to in-projection
-        Cartesian coordinates. If None the coords are assumed to already be Cartesian.
+    coords_crs: pyproj.crs.CRS or None
+        CRS of the given coordinates
+    graph_crs:
+        CRS to build graph in. If given, coords will be transformed from
+        coords_crs to graph_crs before graph construction
 
     Returns
     -------
