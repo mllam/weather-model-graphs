@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.2.0...HEAD)
 
+### Added
+
+- added test to check python codeblocks in README keep working as code changes
+  [\#38](https://github.com/mllam/weather-model-graphs/pull/38) @leifdenby
+
 
 ## [v0.2.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.2.0)
 
