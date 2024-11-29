@@ -13,7 +13,7 @@ def _parse_readme_examples():
     return code_blocks
 
 
-@pytest.mark.parametrize("codeblock_examples", _parse_readme_examples())
+@pytest.mark.parametrize("codeblock_example", _parse_readme_examples())
 def test_readme_example(codeblock_example: str):
     """
     Check that execution of the python code block in the README does not raise an exception.
