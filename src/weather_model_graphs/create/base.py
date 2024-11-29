@@ -85,7 +85,7 @@ def create_all_graph_components(
     Note that this includes a cartopy.crs.CRS. If both are given the coordinates
     will be transformed from their original Coordinate Reference System (`coords_crs`)
     to the CRS where the graph creation should take place (`graph_crs`).
-    If any one of them is None the graph creation is corried out using the original coords.
+    If any one of them is None the graph creation is carried out using the original coords.
 
     `decode_mask` should be an Iterable of booleans, masking which grid positions should be
     decoded to (included in the m2g subgraph), i.e. which positions should be output. It should have the same length as the number of

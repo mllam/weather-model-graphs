@@ -19,18 +19,10 @@ def create_keisler_graph(coords, mesh_node_distance=3, **kwargs):
     Parameters
     ----------
     coords: np.ndarray
-        2D array of grid point positions, either in-projection Cartesian coordinates or lat-lons
+        2D array of grid point positions, in coordinate CRS
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of coords
-    projection: cartopy.crs.CRS or None
-        Projection instance used to transform given lat-lon coords to in-projection
-        Cartesian coordinates. If None the coords are assumed to already be Cartesian.
-    decode_mask: Iterable or None
-        Mask describing which grid positions should be decoded to (included in the m2g subgraph), i.e. which positions should be output.
-        It should have the same length as the number of grid position coordinates given in `coords`.
-        The mask being set to True means that corresponding grid nodes should be included in g2m.
-        If `decode_mask=None` (default), all grid nodes are included.
 
     Returns
     -------
@@ -76,7 +68,7 @@ def create_graphcast_graph(
     Parameters
     ----------
     coords: np.ndarray
-        2D array of grid point positions, either in-projection Cartesian coordinates or lat-lons
+        2D array of grid point positions, in coordinate CRS
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of coords
@@ -85,14 +77,6 @@ def create_graphcast_graph(
         NOTE: Must be an odd integer >1 to create proper multiscale graph
     max_num_levels: int
         The number of levels of longer-range connections in the mesh graph.
-    projection: cartopy.crs.CRS or None
-        Projection instance used to transform given lat-lon coords to in-projection
-        Cartesian coordinates. If None the coords are assumed to already be Cartesian.
-    decode_mask: Iterable or None
-        Mask describing which grid positions should be decoded to (included in the m2g subgraph), i.e. which positions should be output.
-        It should have the same length as the number of grid position coordinates given in `coords`.
-        The mask being set to True means that corresponding grid nodes should be included in g2m.
-        If `decode_mask=None` (default), all grid nodes are included.
 
     Returns
     -------
@@ -148,20 +132,14 @@ def create_oskarsson_hierarchical_graph(
     Parameters
     ----------
     coords: np.ndarray
-        2D array of grid point positions, either in-projection Cartesian coordinates or lat-lons
+        2D array of grid point positions, in coordinate CRS
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes in bottom level,
         in coordinate system of coords
     level_refinement_factor: float
         Refinement factor between grid points and bottom level of mesh hierarchy
-    projection: cartopy.crs.CRS or None
-        Projection instance used to transform given lat-lon coords to in-projection
-        Cartesian coordinates. If None the coords are assumed to already be Cartesian.
-    decode_mask: Iterable or None
-        Mask describing which grid positions should be decoded to (included in the m2g subgraph), i.e. which positions should be output.
-        It should have the same length as the number of grid position coordinates given in `coords`.
-        The mask being set to True means that corresponding grid nodes should be included in g2m.
-        If `decode_mask=None` (default), all grid nodes are included.
+    max_num_levels: int
+        The number of levels of longer-range connections in the mesh graph.
 
     Returns
     -------
