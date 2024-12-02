@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- added test to check python codeblocks in README keep working as code changes
+  [\#38](https://github.com/mllam/weather-model-graphs/pull/38) @leifdenby
+
 - Add coords_crs and graph_crs arguments to allow for using lat-lons coordinates
   or other CRSs as input. These are then converted to the specific CRS used when
   constructing the graph.
