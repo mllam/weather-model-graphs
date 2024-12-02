@@ -1,19 +1,11 @@
 import tempfile
 
-import numpy as np
 import pytest
 from loguru import logger
 
+import tests.utils as test_utils
 import weather_model_graphs as wmg
 from weather_model_graphs.save import HAS_PYG
-
-
-def _create_fake_xy(N=10):
-    x = np.linspace(0, 1, N)
-    y = np.linspace(0, 1, N)
-    xy = np.meshgrid(x, y)
-    xy = np.stack(xy, axis=0)
-    return xy
 
 
 @pytest.mark.parametrize("list_from_attribute", [None, "level"])
@@ -24,8 +16,8 @@ def test_save_to_pyg(list_from_attribute):
         )
         return
 
-    xy = _create_fake_xy(N=64)
-    graph = wmg.create.archetype.create_oskarsson_hierarchical_graph(xy_grid=xy)
+    xy = test_utils.create_fake_xy(N=64)
+    graph = wmg.create.archetype.create_oskarsson_hierarchical_graph(coords=xy)
 
     graph_components = wmg.split_graph_by_edge_attribute(graph=graph, attr="component")
 

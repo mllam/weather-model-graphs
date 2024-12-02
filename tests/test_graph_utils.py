@@ -1,19 +1,10 @@
-import numpy as np
-
+import tests.utils as test_utils
 import weather_model_graphs as wmg
 
 
-def _create_fake_xy(N=10):
-    x = np.linspace(0, 1, N)
-    y = np.linspace(0, 1, N)
-    xy = np.meshgrid(x, y)
-    xy = np.stack(xy, axis=0)
-    return xy
-
-
 def test_graph_splitting():
-    xy = _create_fake_xy(N=64)
-    graph = wmg.create.archetype.create_oskarsson_hierarchical_graph(xy_grid=xy)
+    xy = test_utils.create_fake_xy(N=64)
+    graph = wmg.create.archetype.create_oskarsson_hierarchical_graph(coords=xy)
 
     graph_components = wmg.split_graph_by_edge_attribute(graph=graph, attr="component")
 

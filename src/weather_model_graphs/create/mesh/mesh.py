@@ -22,10 +22,10 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
 
     Parameters
     ----------
-    xy : np.ndarray [2, M, N]
-        Grid point coordinates, with first dimension representing
-        x and y coordinates respectively. M and N are the number
-        of grid points in the y and x direction respectively
+    xy : np.ndarray [N_grid_points, 2]
+        Grid point coordinates, with first column representing
+        x coordinates and second column y coordinates. N_grid_points is the
+        total number of grid points.
     nx : int
         Number of nodes in x direction
     ny : int
@@ -36,8 +36,8 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
     networkx.DiGraph
         Graph representing the 2D grid
     """
-    xm, xM = np.amin(xy[0][0, :]), np.amax(xy[0][0, :])
-    ym, yM = np.amin(xy[1][:, 0]), np.amax(xy[1][:, 0])
+    xm, xM = np.amin(xy[:, 0]), np.amax(xy[:, 0])
+    ym, yM = np.amin(xy[:, 1]), np.amax(xy[:, 1])
 
     # avoid nodes on border
     dx = (xM - xm) / nx
@@ -79,7 +79,7 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
 
 
 def create_multirange_2d_mesh_graphs(
-    max_num_levels, xy, grid_refinement_factor=3, level_refinement_factor=3
+    max_num_levels, xy, mesh_node_distance=3, level_refinement_factor=3
 ):
     """
     Create a list of 2D grid mesh graphs representing different levels of edge-length
@@ -94,11 +94,12 @@ def create_multirange_2d_mesh_graphs(
     max_num_levels : int
         Number of edge-distance levels in mesh graph
     xy : np.ndarray
-        Grid point coordinates, shaped [2, M, N]
-    refinement_factor : int
-        Degree of refinement between successive mesh graphs, the number of nodes
-        grows by approximately refinement_factor**2 between successive
-        mesh graphs.
+        Grid point coordinates, shaped [N_grid_points, 2]
+    mesh_node_distance: float
+        Distance (in x- and y-direction) between created mesh nodes,
+        in coordinate system of xy
+    level_refinement_factor: float
+        Refinement factor between grid points and bottom level of mesh hierarchy
 
     Returns
     -------
@@ -106,24 +107,21 @@ def create_multirange_2d_mesh_graphs(
         List of networkx graphs for each level representing the connectivity
         of the mesh within each level
     """
-    # Compute the size (grid nodes) along x and y direction of area
-    # to cover with graph
-    coord_extent = np.array((xy.shape[2], xy.shape[1]))
+    # Compute the size along x and y direction of area to cover with graph
+    # This is measured in the Cartesian coordiantes of xy
+    coord_extent = np.ptp(xy, axis=0)
+    # Number of nodes that would fit on bottom level of hierarchy,
+    # in both directions
+    max_nodes_bottom = (coord_extent / mesh_node_distance).astype(int)
 
     # Find the number of mesh levels possible in x- and y-direction,
     # and the number of leaf nodes that would correspond to
-    # max_coord/(grid_refinement_factor*level_refinement_factor^mesh_levels) = 1
-    max_mesh_levels_float = (
-        np.log(coord_extent) - np.log(grid_refinement_factor)
-    ) / np.log(level_refinement_factor)
+    # max_nodes_bottom/(level_refinement_factor^mesh_levels) = 1
+    max_mesh_levels_float = np.log(max_nodes_bottom) / np.log(level_refinement_factor)
 
-    # Need to add a small epsilon before flooring to int, due to numerical
-    # issues with the computation above
-    eps = 1e-8
-    max_mesh_levels = (max_mesh_levels_float + eps).astype(int)  # (2,)
-    nleaf = grid_refinement_factor * (
-        level_refinement_factor**max_mesh_levels
-    )  # leaves at the bottom in each direction, if using max_mesh_levels
+    max_mesh_levels = max_mesh_levels_float.astype(int)  # (2,)
+    nleaf = level_refinement_factor**max_mesh_levels
+    # leaves at the bottom in each direction, if using max_mesh_levels
 
     # As we can not instantiate different number of mesh levels in each
     # direction, create mesh levels corresponding to the minimum of the two
@@ -139,9 +137,7 @@ def create_multirange_2d_mesh_graphs(
     G_all_levels = []
     for lev in range(mesh_levels_to_create):  # 0-index mesh levels
         # Compute number of nodes on level separate for each direction
-        nodes_x, nodes_y = (
-            nleaf / (grid_refinement_factor * (level_refinement_factor**lev))
-        ).astype(int)
+        nodes_x, nodes_y = (nleaf / (level_refinement_factor**lev)).astype(int)
         g = create_single_level_2d_mesh_graph(xy, nodes_x, nodes_y)
         # Add level information to nodes, edges and full graph
         for node in g.nodes:
