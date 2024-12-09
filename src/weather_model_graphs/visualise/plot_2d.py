@@ -105,6 +105,7 @@ def nx_draw_with_pos_and_attr(
     node_zorder_attr=None,
     node_size=100,
     connectionstyle="arc3, rad=0.1",
+    with_labels=False,
     **kwargs,
 ):
     """
@@ -171,7 +172,7 @@ def nx_draw_with_pos_and_attr(
         graph,
         ax=ax,
         arrows=True,
-        with_labels=False,
+        with_labels=with_labels,
         node_size=node_size,
         connectionstyle=connectionstyle,
         **kwargs,

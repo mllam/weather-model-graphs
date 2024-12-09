@@ -50,7 +50,15 @@ def test_graph_decode_gridpoints_mask():
             name_unfiltered, output_directory=tmpdirname
         )
 
-    # manually filter the edge connections from
+    # check that the edges in the graph objects match the adjency matrices that
+    # have been written
+    graph_edges_unfiltered = np.array(unfiltered_graph.edges)
+    assert set(zip(*graph_edges_unfiltered.T)) == set(zip(*adj_unfiltered))
+    graph_edges_filtered = np.array(filtered_graph.edges)
+    assert set(zip(*graph_edges_filtered.T)) == set(zip(*adj_filtered))
+
+    # manually filter the edge connections to the grid-nodes that are masked
+    # out and create an adjency matrix
     grid_indexes_to_remove = np.arange(0, xy.shape[0])[decode_mask == 0]
     adj_pairs = []
     for i in range(adj_unfiltered.shape[1]):
@@ -58,7 +66,10 @@ def test_graph_decode_gridpoints_mask():
         if g_idx in grid_indexes_to_remove:
             continue
         adj_pairs.append((m_idx, g_idx))
-
     adj_unfiltered_masked = np.array(adj_pairs).T
+
+    import ipdb
+
+    ipdb.set_trace()
 
     np.testing.assert_equal(adj_filtered, adj_unfiltered_masked)
