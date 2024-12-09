@@ -5,7 +5,11 @@ from typing import List
 import networkx
 from loguru import logger
 
-from .networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attribute
+from .networkx_utils import (
+    MissingEdgeAttributeError,
+    sort_nodes_in_graph,
+    split_graph_by_edge_attribute,
+)
 
 try:
     import torch
@@ -106,18 +110,25 @@ def to_pyg(
     if list_from_attribute is not None:
         # create a list of graph objects by splitting the graph by the list_from_attribute
         try:
-            sub_graphs = list(
-                split_graph_by_edge_attribute(
-                    graph=graph, attr=list_from_attribute
-                ).values()
-            )
+            sub_graphs = [
+                value
+                for key, value in sorted(
+                    split_graph_by_edge_attribute(
+                        graph=graph, attr=list_from_attribute
+                    ).items()
+                )
+            ]
         except MissingEdgeAttributeError:
             # neural-lam still expects a list of graphs, so if the attribute is missing
             # we just return the original graph as a list
             sub_graphs = [graph]
-        pyg_graphs = [pyg_convert.from_networkx(g) for g in sub_graphs]
+        # Nodes must be sorted if we want to preserve any ordering
+        # when converted to pyg
+        pyg_graphs = [
+            pyg_convert.from_networkx(sort_nodes_in_graph(g)) for g in sub_graphs
+        ]
     else:
-        pyg_graphs = [pyg_convert.from_networkx(graph)]
+        pyg_graphs = [pyg_convert.from_networkx(sort_nodes_in_graph(graph))]
 
     edge_features_values = [
         _concat_pyg_features(pyg_g, features=edge_features) for pyg_g in pyg_graphs

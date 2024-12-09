@@ -98,40 +98,29 @@ def split_graph_by_edge_attribute(graph, attr):
             f"No subgraphs were created. Check the edge attribute '{attr}'."
         )
 
-    # copy node attributes
-    for subgraph in subgraphs.values():
-        for node in subgraph.nodes:
-            subgraph.nodes[node].update(graph.nodes[node])
-
-    # check that at least one subgraph was created
-    if len(subgraphs) == 0:
-        raise ValueError(
-            f"No subgraphs were created. Check the edge attribute '{attr}'."
-        )
-
-    # copy node attributes
-    for subgraph in subgraphs.values():
-        for node in subgraph.nodes:
-            subgraph.nodes[node].update(graph.nodes[node])
-
-    # check that at least one subgraph was created
-    if len(subgraphs) == 0:
-        raise ValueError(
-            f"No subgraphs were created. Check the edge attribute '{attr}'."
-        )
-
-    # copy node attributes
-    for subgraph in subgraphs.values():
-        for node in subgraph.nodes:
-            subgraph.nodes[node].update(graph.nodes[node])
-
-    # check that at least one subgraph was created
-    if len(subgraphs) == 0:
-        raise ValueError(
-            f"No subgraphs were created. Check the edge attribute '{attr}'."
-        )
-
     return subgraphs
+
+
+def sort_nodes_in_graph(graph):
+    """
+    Creates a new networkx.DiGraph that is a copy of input, but with nodes
+    sorted according to their id
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        Graph to sort nodes from
+
+    Returns
+    -------
+    networkx.DiGraph
+        Graph with sorted nodes
+    """
+    sorted_graph = networkx.DiGraph()
+    sorted_graph.add_nodes_from(sorted(graph.nodes(data=True)))
+    sorted_graph.add_edges_from(graph.edges(data=True))
+
+    return sorted_graph
 
 
 def replace_node_labels_with_unique_ids(graph):
@@ -149,7 +138,7 @@ def replace_node_labels_with_unique_ids(graph):
         Graph with node labels renamed
     """
     return networkx.relabel_nodes(
-        graph, {node: i for i, node in enumerate(graph.nodes)}, copy=True
+        graph, {node: i for i, node in enumerate(sorted(graph.nodes))}, copy=True
     )
 
 
