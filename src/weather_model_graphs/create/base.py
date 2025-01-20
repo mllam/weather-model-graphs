@@ -17,6 +17,7 @@ import numpy as np
 import pyproj
 import scipy.spatial
 from loguru import logger
+from scipy.spatial import ConvexHull, Delaunay
 
 from ..networkx_utils import (
     replace_node_labels_with_unique_ids,
@@ -147,6 +148,23 @@ def create_all_graph_components(
         grid_connect_graph = graph_components["m2m"]
     else:
         raise NotImplementedError(f"Kind {m2m_connectivity} not implemented")
+
+    # Filter mesh graph nodes to within convex hull
+    # Construct the convex hull
+    xy_hull = ConvexHull(xy)
+    # Create a Delaunay triangulation only using the points in the convex hull
+    xy_delaunay = Delaunay(xy[xy_hull.vertices])
+
+    # Filter nodes based on their positions
+    nodes_in_chull = [n for n, attr in graph_components["m2m"].nodes(data=True)
+            if xy_delaunay.find_simplex(attr['pos']) >= 0]
+
+    # Create a subgraph with the filtered nodes
+    # TODO handle grid_connect_graph for mesh
+    graph_components["m2m"] = graph_components["m2m"].subgraph(nodes_in_chull)
+    grid_connect_graph = split_graph_by_edge_attribute(
+        graph_components["m2m"], "level"
+    )[0]
 
     G_grid = create_grid_graph_nodes(xy=xy)
 
