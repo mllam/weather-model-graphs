@@ -160,11 +160,14 @@ def create_all_graph_components(
             if xy_delaunay.find_simplex(attr['pos']) >= 0]
 
     # Create a subgraph with the filtered nodes
-    # TODO handle grid_connect_graph for mesh
+    # TODO better handle grid_connect_graph for mesh
     graph_components["m2m"] = graph_components["m2m"].subgraph(nodes_in_chull)
-    grid_connect_graph = split_graph_by_edge_attribute(
-        graph_components["m2m"], "level"
-    )[0]
+    if m2m_connectivity == "hierarchical":
+        grid_connect_graph = split_graph_by_edge_attribute(
+            graph_components["m2m"], "level"
+        )[0]
+    else:
+        grid_connect_graph = graph_components["m2m"]
 
     G_grid = create_grid_graph_nodes(xy=xy)
 
