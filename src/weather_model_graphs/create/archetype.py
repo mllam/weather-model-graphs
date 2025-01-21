@@ -36,13 +36,11 @@ def create_keisler_graph(coords, mesh_node_distance=3, **kwargs):
         m2m_connectivity="flat",
         m2m_connectivity_kwargs=dict(mesh_node_distance=mesh_node_distance),
         g2m_connectivity="within_radius",
-        m2g_connectivity="nearest_neighbours",
+        m2g_connectivity="containing_rectangle",
         g2m_connectivity_kwargs=dict(
             rel_max_dist=0.51,
         ),
-        m2g_connectivity_kwargs=dict(
-            max_num_neighbours=4,
-        ),
+        m2g_connectivity_kwargs=dict(),
         **kwargs,
     )
 
@@ -96,13 +94,11 @@ def create_graphcast_graph(
             max_num_levels=max_num_levels,
         ),
         g2m_connectivity="within_radius",
-        m2g_connectivity="nearest_neighbours",
+        m2g_connectivity="containing_rectangle",
         g2m_connectivity_kwargs=dict(
             rel_max_dist=0.51,
         ),
-        m2g_connectivity_kwargs=dict(
-            max_num_neighbours=4,
-        ),
+        m2g_connectivity_kwargs=dict(),
         **kwargs,
     )
 
@@ -161,12 +157,10 @@ def create_oskarsson_hierarchical_graph(
             max_num_levels=max_num_levels,
         ),
         g2m_connectivity="within_radius",
-        m2g_connectivity="nearest_neighbours",
+        m2g_connectivity="containing_rectangle",
         g2m_connectivity_kwargs=dict(
             rel_max_dist=0.51,
         ),
-        m2g_connectivity_kwargs=dict(
-            max_num_neighbours=4,
-        ),
+        m2g_connectivity_kwargs=dict(),
         **kwargs,
     )
