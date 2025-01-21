@@ -2,7 +2,7 @@ import networkx
 import numpy as np
 import scipy
 
-from ....networkx_utils import prepend_node_index
+from ....networkx_utils import filter_nodes, get_chull_filter_func, prepend_node_index
 from .. import mesh as mesh_graph
 
 
@@ -11,6 +11,7 @@ def create_hierarchical_multiscale_mesh_graph(
     mesh_node_distance: float,
     level_refinement_factor: float,
     max_num_levels: int,
+    filter_convex_hull: bool = True,
 ):
     """
     Create a hierarchical multiscale mesh graph with nearest neighbour
@@ -31,6 +32,9 @@ def create_hierarchical_multiscale_mesh_graph(
         Refinement factor between grid points and bottom level of mesh hierarchy
     max_num_levels: int
         The number of levels in the hierarchical mesh graph.
+    filter_convex_hull: bool
+        If the mesh nodes should be filtered to only those that lay within
+        the convex hull of xy.
 
     Returns
     -------
@@ -54,8 +58,15 @@ def create_hierarchical_multiscale_mesh_graph(
             f"or number of grid points {xy.shape[0]}."
         )
 
-    # Relabel nodes of each level with level index first
+    if filter_convex_hull:
+        # Filter mesh nodes
+        chull_filter_func = get_chull_filter_func(xy)
+        Gs_all_levels = [
+            filter_nodes(level_graph, chull_filter_func)
+            for level_graph in Gs_all_levels
+        ]
 
+    # Relabel nodes of each level with level index first
     Gs_all_levels = [
         prepend_node_index(graph, level_i)
         for level_i, graph in enumerate(Gs_all_levels)

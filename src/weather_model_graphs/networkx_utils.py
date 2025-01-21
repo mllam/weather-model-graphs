@@ -1,4 +1,5 @@
 import networkx
+from scipy.spatial import ConvexHull, Delaunay
 
 
 def prepend_node_index(graph, new_index):
@@ -169,3 +170,53 @@ def split_on_edge_attribute_existance(graph, attr):
     graph_without_attr = graph.edge_subgraph(edges_without_attr)
 
     return graph_with_attr, graph_without_attr
+
+
+def get_chull_filter_func(xy):
+    """
+    Create a filter function to check if nodes are within the
+    convex hull of given points.
+
+    Parameters
+    ----------
+    xy : np.array, shape (n_points, 2)
+        Array of xy-coordinates to construct the convex hull for.
+
+    Returns
+    -------
+    filter_func : function
+        A function that takes a node and its attributes, and returns True if
+        the node is within the convex hull, False otherwise.
+    """
+
+    # Filter mesh graph nodes to within convex hull
+    # Construct the convex hull
+    xy_hull = ConvexHull(xy)
+    # Create a Delaunay triangulation only using the points in the convex hull
+    xy_delaunay = Delaunay(xy[xy_hull.vertices])
+
+    def filter_func(node, attr):
+        return xy_delaunay.find_simplex(attr["pos"]) >= 0
+
+    return filter_func
+
+
+def filter_nodes(graph, filter_func):
+    """
+    Filter nodes in a graph based on a filter function.
+
+    Parameters
+    ----------
+    graph : networkx.Graph
+        Graph from which nodes are to be filtered.
+    filter_func : function
+        Function to determine if a node should be included in the filtered graph.
+        Function should return a boolean
+
+    Returns
+    -------
+    subgraph : networkx.Graph
+        Subgraph containing only the nodes that satisfy the filter function.
+    """
+    filtered_nodes = [n for n, attr in graph.nodes(data=True) if filter_func(n, attr)]
+    return graph.subgraph(filtered_nodes)

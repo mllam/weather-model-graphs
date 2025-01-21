@@ -1,12 +1,16 @@
 import networkx
 import numpy as np
 
-from ....networkx_utils import prepend_node_index
+from ....networkx_utils import filter_nodes, get_chull_filter_func, prepend_node_index
 from .. import mesh as mesh_graph
 
 
 def create_flat_multiscale_mesh_graph(
-    xy, mesh_node_distance: float, level_refinement_factor: int, max_num_levels: int
+    xy,
+    mesh_node_distance: float,
+    level_refinement_factor: int,
+    max_num_levels: int,
+    filter_convex_hull: bool = True,
 ):
     """
     Create flat mesh graph by merging the single-level mesh
@@ -26,6 +30,10 @@ def create_flat_multiscale_mesh_graph(
         NOTE: Must be an odd integer >1 to create proper multiscale graph
     max_num_levels : int
         Maximum number of levels in the multi-scale graph
+    filter_convex_hull: bool
+        If the mesh nodes should be filtered to only those that lay within
+        the convex hull of xy.
+
     Returns
     -------
     G_tot : networkx.Graph
@@ -79,10 +87,16 @@ def create_flat_multiscale_mesh_graph(
     G_tot.graph["dx"] = {i: g.graph["dx"] for i, g in enumerate(G_all_levels)}
     G_tot.graph["dy"] = {i: g.graph["dy"] for i, g in enumerate(G_all_levels)}
 
+    if filter_convex_hull:
+        # Filter mesh nodes
+        G_tot = filter_nodes(G_tot, get_chull_filter_func(xy))
+
     return G_tot
 
 
-def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
+def create_flat_singlescale_mesh_graph(
+    xy, mesh_node_distance: float, filter_convex_hull: bool = True
+):
     """
     Create flat mesh graph of single level
 
@@ -95,6 +109,10 @@ def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of xy
+    filter_convex_hull: bool
+        If the mesh nodes should be filtered to only those that lay within
+        the convex hull of xy.
+
     Returns
     -------
     G_flat : networkx.Graph
@@ -105,4 +123,10 @@ def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
     nx = int(range_x / mesh_node_distance)
     ny = int(range_y / mesh_node_distance)
 
-    return mesh_graph.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
+    mesh = mesh_graph.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
+
+    if filter_convex_hull:
+        # Filter mesh nodes
+        mesh = filter_nodes(mesh, get_chull_filter_func(xy))
+
+    return mesh
