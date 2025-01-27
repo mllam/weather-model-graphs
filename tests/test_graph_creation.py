@@ -192,3 +192,24 @@ def test_create_lat_lon(kind):
         coords_crs=coords_crs,
         graph_crs=graph_crs,
     )
+
+
+@pytest.mark.parametrize("kind", ["graphcast", "oskarsson_hierarchical"])
+def test_create_many_levels(kind):
+    """Test that mesh graph creation methods that work with many levels
+    can handle more than 2 levels
+    """
+    # Test 4 levels at lrf=3
+    grid_coord_range = 10
+    level_refinement_factor = 3
+    mesh_node_distance = grid_coord_range / 3**4
+
+    xy = test_utils.create_fake_xy(N=grid_coord_range)
+    fn_name = f"create_{kind}_graph"
+    fn = getattr(wmg.create.archetype, fn_name)
+
+    fn(
+        coords=xy,
+        mesh_node_distance=mesh_node_distance,
+        level_refinement_factor=level_refinement_factor,
+    )

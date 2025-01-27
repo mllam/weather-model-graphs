@@ -52,11 +52,14 @@ def create_flat_multiscale_mesh_graph(
     G_tot = G_all_levels[0]
     # First node at level l+1 share position with node (offset, offset) at level l
     level_offset = level_refinement_factor // 2
+
+    first_level_nodes = list(G_all_levels[0].nodes)
+    # Last nodes in first layer has pos (nx-1, ny-1)
+    num_nodes_x = first_level_nodes[-1][0] + 1
+    num_nodes_y = first_level_nodes[-1][1] + 1
+
     for lev in range(1, len(G_all_levels)):
         nodes = list(G_all_levels[lev - 1].nodes)
-        # Last nodes always has pos (nx-1, ny-1)
-        num_nodes_x = nodes[-1][0] + 1
-        num_nodes_y = nodes[-1][1] + 1
         ij = (
             np.array(nodes)
             .reshape((num_nodes_x, num_nodes_y, 2))[
@@ -71,6 +74,10 @@ def create_flat_multiscale_mesh_graph(
             G_all_levels[lev], dict(zip(G_all_levels[lev].nodes, ij))
         )
         G_tot = networkx.compose(G_tot, G_all_levels[lev])
+
+        # Update number of nodes in x- and y-direction for next iteraion
+        num_nodes_x //= level_refinement_factor
+        num_nodes_y //= level_refinement_factor
 
     # Relabel mesh nodes to start with 0
     G_tot = prepend_node_index(G_tot, 0)
