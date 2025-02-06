@@ -380,6 +380,7 @@ def connect_nodes_across_graphs(
                         key=lambda x: x[2].get("len", 0),
                     )[2]["len"]
                     longest_edge = max(longest_edge, longest_graph_edge)
+            logger.debug(f"Longest distance in bottom mesh graph: {longest_edge}")
             query_dist = longest_edge * rel_max_dist
         else:
             raise Exception(
