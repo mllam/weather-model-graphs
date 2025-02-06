@@ -137,7 +137,7 @@ def create_multirange_2d_mesh_graphs(
         level_refinement_factor ** (mesh_levels_to_create - 1)
     )
     # Above will in general be float, but round down to integer
-    nodes_at_top = nodes_at_top_float.astype(int)
+    nodes_at_top = np.floor(nodes_at_top_float)
     # Compute nleaf based on this
     nleaf = nodes_at_top * (level_refinement_factor ** (mesh_levels_to_create - 1))
     logger.debug(f"mesh_levels: {mesh_levels_to_create}, nleaf: {nleaf}")
