@@ -135,11 +135,11 @@ def test_create_exact_refinement(mesh_node_distance, level_refinement_factor):
     "kind_and_num_mesh",
     [
         ("keisler", 20**2),  # 20 mesh nodes in bottom layer in each direction
-        ("graphcast", 9**2),  # Can only fit 9 x 9 with level_refinement_factor=3
+        ("graphcast", 18**2),  # Can fit 18 x 18 with level_refinement_factor=3
         (
             "oskarsson_hierarchical",
-            9**2 + 3**2,
-        ),  # As above, with additional 3 x 3 layer
+            18**2 + 6**2,
+        ),  # As above, with additional 6 x 6 layer
     ],
 )
 def test_create_irregular_grid(kind_and_num_mesh):

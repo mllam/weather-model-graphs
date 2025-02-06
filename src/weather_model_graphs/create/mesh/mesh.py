@@ -120,8 +120,6 @@ def create_multirange_2d_mesh_graphs(
     max_mesh_levels_float = np.log(max_nodes_bottom) / np.log(level_refinement_factor)
 
     max_mesh_levels = max_mesh_levels_float.astype(int)  # (2,)
-    nleaf = level_refinement_factor**max_mesh_levels
-    # leaves at the bottom in each direction, if using max_mesh_levels
 
     # As we can not instantiate different number of mesh levels in each
     # direction, create mesh levels corresponding to the minimum of the two
@@ -130,7 +128,18 @@ def create_multirange_2d_mesh_graphs(
     if max_num_levels:
         # Limit the levels in mesh graph
         mesh_levels_to_create = min(mesh_levels_to_create, max_num_levels)
+        assert mesh_levels_to_create > 0, "Can not make any mesh levels"
 
+    # Now we have determined how many levels we are making: next to
+    # figure out number nodes at bottom level, using mesh_levels_to_create
+    # Start by computing maximum number of nodes at top level
+    nodes_at_top_float = max_nodes_bottom / (
+        level_refinement_factor ** (mesh_levels_to_create - 1)
+    )
+    # Above will in general be float, but round down to integer
+    nodes_at_top = np.floor(nodes_at_top_float)
+    # Compute nleaf based on this
+    nleaf = nodes_at_top * (level_refinement_factor ** (mesh_levels_to_create - 1))
     logger.debug(f"mesh_levels: {mesh_levels_to_create}, nleaf: {nleaf}")
 
     # multi resolution tree levels
