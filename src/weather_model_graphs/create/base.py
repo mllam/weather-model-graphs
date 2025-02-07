@@ -36,13 +36,16 @@ def create_all_graph_components(
     m2m_connectivity: str,
     m2g_connectivity: str,
     g2m_connectivity: str,
+    non_decode_g2m_connectivity: str = None,
     m2m_connectivity_kwargs={},
     m2g_connectivity_kwargs={},
     g2m_connectivity_kwargs={},
+    non_decode_g2m_connectivity_kwargs={},
     coords_crs: pyproj.crs.CRS | None = None,
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable | None = None,
     return_components: bool = False,
+    allow_zero_degree: bool = False,
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -150,23 +153,58 @@ def create_all_graph_components(
 
     G_grid = create_grid_graph_nodes(xy=xy)
 
-    G_g2m = connect_nodes_across_graphs(
-        G_source=G_grid,
-        G_target=grid_connect_graph,
-        method=g2m_connectivity,
-        **g2m_connectivity_kwargs,
-    )
-    graph_components["g2m"] = G_g2m
-
     if decode_mask is None:
         # decode to all grid nodes
         decode_grid = G_grid
+
+        # Same g2m method for all grid nodes
+        G_g2m = connect_nodes_across_graphs(
+            G_source=G_grid,
+            G_target=grid_connect_graph,
+            method=g2m_connectivity,
+            **g2m_connectivity_kwargs,
+        )
     else:
         # Select subset of grid nodes to decode to, where m2g should connect
-        filter_nodes = [
+        decode_filter_nodes = [
             n for n, include in zip(G_grid.nodes, decode_mask, strict=True) if include
         ]
-        decode_grid = G_grid.subgraph(filter_nodes)
+        decode_grid = G_grid.subgraph(decode_filter_nodes)
+
+        non_decode_filter_nodes = [
+            n for n, decode in zip(G_grid.nodes, decode_mask, strict=True) if not decode
+        ]
+        non_decode_grid = G_grid.subgraph(non_decode_filter_nodes)
+
+        # Different g2m connectivity methods
+        g2m_decode = connect_nodes_across_graphs(
+            G_source=decode_grid,
+            G_target=grid_connect_graph,
+            method=g2m_connectivity,
+            **g2m_connectivity_kwargs,
+        )
+        assert non_decode_g2m_connectivity is not None
+        g2m_non_decode = connect_nodes_across_graphs(
+            G_source=non_decode_grid,
+            G_target=grid_connect_graph,
+            method=non_decode_g2m_connectivity,
+            **non_decode_g2m_connectivity_kwargs,
+        )
+
+        # Take union of graphs
+        G_g2m = nx.compose(g2m_decode, g2m_non_decode)
+
+    graph_components["g2m"] = G_g2m
+
+    if not allow_zero_degree:
+        # Assert that all nodes in g2m have degree > 0
+        zero_degree_nodes = [
+            node for node, degree in dict(G_g2m.degree()).items() if degree == 0
+        ]
+
+        assert (
+            len(zero_degree_nodes) == 0
+        ), f"Zero-degree nodes in g2m: {zero_degree_nodes}"
 
     G_m2g = connect_nodes_across_graphs(
         G_source=grid_connect_graph,
@@ -256,7 +294,10 @@ def connect_nodes_across_graphs(
     target_nodes_list = list(G_target.nodes)
 
     # build kd tree for source nodes (e.g. the mesh nodes when constructing m2g)
-    xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
+    # TODO: Why do we keep sorting nodes in this method?
+    xy_source = np.array(
+        [G_source.nodes[node]["pos"] for node in sorted(G_source.nodes)]
+    )
     kdt_s = scipy.spatial.KDTree(xy_source)
 
     # Determine method and perform checks once

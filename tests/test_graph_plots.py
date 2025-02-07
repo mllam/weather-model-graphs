@@ -21,6 +21,7 @@ def test_plot():
         ),
         g2m_connectivity="nearest_neighbour",
         m2g_connectivity="nearest_neighbour",
+        allow_zero_degree=True,
     )
 
     graph_components = wmg.split_graph_by_edge_attribute(graph=graph, attr="component")
