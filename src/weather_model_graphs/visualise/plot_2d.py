@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib.colorbar import ColorbarBase
 from matplotlib.colors import Normalize
 
-from .. import networkx_utils as nx_utils
+from ..labelling import sort_nodes_internally
 
 
 def nx_draw_with_pos(g, with_labels=False, **kwargs):
@@ -138,7 +138,7 @@ def nx_draw_with_pos_and_attr(
         The axes with the plot
     """
     if node_zorder_attr is not None:
-        graph = nx_utils.sort_nodes_internally(graph, node_attr=node_zorder_attr)
+        graph = sort_nodes_internally(graph, node_attr=node_zorder_attr)
 
     if edge_color_attr is not None:
         edge_attr_vals = _get_graph_attr_values(

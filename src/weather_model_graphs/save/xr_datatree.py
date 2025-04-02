@@ -4,7 +4,7 @@ import networkx as nx
 import numpy as np
 import xarray as xr
 
-from ..networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attribute
+from ..split import MissingEdgeAttributeError, split_graph_by_edge_attribute
 
 VECTOR_FEATURE_NAME_FORMAT = "{attr}:{i}"
 

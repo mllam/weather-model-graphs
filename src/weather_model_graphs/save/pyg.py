@@ -8,7 +8,7 @@ import numpy as np
 import xarray as xr
 from loguru import logger
 
-from ..networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attribute
+from ..split import MissingEdgeAttributeError, split_graph_by_edge_attribute
 
 try:
     import torch

@@ -16,11 +16,8 @@ import pyproj
 import scipy.spatial
 from loguru import logger
 
-from ..networkx_utils import (
-    replace_node_labels_with_unique_ids,
-    split_graph_by_edge_attribute,
-    split_on_edge_attribute_existance,
-)
+from ..labelling import replace_node_labels_with_unique_ids
+from ..split import split_graph_by_edge_attribute, split_on_edge_attribute_existance
 from .grid import create_grid_graph_nodes
 from .mesh.kinds.flat import (
     create_flat_multiscale_mesh_graph,
