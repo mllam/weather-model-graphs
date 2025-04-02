@@ -174,8 +174,20 @@ def create_all_graph_components(
             del G_tot.graph[key]
 
     G_tot = replace_node_labels_with_unique_ids(graph=G_tot)
+    # set a unique id for each edge
+    G_tot = set_unique_edge_ids(G_tot)
 
     return G_tot
+
+
+def set_unique_edge_ids(G):
+    """
+    Set a unique id for each edge in the graph.
+    The id is set as an attribute of the edge with the key 'edge_id'.
+    """
+    for i, edge in enumerate(G.edges):
+        G.edges[edge]["edge_id"] = i
+    return G
 
 
 def connect_nodes_across_graphs(
