@@ -44,7 +44,11 @@ def test_create_graph_archetype(kind):
     # check that the merged dataset has the same number of edges as the original graph
     assert ds_global.dims["edge_index"] == len(graph.edges)
 
-    # TODO: add test for the graph having the same edges and edge features as the original graph
+    graph_reconstructed = wmg.load.datatree_to_graph(dt)
+
+    # check that the reconstructed graph has the same number of edges as the original graph
+    assert len(graph_reconstructed.edges) == len(graph.edges)
+
     import ipdb
 
     ipdb.set_trace()
