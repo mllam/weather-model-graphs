@@ -1,6 +1,6 @@
 import pickle
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import List
 
 import networkx
 import networkx as nx
@@ -8,7 +8,7 @@ import numpy as np
 import xarray as xr
 from loguru import logger
 
-from .networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attribute
+from ..networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attribute
 
 try:
     import torch
@@ -261,119 +261,3 @@ def extract_edges_to_dataset(
         ds = ds.assign_coords(edge_feature=edge_feature_labels)
 
     return ds
-
-
-DEFAULT_SPLIT_RULES = {
-    "component": {
-        "m2m": {"direction": {"same": "level", "up": "levels", "down": "levels"}},
-    }
-}
-
-
-def graph_to_datatree(
-    graph: nx.DiGraph,
-    split_by: Union[str, Dict[str, Any]],
-    edge_feature_attrs: List = ["len", "vdiff"],
-    edge_id_attr="edge_id",
-) -> xr.DataTree:
-    """
-    Recursively split a NetworkX DiGraph based on node attributes and
-    store edge-related data in a hierarchical xarray.DataTree.
-
-    Uses `extract_edges_to_dataset()` to extract edge indices and features
-    at the leaf level.
-
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        A directed acyclic graph (DAG) with integer-convertible node labels.
-
-    split_by : Union[str, Dict[str, Any]]
-        A string or a nested dictionary defining how to split the graph.
-
-        If a string, it is treated as a single edge attribute to split by. I.e.
-        a common choice will be to split the global graph by the `component`
-        edge attribute (which is used for denoting the `g2m`, `m2m`, `m2g`
-        components).
-
-        If a dictionary, then the graph will be split recursively. Here
-        alternate keys in the hierarchy of the dictionary are the edge
-        attributes to split by, the next level keys select the subgraphs (by
-        value of the attribute) to split further. For example, the structure
-        below will first split by the `component` edge attribute, it will then
-        further split the subgraph which has `component == m2m` by the
-        `direction` edge attribute, and finally split the subgraphs with
-        `direction == same` by the `level` edge attribute, and the subgraphs
-        with `direction == up` and `direction == down` by the `levels` edge
-        attribute.
-
-        {
-            "component": {
-                "m2m": {
-                    "direction": {
-                        "same": "level",
-                        "up": "levels",
-                        "down": "levels"
-                    }
-                },
-            }
-        }
-
-    Returns
-    -------
-    xr.DataTree
-        A hierarchical DataTree where each leaf node contains only edge-related data.
-    """
-    tree = xr.DataTree(name="root")
-
-    def _extract_within_subgraph(graph, rules, path):
-        if isinstance(rules, str):
-            rules = {rules: {}}
-        for attr, subrules_by_values in rules.items():
-            for attr_val, subgraph in split_graph_by_edge_attribute(
-                graph=graph, attr=attr
-            ).items():
-                subrule = subrules_by_values.get(attr_val, None)
-                subpath = f"{path}/{attr_val}"
-                if subrule is None:
-                    ds_subgraph = extract_edges_to_dataset(
-                        graph=subgraph,
-                        edge_attrs=edge_feature_attrs,
-                        edge_id_attr=edge_id_attr,
-                    )
-                    yield subpath, ds_subgraph
-                else:
-                    # Recursively populate child tree
-                    for subgraph_path, subgraph_ds in _extract_within_subgraph(
-                        graph=subgraph, rules=subrule, path=subpath
-                    ):
-                        yield subgraph_path, subgraph_ds
-
-    for subgraph_path, subgraph_ds in _extract_within_subgraph(
-        graph=graph, rules=split_by, path=""
-    ):
-        tree[subgraph_path] = subgraph_ds
-
-    # make `node` and `edge_feature` coordinates global by traversing the whole
-    # tree to check that each dataset has the same values for these
-    # coordinates, then drop the coordinates and add them to the root. This
-    # just makes the resulting datatree a bit cleaner
-
-    common_coords = dict()
-
-    def _check_and_remove_common_coords(ds):
-        for c in ["node", "edge_feature"]:
-            if c in ds.coords:
-                if c in common_coords:
-                    if not np.array_equal(common_coords[c], ds.coords[c].values):
-                        raise ValueError(
-                            f"Coordinate '{c}' is not the same across all datasets."
-                        )
-                else:
-                    common_coords[c] = ds.coords[c].values
-                ds = ds.drop_vars(c)
-        return ds
-
-    tree = tree.map_over_datasets(_check_and_remove_common_coords)
-
-    return tree

@@ -45,6 +45,9 @@ def test_create_graph_archetype(kind):
     assert ds_global.dims["edge_index"] == len(graph.edges)
 
     # TODO: add test for the graph having the same edges and edge features as the original graph
+    import ipdb
+
+    ipdb.set_trace()
 
 
 if __name__ == "__main__":
