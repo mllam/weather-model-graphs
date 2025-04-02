@@ -6,6 +6,8 @@ import xarray as xr
 
 from ..networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attribute
 
+VECTOR_FEATURE_NAME_FORMAT = "{attr}:{i}"
+
 
 def extract_edges_to_dataset(
     graph: nx.DiGraph, edge_attrs: List, edge_id_attr: str
@@ -82,7 +84,12 @@ def extract_edges_to_dataset(
             edge_feature_labels.append(attr)
         elif vals.ndim == 2:
             # If the attribute is a list, we need to stack them
-            edge_feature_labels.extend([f"{attr}_{i}" for i in range(vals.shape[1])])
+            edge_feature_labels.extend(
+                [
+                    VECTOR_FEATURE_NAME_FORMAT.format(attr=attr, i=i)
+                    for i in range(vals.shape[1])
+                ]
+            )
         else:
             raise ValueError(
                 f"Edge attribute '{attr}' has unsupported shape {vals.shape}."
@@ -112,16 +119,88 @@ def extract_edges_to_dataset(
     return ds
 
 
-DEFAULT_SPLIT_RULES = {
-    "component": {
-        "m2m": {"direction": {"same": "level", "up": "levels", "down": "levels"}},
-    }
-}
+def _extract_node_features_to_data_array(
+    graph: nx.DiGraph, node_feature_attrs: List
+) -> xr.DataArray:
+    """
+    From the graph, extract the node features and return them as a dataset.
+    This function uses the node labels as indexes for the nodes and assumes
+    these node labels can be cast as integers.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        A directed graph where:
+        - Each node label must be convertible to an integer (e.g. int, str of int).
+        - Nodes must have the feature attributes specified in `node_feature_attrs`.
+    node_feature_attrs : list
+        List of node attributes to extract and include as features in the dataset.
+
+    Returns
+    -------
+    xr.DataArray
+        A DataArray with:
+        - 'node_features' : (node_index, node_feature) → node attributes
+        - Coordinates:
+            * 'node_index' : unique index per node (integer-converted node labels)
+            * 'node_feature' : node feature attributes
+    """
+    try:
+        # Map node labels to integers (check all)
+        nodes = list(graph.nodes)
+        node_labels = [int(n) for n in nodes]  # This will raise ValueError if invalid
+        node_to_idx = dict(zip(node_labels, nodes))
+    except ValueError:
+        raise ValueError(
+            "All node labels must be convertible to integers (e.g. 0, '1', etc.)"
+        )
+
+    if len(nodes) == 0:
+        raise ValueError("Graph must contain at least one node.")
+
+    node_feature_values = []
+    node_feature_labels = []
+    for attr in node_feature_attrs:
+        if attr not in graph.nodes[nodes[0]]:
+            raise MissingEdgeAttributeError(
+                f"Missing node attribute '{attr}' in the graph."
+            )
+        vals = np.array([graph.nodes[n][attr] for n in nodes])
+        if vals.ndim == 1:
+            vals = vals.reshape(-1, 1)
+            node_feature_labels.append(attr)
+        elif vals.ndim == 2:
+            # If the attribute is a list, we need to stack them
+            node_feature_labels.extend(
+                [
+                    VECTOR_FEATURE_NAME_FORMAT.format(attr=attr, i=i)
+                    for i in range(vals.shape[1])
+                ]
+            )
+        else:
+            raise ValueError(
+                f"Node attribute '{attr}' has unsupported shape {vals.shape}."
+            )
+        node_feature_values.append(vals)
+
+    node_features = np.concatenate(node_feature_values, axis=1)
+
+    da = xr.DataArray(
+        data=node_features,
+        dims=["node_index", "node_feature"],
+        coords={
+            "node_index": list(node_to_idx.keys()),
+            "node_feature": node_feature_labels,
+        },
+    )
+
+    return da
 
 
 def graph_to_datatree(
     graph: nx.DiGraph,
     split_by: Union[str, Dict[str, Any]],
+    node_feature_attrs: List = ["pos"],
     edge_feature_attrs: List = ["len", "vdiff"],
     edge_id_attr="edge_id",
 ) -> xr.DataTree:
@@ -226,8 +305,12 @@ def graph_to_datatree(
     for path, ds in subgraph_datasets.items():
         subgraph_datasets[path] = _check_and_remove_common_coords(ds)
 
-    tree = xr.DataTree(name="root", dataset=xr.Dataset(coords=common_coords))
+    ds_root = xr.Dataset(coords=common_coords)
+    ds_root["node_features"] = _extract_node_features_to_data_array(
+        graph=graph, node_feature_attrs=node_feature_attrs
+    )
+    dt = xr.DataTree(name="root", dataset=ds_root)
     for path, subgraph_ds in subgraph_datasets.items():
-        tree[path] = subgraph_ds
+        dt[path] = subgraph_ds
 
-    return tree
+    return dt
