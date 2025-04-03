@@ -8,8 +8,34 @@ VECTOR_FEATURE_NAME_FORMAT = "{attr}:{i}"
 
 def collect_datasets(tree):
     datasets = []
-    if tree.ds is not None:
-        datasets.append(tree.ds)
+    ds = tree.to_dataset()
+
+    if "edge_index" in ds:
+        # find the variables without dimensions
+        # and add them to the edge_features
+        # this is done by creating a new DataArray with the same values
+        # as the attributes and adding it to the edge_features
+        zero_dim_vars = [da.name for da in ds.data_vars.values() if da.dims == ()]
+        das_extra_attrs = []
+        for var_name in zero_dim_vars:
+            da_extra_attr = ds[var_name]
+            da_extra_attr = da_extra_attr.expand_dims(
+                {"edge_index": ds.edge_index, "edge_feature": 1}
+            )
+            da_extra_attr.coords["edge_feature"] = [var_name]
+            das_extra_attrs.append(da_extra_attr)
+
+        # have to remove `edge_features` variable and `edge_feature` dimension
+        # from dataset otherwise we can increase the number of edge features
+        # (the coordinate values stays the same)
+        da_edge_features = ds.edge_features
+        ds = ds.drop_vars(zero_dim_vars).drop_vars(["edge_features", "edge_feature"])
+        ds["edge_features"] = xr.concat(
+            das_extra_attrs + [da_edge_features], dim="edge_feature"
+        )
+
+    datasets.append(ds)
+
     for child in tree.children.values():
         datasets.extend(collect_datasets(child))
     return datasets
@@ -24,7 +50,8 @@ def datatree_to_graph(dt: xr.DataTree):
 
     """
 
-    ds = xr.merge(collect_datasets(dt))
+    subgraph_datasets = collect_datasets(dt)
+    ds = xr.merge(subgraph_datasets)
     graph = nx.DiGraph()
     adjacency_da = ds.adjacency_list  # DataArray for adjacency list
 

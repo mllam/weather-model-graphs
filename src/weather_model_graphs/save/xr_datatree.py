@@ -5,6 +5,7 @@ import numpy as np
 import xarray as xr
 
 from ..split import MissingEdgeAttributeError, split_graph_by_edge_attribute
+from .defaults import DEFAULT_EDGE_FEATURES, DEFAULT_NODE_FEATURES
 
 VECTOR_FEATURE_NAME_FORMAT = "{attr}:{i}"
 
@@ -200,8 +201,8 @@ def _extract_node_features_to_data_array(
 def graph_to_datatree(
     graph: nx.DiGraph,
     split_by: Union[str, Dict[str, Any]],
-    node_feature_attrs: List = ["pos"],
-    edge_feature_attrs: List = ["len", "vdiff"],
+    node_feature_attrs: List = DEFAULT_NODE_FEATURES,
+    edge_feature_attrs: List = DEFAULT_EDGE_FEATURES,
     edge_id_attr="edge_id",
 ) -> xr.DataTree:
     """
@@ -268,6 +269,7 @@ def graph_to_datatree(
                         edge_attrs=edge_feature_attrs,
                         edge_id_attr=edge_id_attr,
                     )
+                    ds_subgraph[attr] = attr_val
                     yield subpath, ds_subgraph
                 else:
                     # Recursively populate child tree

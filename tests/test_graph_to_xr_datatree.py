@@ -1,8 +1,10 @@
+import numpy as np
 import pytest
 import xarray as xr
 
 import tests.utils as test_utils
 import weather_model_graphs as wmg
+from weather_model_graphs.load import collect_datasets
 
 DEFAULT_GRAPH_SPLITS = {
     "keisler": "component",
@@ -13,15 +15,6 @@ DEFAULT_GRAPH_SPLITS = {
         }
     },
 }
-
-
-def collect_datasets(tree):
-    datasets = []
-    if tree.ds is not None:
-        datasets.append(tree.ds)
-    for child in tree.children.values():
-        datasets.extend(collect_datasets(child))
-    return datasets
 
 
 @pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
@@ -49,9 +42,25 @@ def test_create_graph_archetype(kind):
     # check that the reconstructed graph has the same number of edges as the original graph
     assert len(graph_reconstructed.edges) == len(graph.edges)
 
-    import ipdb
+    # check that the edges of the reconstructed graph are the same as the original graph
+    for edge in graph.edges:
+        assert edge in graph_reconstructed.edges
 
-    ipdb.set_trace()
+    # check that the edge attributes of the reconstructed graph are the same as the original graph
+    for edge in graph.edges:
+        for edge_feature in wmg.save.DEFAULT_EDGE_FEATURES:
+            np.testing.assert_equal(
+                graph.edges[edge].get(edge_feature),
+                graph_reconstructed.edges[edge].get(edge_feature),
+            )
+
+    # check that the node attributes of the reconstructed graph are the same as the original graph
+    for node in graph.nodes:
+        for node_feature in wmg.save.DEFAULT_NODE_FEATURES:
+            np.testing.assert_equal(
+                graph.nodes[node].get(node_feature),
+                graph_reconstructed.nodes[node].get(node_feature),
+            )
 
 
 if __name__ == "__main__":
