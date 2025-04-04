@@ -7,22 +7,6 @@ import tests.utils as test_utils
 import weather_model_graphs as wmg
 from weather_model_graphs.load import collect_datasets
 
-DEFAULT_GRAPH_SPLITS = {
-    "keisler": "component",
-    "graphcast": "component",
-    "oskarsson_hierarchical": {
-        "component": {
-            "m2m": {"direction": {"same": "level", "up": "levels", "down": "levels"}},
-        }
-    },
-}
-
-DEFAULT_GRAPH_NODE_SPLITS = {
-    "keisler": "type",
-    "graphcast": "type",
-    "oskarsson_hierarchical": {"type": "level"},
-}
-
 
 @pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
 def test_create_graph_archetype(kind):
@@ -32,8 +16,8 @@ def test_create_graph_archetype(kind):
 
     graph = fn(coords=xy)
 
-    split_edges_by = DEFAULT_GRAPH_SPLITS[kind]
-    split_nodes_by = DEFAULT_GRAPH_NODE_SPLITS[kind]
+    split_edges_by = wmg.split.DEFAULT_EDGE_SPLITS[kind]
+    split_nodes_by = wmg.split.DEFAULT_NODE_SPLITS[kind]
 
     dt = wmg.save.graph_to_datatree(
         graph=graph, split_edges_by=split_edges_by, split_nodes_by=split_nodes_by
@@ -79,7 +63,9 @@ def test_create_graph_archetype(kind):
 
 @logger.catch(reraise=True)
 def main():
-    test_create_graph_archetype("keisler")
+    for kind in ["oskarsson_hierarchical", "keisler", "graphcast"]:
+        logger.info(f"Testing {kind} graph")
+        test_create_graph_archetype(kind)
 
 
 if __name__ == "__main__":

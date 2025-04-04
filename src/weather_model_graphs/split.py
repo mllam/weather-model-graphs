@@ -1,5 +1,27 @@
 import networkx
 
+# The default edge splits for the different graph types in the
+# weather-model-graphs package. The keys are the graph types and the values are
+# the edge attributes to split on.
+DEFAULT_EDGE_SPLITS = {
+    "keisler": "component",
+    "graphcast": "component",
+    "oskarsson_hierarchical": {
+        "component": {
+            "m2m": {"direction": {"same": "level", "up": "levels", "down": "levels"}},
+        }
+    },
+}
+
+# The default node splits for the different graph types in the
+# weather-model-graphs package. The keys are the graph types and the values are
+# the node attributes to split on.
+DEFAULT_NODE_SPLITS = {
+    "keisler": "type",
+    "graphcast": "type",
+    "oskarsson_hierarchical": {"type": {"mesh": "level"}},
+}
+
 
 class MissingEdgeAttributeError(Exception):
     pass

@@ -262,6 +262,30 @@ def _move_common_coordinate_to_root(dt: xr.DataTree, coord_name: str) -> xr.Data
     return dt
 
 
+class InvalidSplittingRulesError(Exception):
+    pass
+
+
+def _check_split_on(rules):
+    def _check_level(rules_on_level, odd_step=True):
+        if isinstance(rules_on_level, str):
+            if not odd_step:
+                raise InvalidSplittingRulesError(
+                    "Found str at an even step in the rule hierarchy."
+                )
+        else:
+            for _, subrules in rules_on_level.items():
+                _check_level(subrules, odd_step=not odd_step)
+
+    try:
+        _check_level(rules)
+    except InvalidSplittingRulesError:
+        raise InvalidSplittingRulesError(
+            "The splitting rules must be a dictionary with the edge or node "
+            "attribute to split on at odd levels and the attribute value at even levels."
+        )
+
+
 def _extract_within_subgraph(
     graph, rules, graph_to_ds_fn, split_on: str, split_path_attrs={}
 ):
@@ -294,6 +318,9 @@ def _extract_within_subgraph(
     xr.DataTree
         The DataTree containing the subgraph data.
     """
+
+    _check_split_on(rules)
+
     if split_on == "edge":
         split_fn = split_graph_by_edge_attribute
     elif split_on == "node":
@@ -328,6 +355,7 @@ def _extract_within_subgraph(
                     rules=subrule,
                     split_path_attrs=subgraph_attrs,
                     graph_to_ds_fn=graph_to_ds_fn,
+                    split_on=split_on,
                 ):
                     children[subgraph_path] = subgraph_ds
 
@@ -408,7 +436,7 @@ def graph_to_datatree(
         )
     )
     dt_edges = xr.DataTree(name="edges", children=edge_subgraph_datasets)
-    for c in ["edge_index", "edge_feature"]:
+    for c in ["node", "edge_feature"]:
         dt_edges = _move_common_coordinate_to_root(dt=dt_edges, coord_name=c)
 
     # extract node-sets
