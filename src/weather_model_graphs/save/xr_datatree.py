@@ -1,3 +1,4 @@
+import copy
 from typing import Any, Dict, List, Union
 
 import networkx as nx
@@ -198,6 +199,65 @@ def _extract_node_features_to_data_array(
     return da
 
 
+def _move_common_coordinate_to_root(dt: xr.DataTree, coord_name: str) -> xr.DataTree:
+    """
+    Traverse the DataTree and move the specified coordinate to the root if it is identical
+    across all datasets. This is useful for cleaning up the DataTree structure.
+
+    Parameters
+    ----------
+    dt : xr.DataTree
+        The DataTree to traverse and modify.
+    coord_name : str
+        The name of the coordinate to check and potentially move.
+
+    Returns
+    -------
+    xr.DataTree
+        The modified DataTree with the specified coordinate moved to the root if identical.
+    """
+
+    def _collect_all_coord_data_arrays(dt, coord_name):
+        for child_dt in dt.children.values():
+            if not child_dt.is_hollow or child_dt.is_leaf:
+                ds = child_dt.dataset
+                if coord_name in ds.coords:
+                    yield ds.coords[coord_name]
+
+            for da_coord in _collect_all_coord_data_arrays(child_dt, coord_name):
+                yield da_coord
+
+    das_coord_values = list(_collect_all_coord_data_arrays(dt, coord_name))
+    if len(das_coord_values) == 0:
+        return dt
+
+    def _drop_vars_in_tree(dt, var_names):
+        if var_names in dt.dataset.data_vars or var_names in dt.dataset.coords:
+            ds = dt.to_dataset()
+            ds = ds.drop_vars(var_names)
+            dt.dataset = ds
+            return dt
+
+        new_children = {}
+        for child_name, child_dt in dt.children.items():
+            new_children[child_name] = _drop_vars_in_tree(child_dt, var_names)
+        dt.children = new_children
+
+        return dt
+
+    # Check if all values are identical, if so move the coordinate to the root
+    da_first_coord = das_coord_values[0]
+
+    if all(np.array_equal(da_first_coord, da) for da in das_coord_values):
+        dt = _drop_vars_in_tree(dt, coord_name)
+
+        ds = dt.to_dataset()
+        ds[coord_name] = da_first_coord
+        dt.dataset = ds
+
+    return dt
+
+
 def graph_to_datatree(
     graph: nx.DiGraph,
     split_by: Union[str, Dict[str, Any]],
@@ -254,7 +314,7 @@ def graph_to_datatree(
         A hierarchical DataTree where each leaf node contains only edge-related data.
     """
 
-    def _extract_within_subgraph(graph, rules, path):
+    def _extract_within_subgraph(graph, rules, split_path_attrs={}):
         if isinstance(rules, str):
             rules = {rules: {}}
         for attr, subrules_by_values in rules.items():
@@ -262,57 +322,51 @@ def graph_to_datatree(
                 graph=graph, attr=attr
             ).items():
                 subrule = subrules_by_values.get(attr_val, None)
-                subpath = f"{path}/{attr_val}"
                 if subrule is None:
                     ds_subgraph = extract_edges_to_dataset(
                         graph=subgraph,
                         edge_attrs=edge_feature_attrs,
                         edge_id_attr=edge_id_attr,
                     )
-                    ds_subgraph[attr] = attr_val
-                    yield subpath, ds_subgraph
+                    # set the edge features (and their values) that have been
+                    # split on as attributes on the dataset (so we can
+                    # reference these later)
+                    ds_subgraph.attrs.update(split_path_attrs)
+                    ds_subgraph.attrs[attr] = attr_val
+                    children = {}
                 else:
+                    subgraph_attrs = copy.deepcopy(split_path_attrs)
+                    subgraph_attrs[attr] = attr_val
+                    ds_subgraph = xr.Dataset()
                     # Recursively populate child tree
+                    children = {}
                     for subgraph_path, subgraph_ds in _extract_within_subgraph(
-                        graph=subgraph, rules=subrule, path=subpath
+                        graph=subgraph, rules=subrule, split_path_attrs=subgraph_attrs
                     ):
-                        yield subgraph_path, subgraph_ds
+                        children[subgraph_path] = subgraph_ds
 
+                dt = xr.DataTree(dataset=ds_subgraph)
+                dt.children = children
+                yield str(attr_val), dt
+
+    dt = xr.DataTree(name="root")
     subgraph_datasets = {}
-    for subgraph_path, subgraph_ds in _extract_within_subgraph(
-        graph=graph, rules=split_by, path=""
+    for subgraph_identifier, subgraph_ds in _extract_within_subgraph(
+        graph=graph, rules=split_by
     ):
-        subgraph_datasets[subgraph_path] = subgraph_ds
+        subgraph_datasets[subgraph_identifier] = subgraph_ds
+    dt.children = subgraph_datasets
 
     # make `node` and `edge_feature` coordinates global by traversing the whole
     # tree to check that each dataset has the same values for these
     # coordinates, then drop the coordinates and add them to the root. This
     # just makes the resulting datatree a bit cleaner
 
-    common_coords = dict()
+    for c in ["node", "edge_feature"]:
+        dt = _move_common_coordinate_to_root(dt=dt, coord_name=c)
 
-    def _check_and_remove_common_coords(ds):
-        for c in ["node", "edge_feature"]:
-            if c in ds.coords:
-                if c in common_coords:
-                    if not np.array_equal(common_coords[c], ds.coords[c].values):
-                        raise ValueError(
-                            f"Coordinate '{c}' is not the same across all datasets."
-                        )
-                else:
-                    common_coords[c] = ds.coords[c].values
-                ds = ds.drop_vars(c)
-        return ds
-
-    for path, ds in subgraph_datasets.items():
-        subgraph_datasets[path] = _check_and_remove_common_coords(ds)
-
-    ds_root = xr.Dataset(coords=common_coords)
-    ds_root["node_features"] = _extract_node_features_to_data_array(
-        graph=graph, node_feature_attrs=node_feature_attrs
-    )
-    dt = xr.DataTree(name="root", dataset=ds_root)
-    for path, subgraph_ds in subgraph_datasets.items():
-        dt[path] = subgraph_ds
+    # dt["node_features"] = _extract_node_features_to_data_array(
+    #     graph=graph, node_feature_attrs=node_feature_attrs
+    # )
 
     return dt
