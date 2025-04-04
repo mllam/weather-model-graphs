@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 import xarray as xr
+from loguru import logger
 
 import tests.utils as test_utils
 import weather_model_graphs as wmg
@@ -16,6 +17,12 @@ DEFAULT_GRAPH_SPLITS = {
     },
 }
 
+DEFAULT_GRAPH_NODE_SPLITS = {
+    "keisler": "type",
+    "graphcast": "type",
+    "oskarsson_hierarchical": {"type": "level"},
+}
+
 
 @pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
 def test_create_graph_archetype(kind):
@@ -25,9 +32,12 @@ def test_create_graph_archetype(kind):
 
     graph = fn(coords=xy)
 
-    split_by = DEFAULT_GRAPH_SPLITS[kind]
+    split_edges_by = DEFAULT_GRAPH_SPLITS[kind]
+    split_nodes_by = DEFAULT_GRAPH_NODE_SPLITS[kind]
 
-    dt = wmg.save.graph_to_datatree(graph=graph, split_by=split_by)
+    dt = wmg.save.graph_to_datatree(
+        graph=graph, split_edges_by=split_edges_by, split_nodes_by=split_nodes_by
+    )
 
     # check that we can merge all the datasets across the datatree that
     # represents all the subgraphs. This is only possible if the edge-indexes
@@ -35,7 +45,7 @@ def test_create_graph_archetype(kind):
     ds_global = xr.merge(collect_datasets(dt))
 
     # check that the merged dataset has the same number of edges as the original graph
-    assert ds_global.dims["edge_index"] == len(graph.edges)
+    assert ds_global.sizes["edge_index"] == len(graph.edges)
 
     graph_reconstructed = wmg.load.datatree_to_graph(dt)
 
@@ -62,6 +72,18 @@ def test_create_graph_archetype(kind):
                 graph_reconstructed.nodes[node].get(node_feature),
             )
 
+    import ipdb
+
+    ipdb.set_trace()
+
+
+@logger.catch(reraise=True)
+def main():
+    test_create_graph_archetype("keisler")
+
 
 if __name__ == "__main__":
-    test_create_graph_archetype("keisler")
+    import ipdb
+
+    with ipdb.launch_ipdb_on_exception():
+        main()

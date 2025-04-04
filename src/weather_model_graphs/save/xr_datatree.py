@@ -1,18 +1,23 @@
 import copy
+import functools
 from typing import Any, Dict, List, Union
 
 import networkx as nx
 import numpy as np
 import xarray as xr
 
-from ..split import MissingEdgeAttributeError, split_graph_by_edge_attribute
+from ..split import (
+    MissingEdgeAttributeError,
+    split_graph_by_edge_attribute,
+    split_graph_by_node_attribute,
+)
 from .defaults import DEFAULT_EDGE_FEATURES, DEFAULT_NODE_FEATURES
 
 VECTOR_FEATURE_NAME_FORMAT = "{attr}:{i}"
 
 
 def extract_edges_to_dataset(
-    graph: nx.DiGraph, edge_attrs: List, edge_id_attr: str
+    graph: nx.DiGraph, feature_attrs: List, id_attr: str
 ) -> xr.Dataset:
     """
     Extract edge indices and features from a NetworkX DiGraph into an xarray.Dataset.
@@ -27,9 +32,9 @@ def extract_edges_to_dataset(
         A directed graph where:
         - Each node label must be convertible to an integer (e.g. int, str of int).
         - Edges may have feature attributes (optional, must be uniform).
-    edge_attrs : list
+    feature_attrs : list
         List of edge attributes to extract and include as features in the dataset.
-    edge_id_attr : str
+    id_attr : str
         The name of the edge attribute to use as the unique identifier for each
         edge. Using this ensures that we can use a globally unique id for each
         edge across the entire graph.
@@ -75,7 +80,7 @@ def extract_edges_to_dataset(
 
     edge_feature_values = []
     edge_feature_labels = []
-    for attr in edge_attrs:
+    for attr in feature_attrs:
         if attr not in graph.edges[edges[0]]:
             raise MissingEdgeAttributeError(
                 f"Missing edge attribute '{attr}' in the graph."
@@ -100,9 +105,7 @@ def extract_edges_to_dataset(
 
     edge_features = np.concatenate(edge_feature_values, axis=1)
 
-    edge_indexes = np.array(
-        [graph.edges[e][edge_id_attr] for e in edges], dtype=np.int64
-    )
+    edge_indexes = np.array([graph.edges[e][id_attr] for e in edges], dtype=np.int64)
 
     ds = xr.Dataset(
         data_vars={
@@ -121,9 +124,7 @@ def extract_edges_to_dataset(
     return ds
 
 
-def _extract_node_features_to_data_array(
-    graph: nx.DiGraph, node_feature_attrs: List
-) -> xr.DataArray:
+def _extract_nodes_to_dataset(graph: nx.DiGraph, feature_attrs: List) -> xr.Dataset:
     """
     From the graph, extract the node features and return them as a dataset.
     This function uses the node labels as indexes for the nodes and assumes
@@ -135,17 +136,17 @@ def _extract_node_features_to_data_array(
         A directed graph where:
         - Each node label must be convertible to an integer (e.g. int, str of int).
         - Nodes must have the feature attributes specified in `node_feature_attrs`.
-    node_feature_attrs : list
+    feature_attrs : list
         List of node attributes to extract and include as features in the dataset.
 
     Returns
     -------
-    xr.DataArray
-        A DataArray with:
+    xr.Dataset
+        A dataset with:
         - 'node_features' : (node_index, node_feature) → node attributes
         - Coordinates:
-            * 'node_index' : unique index per node (integer-converted node labels)
-            * 'node_feature' : node feature attributes
+            * 'node_index' : unique index per node
+            * 'node_feature' : list of node attributes
     """
     try:
         # Map node labels to integers (check all)
@@ -162,7 +163,7 @@ def _extract_node_features_to_data_array(
 
     node_feature_values = []
     node_feature_labels = []
-    for attr in node_feature_attrs:
+    for attr in feature_attrs:
         if attr not in graph.nodes[nodes[0]]:
             raise MissingEdgeAttributeError(
                 f"Missing node attribute '{attr}' in the graph."
@@ -196,7 +197,10 @@ def _extract_node_features_to_data_array(
         },
     )
 
-    return da
+    ds = xr.Dataset()
+    ds["node_features"] = da
+
+    return ds
 
 
 def _move_common_coordinate_to_root(dt: xr.DataTree, coord_name: str) -> xr.DataTree:
@@ -258,9 +262,84 @@ def _move_common_coordinate_to_root(dt: xr.DataTree, coord_name: str) -> xr.Data
     return dt
 
 
+def _extract_within_subgraph(
+    graph, rules, graph_to_ds_fn, split_on: str, split_path_attrs={}
+):
+    """
+    Recursively extract subgraphs based on the specified rules and
+    convert them to xarray datasets. The function traverses the graph
+    according to the rules and creates a DataTree structure.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        The input graph to be split.
+    rules : Union[str, Dict[str, Any]]
+        The rules for splitting the graph. Can be a string or a nested
+        dictionary.
+    graph_to_ds_fn : callable
+        A function to convert the subgraph to an xarray dataset, should
+        take the graph to convert as a single argument
+    split_path_attrs : dict
+        A dictionary of attributes that have been split on so far. This
+        is used to set the attributes on the dataset.
+    split_on : str
+        Should be either "edge" or "node". This is used to determine
+        whether to split the graph by edge attributes or node attributes.
+
+    Yields
+    -------
+    str
+        The identifier for the subgraph.
+    xr.DataTree
+        The DataTree containing the subgraph data.
+    """
+    if split_on == "edge":
+        split_fn = split_graph_by_edge_attribute
+    elif split_on == "node":
+        split_fn = split_graph_by_node_attribute
+    else:
+        raise ValueError(f"split_on must be either 'edge' or 'node', not {split_on}")
+
+    if isinstance(rules, str):
+        rules = {rules: {}}
+
+    for attr, subrules_by_values in rules.items():
+        for attr_val, subgraph in split_fn(graph=graph, attr=attr).items():
+            subrule = subrules_by_values.get(attr_val, None)
+            if subrule is None:
+                ds_subgraph = graph_to_ds_fn(
+                    graph=subgraph,
+                )
+                # set the edge features (and their values) that have been
+                # split on as attributes on the dataset (so we can
+                # reference these later)
+                ds_subgraph.attrs.update(split_path_attrs)
+                ds_subgraph.attrs[attr] = attr_val
+                children = {}
+            else:
+                subgraph_attrs = copy.deepcopy(split_path_attrs)
+                subgraph_attrs[attr] = attr_val
+                ds_subgraph = xr.Dataset()
+                # Recursively populate child tree
+                children = {}
+                for subgraph_path, subgraph_ds in _extract_within_subgraph(
+                    graph=subgraph,
+                    rules=subrule,
+                    split_path_attrs=subgraph_attrs,
+                    graph_to_ds_fn=graph_to_ds_fn,
+                ):
+                    children[subgraph_path] = subgraph_ds
+
+            dt = xr.DataTree(dataset=ds_subgraph)
+            dt.children = children
+            yield str(attr_val), dt
+
+
 def graph_to_datatree(
     graph: nx.DiGraph,
-    split_by: Union[str, Dict[str, Any]],
+    split_edges_by: Union[str, Dict[str, Any]],
+    split_nodes_by: Union[str, Dict[str, Any]],
     node_feature_attrs: List = DEFAULT_NODE_FEATURES,
     edge_feature_attrs: List = DEFAULT_EDGE_FEATURES,
     edge_id_attr="edge_id",
@@ -314,59 +393,43 @@ def graph_to_datatree(
         A hierarchical DataTree where each leaf node contains only edge-related data.
     """
 
-    def _extract_within_subgraph(graph, rules, split_path_attrs={}):
-        if isinstance(rules, str):
-            rules = {rules: {}}
-        for attr, subrules_by_values in rules.items():
-            for attr_val, subgraph in split_graph_by_edge_attribute(
-                graph=graph, attr=attr
-            ).items():
-                subrule = subrules_by_values.get(attr_val, None)
-                if subrule is None:
-                    ds_subgraph = extract_edges_to_dataset(
-                        graph=subgraph,
-                        edge_attrs=edge_feature_attrs,
-                        edge_id_attr=edge_id_attr,
-                    )
-                    # set the edge features (and their values) that have been
-                    # split on as attributes on the dataset (so we can
-                    # reference these later)
-                    ds_subgraph.attrs.update(split_path_attrs)
-                    ds_subgraph.attrs[attr] = attr_val
-                    children = {}
-                else:
-                    subgraph_attrs = copy.deepcopy(split_path_attrs)
-                    subgraph_attrs[attr] = attr_val
-                    ds_subgraph = xr.Dataset()
-                    # Recursively populate child tree
-                    children = {}
-                    for subgraph_path, subgraph_ds in _extract_within_subgraph(
-                        graph=subgraph, rules=subrule, split_path_attrs=subgraph_attrs
-                    ):
-                        children[subgraph_path] = subgraph_ds
+    # extract edge-sets
+    graph_edges_to_ds_fn = functools.partial(
+        extract_edges_to_dataset,
+        feature_attrs=edge_feature_attrs,
+        id_attr=edge_id_attr,
+    )
+    edge_subgraph_datasets = dict(
+        _extract_within_subgraph(
+            graph=graph,
+            rules=split_edges_by,
+            graph_to_ds_fn=graph_edges_to_ds_fn,
+            split_on="edge",
+        )
+    )
+    dt_edges = xr.DataTree(name="edges", children=edge_subgraph_datasets)
+    for c in ["edge_index", "edge_feature"]:
+        dt_edges = _move_common_coordinate_to_root(dt=dt_edges, coord_name=c)
 
-                dt = xr.DataTree(dataset=ds_subgraph)
-                dt.children = children
-                yield str(attr_val), dt
+    # extract node-sets
+    graph_nodes_to_ds_fn = functools.partial(
+        _extract_nodes_to_dataset,
+        feature_attrs=node_feature_attrs,
+    )
+    node_subgraph_datasets = dict(
+        _extract_within_subgraph(
+            graph=graph,
+            rules=split_nodes_by,
+            graph_to_ds_fn=graph_nodes_to_ds_fn,
+            split_on="node",
+        )
+    )
+    dt_nodes = xr.DataTree(name="nodes", children=node_subgraph_datasets)
+    for c in ["node_index", "node_feature"]:
+        dt_nodes = _move_common_coordinate_to_root(dt=dt_nodes, coord_name=c)
 
+    # make complete tree include both node and edge sets
     dt = xr.DataTree(name="root")
-    subgraph_datasets = {}
-    for subgraph_identifier, subgraph_ds in _extract_within_subgraph(
-        graph=graph, rules=split_by
-    ):
-        subgraph_datasets[subgraph_identifier] = subgraph_ds
-    dt.children = subgraph_datasets
-
-    # make `node` and `edge_feature` coordinates global by traversing the whole
-    # tree to check that each dataset has the same values for these
-    # coordinates, then drop the coordinates and add them to the root. This
-    # just makes the resulting datatree a bit cleaner
-
-    for c in ["node", "edge_feature"]:
-        dt = _move_common_coordinate_to_root(dt=dt, coord_name=c)
-
-    # dt["node_features"] = _extract_node_features_to_data_array(
-    #     graph=graph, node_feature_attrs=node_feature_attrs
-    # )
+    dt.children = dict(edges=dt_edges, nodes=dt_nodes)
 
     return dt

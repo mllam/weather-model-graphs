@@ -11,27 +11,53 @@ def collect_datasets(tree):
     ds = tree.to_dataset()
 
     if "edge_index" in ds:
-        # find the variables without dimensions
-        # and add them to the edge_features
-        # this is done by creating a new DataArray with the same values
-        # as the attributes and adding it to the edge_features
-        zero_dim_vars = [da.name for da in ds.data_vars.values() if da.dims == ()]
+        # the attributes set on the subgraph datasets are the attributes (and
+        # their values) that were used for splitting. To set these attributes
+        # on each edge in the graph when we convert back to at networkx.DiGraph
+        # we here broadcast the attribute values for each edge_index.
         das_extra_attrs = []
-        for var_name in zero_dim_vars:
-            da_extra_attr = ds[var_name]
-            da_extra_attr = da_extra_attr.expand_dims(
+        attrs = dict(ds.attrs)
+        for key, value in attrs.items():
+            da_extra_attr = xr.DataArray(value).expand_dims(
                 {"edge_index": ds.edge_index, "edge_feature": 1}
             )
-            da_extra_attr.coords["edge_feature"] = [var_name]
+            da_extra_attr.coords["edge_feature"] = [key]
             das_extra_attrs.append(da_extra_attr)
+
+            del ds.attrs[key]
 
         # have to remove `edge_features` variable and `edge_feature` dimension
         # from dataset otherwise we can increase the number of edge features
         # (the coordinate values stays the same)
         da_edge_features = ds.edge_features
-        ds = ds.drop_vars(zero_dim_vars).drop_vars(["edge_features", "edge_feature"])
+        ds = ds.drop_vars(["edge_features", "edge_feature"])
         ds["edge_features"] = xr.concat(
             das_extra_attrs + [da_edge_features], dim="edge_feature"
+        )
+
+    if "node_index" in ds:
+        # the attributes set on the subgraph datasets are the attributes (and
+        # their values) that were used for splitting. To set these attributes
+        # on each node in the graph when we convert back to at networkx.DiGraph
+        # we here broadcast the attribute values for each node_index.
+        das_extra_attrs = []
+        attrs = dict(ds.attrs)
+        for key, value in attrs.items():
+            da_extra_attr = xr.DataArray(value).expand_dims(
+                {"node_index": ds.node_index, "node_feature": 1}
+            )
+            da_extra_attr.coords["node_feature"] = [key]
+            das_extra_attrs.append(da_extra_attr)
+
+            del ds.attrs[key]
+
+        # have to remove `node_features` variable and `node_feature` dimension
+        # from dataset otherwise we can increase the number of node features
+        # (the coordinate values stays the same)
+        da_node_features = ds.node_features
+        ds = ds.drop_vars(["node_features", "node_feature"])
+        ds["node_features"] = xr.concat(
+            das_extra_attrs + [da_node_features], dim="node_feature"
         )
 
     datasets.append(ds)

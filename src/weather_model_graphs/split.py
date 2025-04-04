@@ -119,3 +119,48 @@ def split_on_edge_attribute_existance(graph, attr):
     graph_without_attr = graph.edge_subgraph(edges_without_attr)
 
     return graph_with_attr, graph_without_attr
+
+
+def split_graph_by_node_attribute(graph, attr):
+    """
+    Split a graph into subgraphs based on a node attribute, returning
+    a dictionary of subgraphs keyed by the node attribute value.
+
+    Parameters
+    ----------
+    graph : networkx.Graph
+        Graph to split
+    attr : str
+        Node attribute to split the graph by
+
+    Returns
+    -------
+    dict
+        Dictionary of subgraphs keyed by node attribute value
+    """
+
+    # Get unique node attribute values
+    node_values = set(networkx.get_node_attributes(graph, attr).values())
+
+    # Create a dictionary of subgraphs keyed by node attribute value
+    subgraphs = {}
+    for node_value in node_values:
+        filtered_nodes = [
+            n
+            for n, node_attrs in graph.nodes(data=True)
+            if node_attrs[attr] == node_value
+        ]
+        subgraphs[node_value] = graph.subgraph(filtered_nodes).copy()
+
+    # copy edge attributes
+    for subgraph in subgraphs.values():
+        for edge in subgraph.edges:
+            subgraph.edges[edge].update(graph.edges[edge])
+
+    # check that at least one subgraph was created
+    if len(subgraphs) == 0:
+        raise ValueError(
+            f"No subgraphs were created. Check the node attribute '{attr}'."
+        )
+
+    return subgraphs
