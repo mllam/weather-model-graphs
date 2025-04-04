@@ -373,11 +373,16 @@ def graph_to_datatree(
     edge_id_attr="edge_id",
 ) -> xr.DataTree:
     """
-    Recursively split a NetworkX DiGraph based on node attributes and
-    store edge-related data in a hierarchical xarray.DataTree.
+    Recursively split a NetworkX DiGraph based on edge and node attributes,
+    store the resulting subgraphs in an xarray DataTree. In the extraction
+    node/edge attributes given in `node_feature_attrs` and `edge_feature_attrs`
+    are extracted as feature data-arrays.
 
-    Uses `extract_edges_to_dataset()` to extract edge indices and features
-    at the leaf level.
+    All node and edge index are globally unique across all subgraphs and are
+    gauranteed to be in sequential numerical order within each subgraph (this
+    ensures that downstream GNNs can use these indexes with only subgraph
+    feature vectors by subgraph the first index values and thereby creating a
+    zero-index for a given subgraph)
 
     Parameters
     ----------
@@ -418,7 +423,23 @@ def graph_to_datatree(
     Returns
     -------
     xr.DataTree
-        A hierarchical DataTree where each leaf node contains only edge-related data.
+        A hierarchical DataTree which contains subgraphs of the original graph.
+        The subgraphs are stored in xarray datasets, and the tree structure
+        reflects the splitting rules applied to the graph.
+
+        For example for a Keisler like graph with edges split by `component`
+        (resulting in `g2m`, `m2m` and `m2g`) and and nodes split by `type`
+        (`grid` and `mesh`) the resulting DataTree will look like:
+
+        Structure:
+        └── root
+            ├── edges
+            │   ├── g2m
+            │   ├── m2m
+            │   └── m2g
+            └── nodes
+                ├── grid
+                └── mesh
     """
 
     # extract edge-sets
