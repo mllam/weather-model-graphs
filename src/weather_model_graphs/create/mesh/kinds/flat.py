@@ -6,7 +6,7 @@ from .. import mesh as mesh_graph
 
 
 def create_flat_multiscale_mesh_graph(
-    xy, grid_refinement_factor: float, level_refinement_factor: int, max_num_levels: int
+    xy, mesh_node_distance: float, level_refinement_factor: int, max_num_levels: int
 ):
     """
     Create flat mesh graph by merging the single-level mesh
@@ -14,12 +14,13 @@ def create_flat_multiscale_mesh_graph(
 
     Parameters
     ----------
-    xy : np.ndarray [2, M, N]
-        Grid point coordinates, with first dimension representing
-        x and y coordinates respectively. M and N are the number
-        of grid points in the y and x direction respectively
-    grid_refinement_factor: float
-        Refinement factor between grid points and bottom level of mesh hierarchy
+    xy : np.ndarray [N_grid_points, 2]
+        Grid point coordinates, with first column representing
+        x coordinates and second column y coordinates. N_grid_points is the
+        total number of grid points.
+    mesh_node_distance: float
+        Distance (in x- and y-direction) between created mesh nodes,
+        in coordinate system of xy
     level_refinement_factor: int
         Refinement factor between grid points and bottom level of mesh hierarchy
         NOTE: Must be an odd integer >1 to create proper multiscale graph
@@ -27,12 +28,8 @@ def create_flat_multiscale_mesh_graph(
         Maximum number of levels in the multi-scale graph
     Returns
     -------
-    m2m_graphs : list
-        List of PyTorch geometric graphs for each level
-    G_bottom_mesh : networkx.Graph
-        Graph representing the bottom mesh level
-    all_mesh_nodes : networkx.NodeView
-        All mesh nodes
+    G_tot : networkx.Graph
+        The merged mesh graph
     """
     # Check that level_refinement_factor is an odd integer
     if (
@@ -47,7 +44,7 @@ def create_flat_multiscale_mesh_graph(
     G_all_levels: list[networkx.DiGraph] = mesh_graph.create_multirange_2d_mesh_graphs(
         max_num_levels=max_num_levels,
         xy=xy,
-        grid_refinement_factor=grid_refinement_factor,
+        mesh_node_distance=mesh_node_distance,
         level_refinement_factor=level_refinement_factor,
     )
 
@@ -55,11 +52,14 @@ def create_flat_multiscale_mesh_graph(
     G_tot = G_all_levels[0]
     # First node at level l+1 share position with node (offset, offset) at level l
     level_offset = level_refinement_factor // 2
+
+    first_level_nodes = list(G_all_levels[0].nodes)
+    # Last nodes in first layer has pos (nx-1, ny-1)
+    num_nodes_x = first_level_nodes[-1][0] + 1
+    num_nodes_y = first_level_nodes[-1][1] + 1
+
     for lev in range(1, len(G_all_levels)):
         nodes = list(G_all_levels[lev - 1].nodes)
-        # Last nodes always has pos (nx-1, ny-1)
-        num_nodes_x = nodes[-1][0] + 1
-        num_nodes_y = nodes[-1][1] + 1
         ij = (
             np.array(nodes)
             .reshape((num_nodes_x, num_nodes_y, 2))[
@@ -75,6 +75,10 @@ def create_flat_multiscale_mesh_graph(
         )
         G_tot = networkx.compose(G_tot, G_all_levels[lev])
 
+        # Update number of nodes in x- and y-direction for next iteraion
+        num_nodes_x //= level_refinement_factor
+        num_nodes_y //= level_refinement_factor
+
     # Relabel mesh nodes to start with 0
     G_tot = prepend_node_index(G_tot, 0)
 
@@ -83,3 +87,29 @@ def create_flat_multiscale_mesh_graph(
     G_tot.graph["dy"] = {i: g.graph["dy"] for i, g in enumerate(G_all_levels)}
 
     return G_tot
+
+
+def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
+    """
+    Create flat mesh graph of single level
+
+    Parameters
+    ----------
+    xy : np.ndarray [N_grid_points, 2]
+        Grid point coordinates, with first column representing
+        x coordinates and second column y coordinates. N_grid_points is the
+        total number of grid points.
+    mesh_node_distance: float
+        Distance (in x- and y-direction) between created mesh nodes,
+        in coordinate system of xy
+    Returns
+    -------
+    G_flat : networkx.Graph
+        The flat mesh graph
+    """
+    # Compute number of mesh nodes in x and y dimensions
+    range_x, range_y = np.ptp(xy, axis=0)
+    nx = int(range_x / mesh_node_distance)
+    ny = int(range_y / mesh_node_distance)
+
+    return mesh_graph.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
