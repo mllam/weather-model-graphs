@@ -27,9 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Maintenance
 
-- Update pre-commit github action in CI to fix caching issue that lead to tests
-  failing [\#48](https://github.com/mllam/weather-model-graphs/pull/48),
-  @leifdenby
+- Update github CI actions, including pre-commit action to fix caching issue
+  that lead to tests failing
+  [\#48](https://github.com/mllam/weather-model-graphs/pull/48), @leifdenby
 
 ## [v0.2.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.2.0)
 
