@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix crash when trying to create flat multiscale graphs with >= 3 levels
   [\#41](https://github.com/mllam/weather-model-graphs/pull/41), @joeloskarsson
 
+- Fix example in README
+  [\#38](https://github.com/mllam/weather-model-graphs/pull/38) @leifdenby
+
 ### Maintenance
 
 - Update github CI actions, including pre-commit action to fix caching issue
