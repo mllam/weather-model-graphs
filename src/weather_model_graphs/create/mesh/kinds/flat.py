@@ -112,4 +112,12 @@ def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
     nx = int(range_x / mesh_node_distance)
     ny = int(range_y / mesh_node_distance)
 
+    if nx == 0 or ny == 0:
+        raise ValueError(
+            "The given `mesh_node_distance` is too large for the provided coordinates. "
+            f"Got mesh_node_distance={mesh_node_distance}, but the x-range is {range_x} "
+            f"and y-range is {range_y}. Maybe you want to decrease the `mesh_node_distance`"
+            " so that the mesh nodes are spaced closer together?"
+        )
+
     return mesh_graph.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
