@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that lead to tests failing
   [\#48](https://github.com/mllam/weather-model-graphs/pull/48), @leifdenby
 
+- Update github CI actions to fix failing build and deploy of jupyterbook
+  [\#49](https://github.com/mllam/weather-model-graphs/pull/49), @leifdenby
+
 ## [v0.2.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.2.0)
 
 ### Added
