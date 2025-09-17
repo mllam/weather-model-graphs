@@ -1,46 +1,26 @@
 import networkx
 
+# The default edge splits for the different graph types in the
+# weather-model-graphs package. The keys are the graph types and the values are
+# the edge attributes to split on.
+DEFAULT_EDGE_SPLITS = {
+    "keisler": "component",
+    "graphcast": "component",
+    "oskarsson_hierarchical": {
+        "component": {
+            "m2m": {"direction": {"same": "level", "up": "levels", "down": "levels"}},
+        }
+    },
+}
 
-def prepend_node_index(graph, new_index):
-    """
-    Prepend node index to node tuple in graph, i.e. (i, j) -> (new_index, i, j)
-
-    Parameters
-    ----------
-    graph : networkx.Graph
-        Graph to relabel
-    new_index : int
-        New index to prepend to node tuple
-
-    Returns
-    -------
-    networkx.Graph
-        Graph with relabeled nodes
-    """
-    ijk = [tuple((new_index,) + x) for x in graph.nodes]
-    to_mapping = dict(zip(graph.nodes, ijk))
-    return networkx.relabel_nodes(graph, to_mapping, copy=True)
-
-
-def sort_nodes_internally(nx_graph, node_attr=None, edge_attr=None):
-    # For some reason the networkx .nodes() return list can not be sorted,
-    # but this is the ordering used by pyg when converting.
-    # This function fixes this.
-    H = networkx.DiGraph()
-    if node_attr is not None:
-        H.add_nodes_from(
-            sorted(nx_graph.nodes(data=True), key=lambda x: x[1][node_attr])
-        )
-    else:
-        H.add_nodes_from(sorted(nx_graph.nodes(data=True)))
-
-    if edge_attr is not None:
-        H.add_edges_from(
-            sorted(nx_graph.edges(data=True), key=lambda x: x[2][edge_attr])
-        )
-    else:
-        H.add_edges_from(nx_graph.edges(data=True))
-    return H
+# The default node splits for the different graph types in the
+# weather-model-graphs package. The keys are the graph types and the values are
+# the node attributes to split on.
+DEFAULT_NODE_SPLITS = {
+    "keisler": "type",
+    "graphcast": "type",
+    "oskarsson_hierarchical": {"type": {"mesh": "level"}},
+}
 
 
 class MissingEdgeAttributeError(Exception):
@@ -134,25 +114,6 @@ def split_graph_by_edge_attribute(graph, attr):
     return subgraphs
 
 
-def replace_node_labels_with_unique_ids(graph):
-    """
-    Rename node labels with unique id.
-
-    Parameters
-    ----------
-    graph : networkx.Graph
-        Graph to rename node labels
-
-    Returns
-    -------
-    networkx.Graph
-        Graph with node labels renamed
-    """
-    return networkx.relabel_nodes(
-        graph, {node: i for i, node in enumerate(graph.nodes)}, copy=True
-    )
-
-
 def split_on_edge_attribute_existance(graph, attr):
     """
     Split up graph based on if edges have specific attribute.
@@ -180,3 +141,48 @@ def split_on_edge_attribute_existance(graph, attr):
     graph_without_attr = graph.edge_subgraph(edges_without_attr)
 
     return graph_with_attr, graph_without_attr
+
+
+def split_graph_by_node_attribute(graph, attr):
+    """
+    Split a graph into subgraphs based on a node attribute, returning
+    a dictionary of subgraphs keyed by the node attribute value.
+
+    Parameters
+    ----------
+    graph : networkx.Graph
+        Graph to split
+    attr : str
+        Node attribute to split the graph by
+
+    Returns
+    -------
+    dict
+        Dictionary of subgraphs keyed by node attribute value
+    """
+
+    # Get unique node attribute values
+    node_values = set(networkx.get_node_attributes(graph, attr).values())
+
+    # Create a dictionary of subgraphs keyed by node attribute value
+    subgraphs = {}
+    for node_value in node_values:
+        filtered_nodes = [
+            n
+            for n, node_attrs in graph.nodes(data=True)
+            if node_attrs[attr] == node_value
+        ]
+        subgraphs[node_value] = graph.subgraph(filtered_nodes).copy()
+
+    # copy edge attributes
+    for subgraph in subgraphs.values():
+        for edge in subgraph.edges:
+            subgraph.edges[edge].update(graph.edges[edge])
+
+    # check that at least one subgraph was created
+    if len(subgraphs) == 0:
+        raise ValueError(
+            f"No subgraphs were created. Check the node attribute '{attr}'."
+        )
+
+    return subgraphs

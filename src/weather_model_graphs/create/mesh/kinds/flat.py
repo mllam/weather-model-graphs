@@ -1,7 +1,7 @@
 import networkx
 import numpy as np
 
-from ....networkx_utils import prepend_node_index
+from ....labelling import prepend_node_index
 from .. import mesh as mesh_graph
 
 

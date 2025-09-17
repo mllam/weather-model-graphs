@@ -1,0 +1,2 @@
+DEFAULT_EDGE_FEATURES = ["len", "vdiff"]
+DEFAULT_NODE_FEATURES = ["pos"]

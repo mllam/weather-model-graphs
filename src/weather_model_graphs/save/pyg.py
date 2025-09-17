@@ -3,9 +3,12 @@ from pathlib import Path
 from typing import List
 
 import networkx
+import networkx as nx
+import numpy as np
+import xarray as xr
 from loguru import logger
 
-from .networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attribute
+from ..split import MissingEdgeAttributeError, split_graph_by_edge_attribute
 
 try:
     import torch
@@ -154,3 +157,107 @@ def to_pickle(graph: networkx.DiGraph, output_directory: str, name: str):
     with open(fp, "wb") as f:
         pickle.dump(graph, f)
     logger.info(f"Saved graph to {fp}.")
+
+
+def extract_edges_to_dataset(
+    graph: nx.DiGraph, edge_attrs: List, edge_id_attr: str
+) -> xr.Dataset:
+    """
+    Extract edge indices and features from a NetworkX DiGraph into an xarray.Dataset.
+
+    This function assumes that all node labels can be uniquely and deterministically
+    converted into integers. These integer-converted node labels will be used directly
+    as edge indices (i.e., no remapping or reindexing is performed).
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        A directed graph where:
+        - Each node label must be convertible to an integer (e.g. int, str of int).
+        - Edges may have feature attributes (optional, must be uniform).
+    edge_attrs : list
+        List of edge attributes to extract and include as features in the dataset.
+    edge_id_attr : str
+        The name of the edge attribute to use as the unique identifier for each
+        edge. Using this ensures that we can use a globally unique id for each
+        edge across the entire graph.
+
+    Returns
+    -------
+    xr.Dataset
+        A dataset with:
+        - 'adjacency_list' : (edge_index, node_position) → integer node indices
+        - 'edge_features'  : (edge_index, edge_feature) → optional edge attributes
+        - Coordinates:
+            * 'edge_index' : unique index per edge
+            * 'node_position' : ['src_index', 'dst_index']
+            * 'edge_feature' : (if edge features exist)
+
+    Raises
+    ------
+    ValueError
+        If any node label cannot be converted into an integer.
+    """
+    try:
+        # Map node labels to integers (check all)
+        nodes = list(graph.nodes)
+        node_labels = [int(n) for n in nodes]  # This will raise ValueError if invalid
+        node_to_idx = dict(zip(node_labels, nodes))
+    except ValueError:
+        raise ValueError(
+            "All node labels must be convertible to integers (e.g. 0, '1', etc.)"
+        )
+
+    if len(nodes) == 0:
+        raise ValueError("Graph must contain at least one node.")
+
+    # Build adjacency list
+    edges = list(graph.edges)
+    adjacency_list = np.array(
+        [[node_to_idx[u], node_to_idx[v]] for u, v in edges], dtype=np.int64
+    )
+
+    if len(edges) == 0:
+        raise ValueError("Graph must contain at least one edge.")
+
+    edge_feature_values = []
+    edge_feature_labels = []
+    for attr in edge_attrs:
+        if attr not in graph.edges[edges[0]]:
+            raise MissingEdgeAttributeError(
+                f"Missing edge attribute '{attr}' in the graph."
+            )
+        vals = np.array([graph.edges[e][attr] for e in edges])
+        if vals.ndim == 1:
+            vals = vals.reshape(-1, 1)
+            edge_feature_labels.append(attr)
+        elif vals.ndim == 2:
+            # If the attribute is a list, we need to stack them
+            edge_feature_labels.extend([f"{attr}_{i}" for i in range(vals.shape[1])])
+        else:
+            raise ValueError(
+                f"Edge attribute '{attr}' has unsupported shape {vals.shape}."
+            )
+        edge_feature_values.append(vals)
+
+    edge_features = np.concatenate(edge_feature_values, axis=1)
+
+    edge_indexes = np.array(
+        [graph.edges[e][edge_id_attr] for e in edges], dtype=np.int64
+    )
+
+    ds = xr.Dataset(
+        data_vars={
+            "adjacency_list": (["edge_index", "node"], adjacency_list),
+        },
+        coords={
+            "edge_index": edge_indexes,
+            "node": ["src_index", "dst_index"],
+        },
+    )
+
+    if edge_features is not None and edge_feature_labels:
+        ds["edge_features"] = (["edge_index", "edge_feature"], edge_features)
+        ds = ds.assign_coords(edge_feature=edge_feature_labels)
+
+    return ds
