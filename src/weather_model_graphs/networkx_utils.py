@@ -104,7 +104,7 @@ def split_graph_by_edge_attribute(graph, attr):
 def sort_nodes_in_graph(graph):
     """
     Creates a new networkx.DiGraph that is a copy of input, but with nodes
-    sorted according to their id
+    sorted according to their label value
 
     Parameters
     ----------
