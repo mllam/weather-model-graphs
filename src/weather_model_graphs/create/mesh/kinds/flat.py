@@ -52,11 +52,14 @@ def create_flat_multiscale_mesh_graph(
     G_tot = G_all_levels[0]
     # First node at level l+1 share position with node (offset, offset) at level l
     level_offset = level_refinement_factor // 2
+
+    first_level_nodes = list(G_all_levels[0].nodes)
+    # Last nodes in first layer has pos (nx-1, ny-1)
+    num_nodes_x = first_level_nodes[-1][0] + 1
+    num_nodes_y = first_level_nodes[-1][1] + 1
+
     for lev in range(1, len(G_all_levels)):
         nodes = list(G_all_levels[lev - 1].nodes)
-        # Last nodes always has pos (nx-1, ny-1)
-        num_nodes_x = nodes[-1][0] + 1
-        num_nodes_y = nodes[-1][1] + 1
         ij = (
             np.array(nodes)
             .reshape((num_nodes_x, num_nodes_y, 2))[
@@ -71,6 +74,10 @@ def create_flat_multiscale_mesh_graph(
             G_all_levels[lev], dict(zip(G_all_levels[lev].nodes, ij))
         )
         G_tot = networkx.compose(G_tot, G_all_levels[lev])
+
+        # Update number of nodes in x- and y-direction for next iteraion
+        num_nodes_x //= level_refinement_factor
+        num_nodes_y //= level_refinement_factor
 
     # Relabel mesh nodes to start with 0
     G_tot = prepend_node_index(G_tot, 0)
@@ -104,5 +111,13 @@ def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
     range_x, range_y = np.ptp(xy, axis=0)
     nx = int(range_x / mesh_node_distance)
     ny = int(range_y / mesh_node_distance)
+
+    if nx == 0 or ny == 0:
+        raise ValueError(
+            "The given `mesh_node_distance` is too large for the provided coordinates. "
+            f"Got mesh_node_distance={mesh_node_distance}, but the x-range is {range_x} "
+            f"and y-range is {range_y}. Maybe you want to decrease the `mesh_node_distance`"
+            " so that the mesh nodes are spaced closer together?"
+        )
 
     return mesh_graph.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
