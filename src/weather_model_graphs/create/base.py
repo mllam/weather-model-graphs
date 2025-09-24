@@ -41,7 +41,7 @@ def create_all_graph_components(
     g2m_connectivity_kwargs={},
     coords_crs: pyproj.crs.CRS | None = None,
     graph_crs: pyproj.crs.CRS | None = None,
-    decode_mask: Iterable | None = None,
+    decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
 ):
     """
