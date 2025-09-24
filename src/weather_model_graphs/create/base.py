@@ -182,6 +182,7 @@ def create_all_graph_components(
             graph.edges[edge]["component"] = name
 
     if return_components:
+       # Because merging to a single graph and then splitting again leads to changes in node indexing when converting to `pyg.Data` objects (this in part is due to the to `m2g` and `g2m` having a different set of grid nodes) the ability to return the graph components (`g2m`, `m2m` and `m2g`) has been added here. See https://github.com/mllam/weather-model-graphs/pull/34#issuecomment-2507980752 for details
         # Give each component unique ids
         graph_components = {
             comp_name: replace_node_labels_with_unique_ids(subgraph)
