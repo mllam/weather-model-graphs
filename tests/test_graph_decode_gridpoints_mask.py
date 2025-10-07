@@ -11,7 +11,7 @@ from tests import utils as test_utils
 def test_graph_decode_gridpoints_mask():
     """
     Test to ensure that when applying a mask to select which grid nodes to
-    decode to that the resulting adjecency matrix contains the grid-indexes
+    decode to that the resulting adjacency list contains the grid-indexes
     of the retained nodes.
     """
 
