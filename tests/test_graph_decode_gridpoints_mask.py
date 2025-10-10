@@ -39,8 +39,8 @@ def test_graph_decode_gridpoints_mask():
 
     # store the graphs to disk and load the adjecency matrices for each
     with tempfile.TemporaryDirectory() as tmpdirname:
-        name_filtered = "g2m_filtered"
-        name_unfiltered = "g2m"
+        name_filtered = "m2g_filtered"
+        name_unfiltered = "m2g"
 
         wmg.save.to_pyg(
             graph=unfiltered_graph, output_directory=tmpdirname, name=name_unfiltered
@@ -59,7 +59,7 @@ def test_graph_decode_gridpoints_mask():
 
     np.testing.assert_equal(adj_filtered.shape, adj_unfiltered_masked.shape)
 
-    # Re-index nodes from unfiltered g2m to match
+    # Re-index nodes from unfiltered m2g to match
     # New index is number of kept nodes before in decode_mask
     reindex_map = decode_mask.cumsum() - 1
     adj_grid_reindexed = reindex_map[adj_unfiltered_masked[1]]
