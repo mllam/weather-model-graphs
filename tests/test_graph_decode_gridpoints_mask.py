@@ -52,7 +52,9 @@ def test_graph_decode_gridpoints_mask():
         adj_filtered = load_edge_index(name_filtered, output_directory=tmpdirname)
         adj_unfiltered = load_edge_index(name_unfiltered, output_directory=tmpdirname)
 
-    # Look up which edges should be kept according to decode_mask
+    # Use the decode mask to find out which edges to retain by taking the
+    # grid-index values from the m2g adjacency list and indexing into the
+    # decode mask
     unfiltered_edge_mask = decode_mask[adj_unfiltered[1]]
     # Filter edges from full set
     adj_unfiltered_masked = adj_unfiltered[:, unfiltered_edge_mask]
