@@ -91,6 +91,9 @@ def create_all_graph_components(
     decoded to (included in the m2g subgraph), i.e. which positions should be output. It should have the same length as the number of
     grid position coordinates given in `coords`.  The mask being set to True means that corresponding
     grid nodes should be included in g2m. If `decode_mask=None` (default), all grid nodes are included.
+
+    `return_components` is a boolean flag, if True the function returns a dict with
+    m2g, m2m and g2m as separate graphs. If false returns one combined graph.
     """
     graph_components: dict[networkx.DiGraph] = {}
 

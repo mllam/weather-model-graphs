@@ -1,7 +1,18 @@
+from typing import Iterable
+
+import pyproj
+
 from .base import create_all_graph_components
 
 
-def create_keisler_graph(coords, mesh_node_distance=3, **kwargs):
+def create_keisler_graph(
+    coords,
+    mesh_node_distance=3,
+    coords_crs: pyproj.crs.CRS | None = None,
+    graph_crs: pyproj.crs.CRS | None = None,
+    decode_mask: Iterable[bool] | None = None,
+    return_components: bool = False,
+):
     """
     Create a flat LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     This graph setup is inspired by the global graph used by Keisler (2022, https://arxiv.org/abs/2202.07575).
@@ -23,8 +34,21 @@ def create_keisler_graph(coords, mesh_node_distance=3, **kwargs):
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of coords
-    **kwargs:
-        Additional keyword arguments passed on to create_all_graph_components.
+    coords_crs: pyproj.crs.CRS or None
+        Coordinate Reference System (CRS) of the input `coords`. Must be a
+        pyproj.crs.CRS or cartopy.crs.CRS.
+    graph_crs: pyproj.crs.CRS or None
+        CRS where the graph creation should take place. If both `coords_crs`
+        and `graph_crs` are given, coords are transformed from `coords_crs` to
+        `graph_crs`. If any one of them is None, the original coords are used.
+    decode_mask: Iterable[bool] or None
+        An Iterable of booleans, masking which grid positions should be decoded
+        to (included in the m2g subgraph), i.e., which positions should be output.
+        Must have the same length as `coords`. If None (default), all grid nodes
+        are included.
+    return_components: bool, default False
+        If True, the function returns a dict with m2g, m2m, and g2m as separate
+        graphs. If False, returns one combined graph.
 
     Returns
     -------
@@ -43,7 +67,10 @@ def create_keisler_graph(coords, mesh_node_distance=3, **kwargs):
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
-        **kwargs,
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
+        decode_mask=decode_mask,
+        return_components=return_components,
     )
 
 
@@ -52,7 +79,10 @@ def create_graphcast_graph(
     mesh_node_distance=3,
     level_refinement_factor=3,
     max_num_levels=None,
-    **kwargs,
+    coords_crs: pyproj.crs.CRS | None = None,
+    graph_crs: pyproj.crs.CRS | None = None,
+    decode_mask: Iterable[bool] | None = None,
+    return_components: bool = False,
 ):
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -79,8 +109,21 @@ def create_graphcast_graph(
         NOTE: Must be an odd integer >1 to create proper multiscale graph
     max_num_levels: int
         The number of levels of longer-range connections in the mesh graph.
-    **kwargs:
-        Additional keyword arguments passed on to create_all_graph_components.
+    coords_crs: pyproj.crs.CRS or None
+        Coordinate Reference System (CRS) of the input `coords`. Must be a
+        pyproj.crs.CRS or cartopy.crs.CRS.
+    graph_crs: pyproj.crs.CRS or None
+        CRS where the graph creation should take place. If both `coords_crs`
+        and `graph_crs` are given, coords are transformed from `coords_crs` to
+        `graph_crs`. If any one of them is None, the original coords are used.
+    decode_mask: Iterable[bool] or None
+        An Iterable of booleans, masking which grid positions should be decoded
+        to (included in the m2g subgraph), i.e., which positions should be output.
+        Must have the same length as `coords`. If None (default), all grid nodes
+        are included.
+    return_components: bool, default False
+        If True, the function returns a dict with m2g, m2m, and g2m as separate
+        graphs. If False, returns one combined graph.
 
     Returns
     -------
@@ -103,7 +146,10 @@ def create_graphcast_graph(
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
-        **kwargs,
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
+        decode_mask=decode_mask,
+        return_components=return_components,
     )
 
 
@@ -112,7 +158,10 @@ def create_oskarsson_hierarchical_graph(
     mesh_node_distance=3,
     level_refinement_factor=3,
     max_num_levels=None,
-    **kwargs,
+    coords_crs: pyproj.crs.CRS | None = None,
+    graph_crs: pyproj.crs.CRS | None = None,
+    decode_mask: Iterable[bool] | None = None,
+    return_components: bool = False,
 ):
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -144,8 +193,21 @@ def create_oskarsson_hierarchical_graph(
         Refinement factor between grid points and bottom level of mesh hierarchy
     max_num_levels: int
         The number of levels of longer-range connections in the mesh graph.
-    **kwargs:
-        Additional keyword arguments passed on to create_all_graph_components.
+    coords_crs: pyproj.crs.CRS or None
+        Coordinate Reference System (CRS) of the input `coords`. Must be a
+        pyproj.crs.CRS or cartopy.crs.CRS.
+    graph_crs: pyproj.crs.CRS or None
+        CRS where the graph creation should take place. If both `coords_crs`
+        and `graph_crs` are given, coords are transformed from `coords_crs` to
+        `graph_crs`. If any one of them is None, the original coords are used.
+    decode_mask: Iterable[bool] or None
+        An Iterable of booleans, masking which grid positions should be decoded
+        to (included in the m2g subgraph), i.e., which positions should be output.
+        Must have the same length as `coords`. If None (default), all grid nodes
+        are included.
+    return_components: bool, default False
+        If True, the function returns a dict with m2g, m2m, and g2m as separate
+        graphs. If False, returns one combined graph.
 
     Returns
     -------
@@ -168,5 +230,8 @@ def create_oskarsson_hierarchical_graph(
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
-        **kwargs,
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
+        decode_mask=decode_mask,
+        return_components=return_components,
     )
