@@ -1,7 +1,12 @@
 from .base import create_all_graph_components
 
 
-def create_keisler_graph(coords, mesh_node_distance=3, **kwargs):
+def create_keisler_graph(
+    coords,
+    mesh_node_distance=3,
+    coords_crs=None,
+    graph_crs=None,
+):
     """
     Create a flat LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     This graph setup is inspired by the global graph used by Keisler (2022, https://arxiv.org/abs/2202.07575).
@@ -39,12 +44,15 @@ def create_keisler_graph(coords, mesh_node_distance=3, **kwargs):
         m2m_connectivity="flat",
         m2m_connectivity_kwargs=dict(mesh_node_distance=mesh_node_distance),
         g2m_connectivity="within_radius",
-        m2g_connectivity="containing_rectangle",
+        m2g_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
             rel_max_dist=0.51,
         ),
-        m2g_connectivity_kwargs=dict(),
-        **kwargs,
+        m2g_connectivity_kwargs=dict(
+            max_num_neighbours=4,
+        ),
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
     )
 
 
@@ -53,7 +61,8 @@ def create_graphcast_graph(
     mesh_node_distance=3,
     level_refinement_factor=3,
     max_num_levels=None,
-    **kwargs,
+    coords_crs=None,
+    graph_crs=None,
 ):
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -100,12 +109,15 @@ def create_graphcast_graph(
             max_num_levels=max_num_levels,
         ),
         g2m_connectivity="within_radius",
-        m2g_connectivity="containing_rectangle",
+        m2g_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
             rel_max_dist=0.51,
         ),
-        m2g_connectivity_kwargs=dict(),
-        **kwargs,
+        m2g_connectivity_kwargs=dict(
+            max_num_neighbours=4,
+        ),
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
     )
 
 
@@ -114,7 +126,8 @@ def create_oskarsson_hierarchical_graph(
     mesh_node_distance=3,
     level_refinement_factor=3,
     max_num_levels=None,
-    **kwargs,
+    coords_crs=None,
+    graph_crs=None,
 ):
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -164,10 +177,13 @@ def create_oskarsson_hierarchical_graph(
             max_num_levels=max_num_levels,
         ),
         g2m_connectivity="within_radius",
-        m2g_connectivity="containing_rectangle",
+        m2g_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
             rel_max_dist=0.51,
         ),
-        m2g_connectivity_kwargs=dict(),
-        **kwargs,
+        m2g_connectivity_kwargs=dict(
+            max_num_neighbours=4,
+        ),
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
     )
