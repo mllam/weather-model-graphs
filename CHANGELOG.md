@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix the bug with edgeless nodes being dropped
+  [\#51](https://github.com/mllam/weather-model-graphs/pull/51), @pkhalaj, @wi-spang, @krikru
+
 - Fix crash when trying to create flat multiscale graphs with >= 3 levels
   [\#41](https://github.com/mllam/weather-model-graphs/pull/41), @joeloskarsson
 
