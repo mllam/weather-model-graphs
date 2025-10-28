@@ -11,7 +11,7 @@ from tests import utils as test_utils
 def test_graph_decode_gridpoints_mask():
     """
     Test to ensure that when applying a mask to select which grid nodes to
-    decode to that the resulting adjecency matrix contains the grid-indexes
+    decode to that the resulting adjacency list contains the grid-indexes
     of the retained nodes.
     """
 
@@ -39,8 +39,8 @@ def test_graph_decode_gridpoints_mask():
 
     # store the graphs to disk and load the adjecency matrices for each
     with tempfile.TemporaryDirectory() as tmpdirname:
-        name_filtered = "g2m_filtered"
-        name_unfiltered = "g2m"
+        name_filtered = "m2g_filtered"
+        name_unfiltered = "m2g"
 
         wmg.save.to_pyg(
             graph=unfiltered_graph, output_directory=tmpdirname, name=name_unfiltered
@@ -52,14 +52,16 @@ def test_graph_decode_gridpoints_mask():
         adj_filtered = load_edge_index(name_filtered, output_directory=tmpdirname)
         adj_unfiltered = load_edge_index(name_unfiltered, output_directory=tmpdirname)
 
-    # Look up which edges should be kept according to decode_mask
+    # Use the decode mask to find out which edges to retain by taking the
+    # grid-index values from the m2g adjacency list and indexing into the
+    # decode mask
     unfiltered_edge_mask = decode_mask[adj_unfiltered[1]]
     # Filter edges from full set
     adj_unfiltered_masked = adj_unfiltered[:, unfiltered_edge_mask]
 
     np.testing.assert_equal(adj_filtered.shape, adj_unfiltered_masked.shape)
 
-    # Re-index nodes from unfiltered g2m to match
+    # Re-index nodes from unfiltered m2g to match
     # New index is number of kept nodes before in decode_mask
     reindex_map = decode_mask.cumsum() - 1
     adj_grid_reindexed = reindex_map[adj_unfiltered_masked[1]]

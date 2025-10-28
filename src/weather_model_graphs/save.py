@@ -122,8 +122,9 @@ def to_pyg(
             # neural-lam still expects a list of graphs, so if the attribute is missing
             # we just return the original graph as a list
             sub_graphs = [graph]
-        # Nodes must be sorted if we want to preserve any ordering
-        # when converted to pyg
+        # Nodes must be sorted if we want to preserve the ordering in node
+        # labels when we convert to a pyg object. This conversion does not care
+        # about node labels inherently.
         pyg_graphs = [
             pyg_convert.from_networkx(sort_nodes_in_graph(g)) for g in sub_graphs
         ]
