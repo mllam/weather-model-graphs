@@ -213,3 +213,32 @@ def test_create_many_levels(kind):
         mesh_node_distance=mesh_node_distance,
         level_refinement_factor=level_refinement_factor,
     )
+
+
+@pytest.mark.parametrize("coordinates_offset", [0, 1, 10, 100])
+@pytest.mark.parametrize(
+    ("method", "method_kwargs"),
+    [
+        ("containing_rectangle", dict()),
+        ("nearest_neighbour", dict()),
+        *[("within_radius", dict(max_dist=md)) for md in [0.1, 0.51, 1.0]],
+        *[("within_radius", dict(rel_max_dist=md)) for md in [0.1, 0.51, 1.0]],
+    ],
+)
+def test_edgeless_nodes_preservation_in_different_graphs(
+    coordinates_offset, method, method_kwargs
+):
+    """A regression test to ensure that edgeless nodes are not dropped.
+
+    This was an issue only with the `containing_rectangle` method. However, we are testing for other methods as well.
+    """
+    coordinates_mesh = test_utils.create_fake_xy(10)
+    coordinates_grid = coordinates_mesh + coordinates_offset
+    graph_source = wmg.create.mesh.create_single_level_2d_mesh_graph(
+        xy=coordinates_mesh, nx=4, ny=4
+    )
+    graph_target = wmg.create.grid.create_grid_graph_nodes(coordinates_grid)
+    graph = wmg.create.base.connect_nodes_across_graphs(
+        G_source=graph_source, G_target=graph_target, method=method, **method_kwargs
+    )
+    assert set(graph.nodes) == set(graph_source.nodes) | set(graph_target.nodes)

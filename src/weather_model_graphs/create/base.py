@@ -273,12 +273,15 @@ def connect_nodes_across_graphs(
             return abs_diffs[0] < mesh_node_dx and abs_diffs[1] < mesh_node_dy
 
         filtered_edges = [
-            (u, v)
+            (u, v, edge_prop)
             for u, v, edge_prop in rad_graph.edges(data=True)
             if _edge_filter(edge_prop)
         ]
 
-        filtered_graph = rad_graph.edge_subgraph(filtered_edges)
+        # Construct subgraph with only filtered edges, but all nodes
+        filtered_graph = networkx.DiGraph()
+        filtered_graph.add_nodes_from(rad_graph.nodes(data=True))
+        filtered_graph.add_edges_from(filtered_edges)
         return filtered_graph
 
     elif method == "nearest_neighbour":
