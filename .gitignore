@@ -185,3 +185,8 @@ tags
 
 # Coc configuration directory
 .vim
+
+
+.idea
+.python-version
+*.pt
