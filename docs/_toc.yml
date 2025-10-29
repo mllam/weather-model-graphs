@@ -9,3 +9,4 @@ chapters:
 - file: creating_the_graph
 - file: lat_lons
 - file: saving_graphs_for_neural_lam
+- file: decoding_mask
