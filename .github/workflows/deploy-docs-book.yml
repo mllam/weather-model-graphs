@@ -23,7 +23,13 @@ jobs:
         cache: true
 
     - name: Install dependencies
+      # note we pin to using python 3.12 here because there aren't scipy wheels
+      # available for python3.13 unless we enforce use of numpy>=2.1 which
+      # seems quite aggressive for now. And without a scipy wheel we have to
+      # build from source, which would mean installing openblas which seems
+      # unnecessary
       run: |
+        pdm use --auto-install-min 3.12
         pdm install --prod
         pdm install --group docs
         pdm install --group visualisation
