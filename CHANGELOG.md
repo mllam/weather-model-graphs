@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add a decoding mask option to only include subset of grid nodes in m2g
+  [\#34](https://github.com/mllam/weather-model-graphs/pull/34) @joeloskarsson
+
 - Add test to check python codeblocks in README keep working as code changes
   [\#38](https://github.com/mllam/weather-model-graphs/pull/38) @leifdenby
 
