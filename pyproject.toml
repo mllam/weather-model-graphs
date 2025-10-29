@@ -40,9 +40,11 @@ profile = "black"
 [tool.pdm]
 distribution = true
 
-[tool.pdm.dev-dependencies]
+
+[dependency-groups]
 dev = [
     "pytest>=8.2.0",
     "nbval>=0.11.0",
     "ipdb>=0.13.13",
+    "pre-commit>=4.3.0",
 ]
