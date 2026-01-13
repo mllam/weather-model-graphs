@@ -29,7 +29,7 @@ jobs:
 
       - name: Install package (including dev dependencies)
         run: |
-          pdm install
+          pdm install -G :all
           pdm install --dev
 
       - name: Run tests
