@@ -11,6 +11,8 @@ dependencies = [
     "networkx>=3.3",
     "scipy>=1.13.0",
     "pyproj>=3.7.0",
+    "xarray>=2025.6.1",
+    "zarr>=2.18.3",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
@@ -47,4 +49,5 @@ dev = [
     "nbval>=0.11.0",
     "ipdb>=0.13.13",
     "pre-commit>=4.3.0",
+    "nbconvert>=7.16.6",
 ]
