@@ -23,7 +23,13 @@ jobs:
         cache: true
 
     - name: Install dependencies
+      # note we pin to using python 3.12 here because there aren't scipy wheels
+      # available for python3.13 unless we enforce use of numpy>=2.1 which
+      # seems quite aggressive for now. And without a scipy wheel we have to
+      # build from source, which would mean installing openblas which seems
+      # unnecessary
       run: |
+        pdm use --auto-install-min 3.12
         pdm install --prod
         pdm install --group docs
         pdm install --group visualisation
@@ -35,11 +41,11 @@ jobs:
 
     # Upload the book's HTML as an artifact
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v2
+      uses: actions/upload-pages-artifact@v4
       with:
         path: "docs/_build/html"
 
     # Deploy the book's HTML to GitHub Pages
     - name: Deploy to GitHub Pages
       id: deployment
-      uses: actions/deploy-pages@v2
+      uses: actions/deploy-pages@v4
