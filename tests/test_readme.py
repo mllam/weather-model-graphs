@@ -18,4 +18,4 @@ def test_readme_example(codeblock_example: str):
     """
     Check that execution of the python code block in the README does not raise an exception.
     """
-    exec(codeblock_example)
+    exec(codeblock_example,{})
