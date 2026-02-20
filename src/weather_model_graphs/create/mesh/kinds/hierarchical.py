@@ -66,6 +66,7 @@ def create_hierarchical_multiscale_mesh_graph(
         for u, v in G.edges:
             G.edges[u, v]["direction"] = "same"
             G.edges[u, v]["level"] = i
+            G.edges[u, v]["levels"] = f"{i}>{i}"  # <--- NEW ADDITION
 
     # Create inter-level mesh edges
     up_graphs = []
@@ -107,7 +108,7 @@ def create_hierarchical_multiscale_mesh_graph(
             )
             G_down.edges[u, v]["levels"] = f"{from_level}>{to_level}"
             G_down.edges[u, v]["direction"] = "down"
-
+            G_down.edges[u, v]["level"] = max(from_level, to_level) # <--- NEW ADDITION
         G_up = networkx.DiGraph()
         G_up.add_nodes_from(G_down.nodes(data=True))
         for u, v, data in G_down.edges(data=True):
