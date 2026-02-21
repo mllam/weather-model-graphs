@@ -239,6 +239,33 @@ def test_create_many_levels(kind):
     )
 
 
+def test_hierarchical_edges_have_consistent_level_metadata():
+    xy = test_utils.create_fake_xy(N=64)
+    graph = wmg.create.archetype.create_oskarsson_hierarchical_graph(coords=xy)
+
+    graph_components = wmg.split_graph_by_edge_attribute(graph=graph, attr="component")
+    m2m_graph = graph_components["m2m"]
+
+    for _, _, edge_data in m2m_graph.edges(data=True):
+        assert "direction" in edge_data
+        assert "from_level" in edge_data
+        assert "to_level" in edge_data
+        assert "connection" in edge_data
+
+        assert isinstance(edge_data["from_level"], int)
+        assert isinstance(edge_data["to_level"], int)
+        assert isinstance(edge_data["connection"], str)
+
+        if edge_data["direction"] == "same":
+            assert edge_data["from_level"] == edge_data["to_level"]
+
+        assert edge_data["connection"] == (
+            f"{edge_data['from_level']}>{edge_data['to_level']}"
+        )
+        assert "level" not in edge_data
+        assert "levels" not in edge_data
+
+
 @pytest.mark.parametrize("coordinates_offset", [0, 1, 10, 100])
 @pytest.mark.parametrize(
     ("method", "method_kwargs"),

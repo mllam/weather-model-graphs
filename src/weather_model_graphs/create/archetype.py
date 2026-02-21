@@ -172,8 +172,8 @@ def create_oskarsson_hierarchical_graph(
     connections the mesh graph contains nearest neighbour connections between
     levels (up and down). To distinguish between these these three types of
     edge connections each edge has a `direction` attribute (with value "up",
-    "down", or "same"). In addition, the `levels` attribute indicates which two levels
-    are connected for cross-level edges (e.g. "1>2" for edges between level 1 and 2).
+    "down", or "same"). In addition, the `from_level` and `to_level` attributes
+    indicate which two levels are connected (e.g. from_level=1 and to_level=2).
 
     The grid to mesh connectivity connects each mesh node to grid nodes withing
     distance 0.51d, where d is the length of diagonal edges between neighbouring
