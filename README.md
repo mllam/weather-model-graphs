@@ -95,6 +95,19 @@ for component, graph in graph_components.items():
     wmg.save.to_pyg(graph=graph, name=component, output_directory=".")
 ```
 
+
+# NetworkX Backend Compatibility
+
+`weather-model-graphs` normalises all node position arithmetic to use `numpy.ndarray`, making it compatible with alternative [NetworkX backends](https://networkx.org/documentation/stable/reference/backends.html) such as [nx-cugraph](https://github.com/rapidsai/nx-cugraph).
+
+The GPU-accelerated `nx-cugraph` backend can be enabled with a single environment variable:
+
+```bash
+NX_CUGRAPH_AUTOCONFIG=True python your_script.py
+```
+
+> **Note:** Actual speedups depend on graph size and which NetworkX algorithms are GPU-accelerated. See the benchmark helper in `examples/benchmark_graph_build_backend.py` to measure the effect on your workload.
+
 # Documentation
 
 The documentation is built using [Jupyter Book](https://jupyterbook.org/intro.html) and can be found at [https://mllam.github.io/weather-model-graphs](https://mllam.github.io/weather-model-graphs). This includes background on graph-based weather models, the design principles of `weather-model-graphs` and how to use it to create your own graph architectures.

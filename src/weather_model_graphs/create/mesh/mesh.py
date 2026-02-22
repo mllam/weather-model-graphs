@@ -65,12 +65,15 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
     # turn into directed graph
     dg = networkx.DiGraph(g)
     for u, v in g.edges():
-        d = np.sqrt(np.sum((g.nodes[u]["pos"] - g.nodes[v]["pos"]) ** 2))
+        pos_u = np.array(g.nodes[u]["pos"])
+        pos_v = np.array(g.nodes[v]["pos"])
+        
+        d = np.sqrt(np.sum((pos_u - pos_v) ** 2))
         dg.edges[u, v]["len"] = d
-        dg.edges[u, v]["vdiff"] = g.nodes[u]["pos"] - g.nodes[v]["pos"]
+        dg.edges[u, v]["vdiff"] = pos_u - pos_v
         dg.add_edge(v, u)
         dg.edges[v, u]["len"] = d
-        dg.edges[v, u]["vdiff"] = g.nodes[v]["pos"] - g.nodes[u]["pos"]
+        dg.edges[v, u]["vdiff"] = pos_v - pos_u
 
     dg.graph["dx"] = dx
     dg.graph["dy"] = dy

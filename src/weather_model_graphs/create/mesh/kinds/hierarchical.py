@@ -100,11 +100,12 @@ def create_hierarchical_multiscale_mesh_graph(
 
             # add edge from mesh to grid
             G_down.add_edge(u, v)
-            d = np.sqrt(np.sum((G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]) ** 2))
+            pos_u = np.array(G_down.nodes[u]["pos"])
+            pos_v = np.array(G_down.nodes[v]["pos"])
+            
+            d = np.sqrt(np.sum((pos_u - pos_v) ** 2))
             G_down.edges[u, v]["len"] = d
-            G_down.edges[u, v]["vdiff"] = (
-                G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]
-            )
+            G_down.edges[u, v]["vdiff"] = pos_u - pos_v
             G_down.edges[u, v]["levels"] = f"{from_level}>{to_level}"
             G_down.edges[u, v]["direction"] = "down"
 
