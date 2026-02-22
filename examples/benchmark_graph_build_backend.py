@@ -72,7 +72,6 @@ if __name__ == "__main__":
             "Install via:  pip install nx-cugraph-cu12\n"
         )
 
-    # Benchmark at two sizes
     for grid in [(50, 50), (100, 100)]:
         run_benchmark(*grid, label=label)
 

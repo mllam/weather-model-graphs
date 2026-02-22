@@ -1,0 +1,152 @@
+diff --git a/convex_hull_verification.png b/convex_hull_verification.png
+new file mode 100644
+index 0000000..a175884
+Binary files /dev/null and b/convex_hull_verification.png differ
+diff --git a/src/weather_model_graphs/create/mesh/kinds/hierarchical.py b/src/weather_model_graphs/create/mesh/kinds/hierarchical.py
+index b897693..1e3f25a 100644
+--- a/src/weather_model_graphs/create/mesh/kinds/hierarchical.py
++++ b/src/weather_model_graphs/create/mesh/kinds/hierarchical.py
+@@ -100,11 +100,12 @@ def create_hierarchical_multiscale_mesh_graph(
+ 
+             # add edge from mesh to grid
+             G_down.add_edge(u, v)
+-            d = np.sqrt(np.sum((G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]) ** 2))
++            pos_u = np.array(G_down.nodes[u]["pos"])
++            pos_v = np.array(G_down.nodes[v]["pos"])
++            
++            d = np.sqrt(np.sum((pos_u - pos_v) ** 2))
+             G_down.edges[u, v]["len"] = d
+-            G_down.edges[u, v]["vdiff"] = (
+-                G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]
+-            )
++            G_down.edges[u, v]["vdiff"] = pos_u - pos_v
+             G_down.edges[u, v]["levels"] = f"{from_level}>{to_level}"
+             G_down.edges[u, v]["direction"] = "down"
+ 
+diff --git a/src/weather_model_graphs/create/mesh/mesh.py b/src/weather_model_graphs/create/mesh/mesh.py
+index 75c82d6..68df151 100644
+--- a/src/weather_model_graphs/create/mesh/mesh.py
++++ b/src/weather_model_graphs/create/mesh/mesh.py
+@@ -65,12 +65,15 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
+     # turn into directed graph
+     dg = networkx.DiGraph(g)
+     for u, v in g.edges():
+-        d = np.sqrt(np.sum((g.nodes[u]["pos"] - g.nodes[v]["pos"]) ** 2))
++        pos_u = np.array(g.nodes[u]["pos"])
++        pos_v = np.array(g.nodes[v]["pos"])
++        
++        d = np.sqrt(np.sum((pos_u - pos_v) ** 2))
+         dg.edges[u, v]["len"] = d
+-        dg.edges[u, v]["vdiff"] = g.nodes[u]["pos"] - g.nodes[v]["pos"]
++        dg.edges[u, v]["vdiff"] = pos_u - pos_v
+         dg.add_edge(v, u)
+         dg.edges[v, u]["len"] = d
+-        dg.edges[v, u]["vdiff"] = g.nodes[v]["pos"] - g.nodes[u]["pos"]
++        dg.edges[v, u]["vdiff"] = pos_v - pos_u
+ 
+     dg.graph["dx"] = dx
+     dg.graph["dy"] = dy
+diff --git a/test_issue_40.py b/test_issue_40.py
+new file mode 100644
+index 0000000..d59d3f3
+--- /dev/null
++++ b/test_issue_40.py
+@@ -0,0 +1,25 @@
++import numpy as np
++from weather_model_graphs.create.mesh.mesh import create_single_level_2d_mesh_graph
++
++# 1. Create a "circular" cluster of data points
++theta = np.linspace(0, 2*np.pi, 100)
++r = 10.0
++xy = np.column_stack((r*np.cos(theta), r*np.sin(theta)))
++
++# 2. Create a standard (uncropped) mesh
++# This will build a massive 20x20 square grid covering the circle
++uncropped_graph = create_single_level_2d_mesh_graph(xy, nx=20, ny=20, crop_to_convex_hull=False)
++uncropped_nodes = len(uncropped_graph.nodes)
++
++# 3. Create our cropped mesh
++cropped_graph = create_single_level_2d_mesh_graph(xy, nx=20, ny=20, crop_to_convex_hull=True)
++cropped_nodes = len(cropped_graph.nodes)
++
++print(f"Nodes in standard rectangular mesh: {uncropped_nodes}")
++print(f"Nodes in Convex Hull cropped mesh: {cropped_nodes}")
++print(f"Nodes deleted from empty space: {uncropped_nodes - cropped_nodes}")
++
++if cropped_nodes < uncropped_nodes:
++    print("\n✅ SUCCESS! The Convex Hull math correctly chopped off the empty corners!")
++else:
++    print("\n❌ FAILED. No nodes were removed.")
+\ No newline at end of file
+diff --git a/test_issue_44.py b/test_issue_44.py
+new file mode 100644
+index 0000000..e6abbbc
+--- /dev/null
++++ b/test_issue_44.py
+@@ -0,0 +1,20 @@
++import numpy as np
++from weather_model_graphs.create.mesh.kinds.flat import create_flat_singlescale_mesh_graph
++
++# 1. Create a tiny coordinate grid (A box from 0 to 1)
++# This means the maximum extent (range) is just 1.0 in both x and y.
++xy = np.array([
++    [0.0, 0.0],
++    [1.0, 1.0]
++])
++
++# 2. Set a massive mesh distance (100.0)
++# Since 100 is way bigger than our grid size of 1, this WILL trigger our new error.
++print("Triggering the error...")
++
++try:
++    create_flat_singlescale_mesh_graph(xy, mesh_node_distance=100.0)
++    print("Wait, it didn't crash? Something is wrong.")
++except ValueError as e:
++    print("\n✅ SUCCESS! Caught the expected error. Here is your new message:\n")
++    print(f"--> {e}")
+\ No newline at end of file
+diff --git a/visualize_fix_40.py b/visualize_fix_40.py
+new file mode 100644
+index 0000000..671f06f
+--- /dev/null
++++ b/visualize_fix_40.py
+@@ -0,0 +1,38 @@
++import numpy as np
++import matplotlib.pyplot as plt
++from scipy.spatial import ConvexHull
++from weather_model_graphs.create.mesh.mesh import create_single_level_2d_mesh_graph
++
++# 1. Create irregular data (a heart shape or 'blob')
++t = np.linspace(0, 2*np.pi, 100)
++x = 16 * np.sin(t)**3
++y = 13 * np.cos(t) - 5 * np.cos(2*t) - 2 * np.cos(3*t) - np.cos(4*t)
++xy_data = np.column_stack((x, y))
++
++# 2. Generate Meshes
++# Standard rectangular mesh (Before)
++g_before = create_single_level_2d_mesh_graph(xy_data, nx=25, ny=25, crop_to_convex_hull=False)
++pos_before = np.array([data["pos"] for _, data in g_before.nodes(data=True)])
++
++# Cropped mesh (After)
++g_after = create_single_level_2d_mesh_graph(xy_data, nx=25, ny=25, crop_to_convex_hull=True)
++pos_after = np.array([data["pos"] for _, data in g_after.nodes(data=True)])
++
++# 3. Plotting
++fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
++
++# Plot Before
++ax1.scatter(pos_before[:, 0], pos_before[:, 1], c='blue', s=10, alpha=0.3, label='Mesh Nodes')
++ax1.plot(xy_data[:, 0], xy_data[:, 1], c='red', linewidth=2, label='Data Boundary')
++ax1.set_title(f"Before: Standard Bounding Box\n({len(pos_before)} nodes)")
++ax1.legend()
++
++# Plot After
++ax2.scatter(pos_after[:, 0], pos_after[:, 1], c='green', s=10, alpha=0.6, label='Pruned Mesh')
++ax2.plot(xy_data[:, 0], xy_data[:, 1], c='red', linewidth=2, label='Data Boundary')
++ax2.set_title(f"After: Convex Hull Cropped\n({len(pos_after)} nodes)")
++ax2.legend()
++
++plt.tight_layout()
++plt.savefig('convex_hull_verification.png')
++print("✅ Visualization saved as 'convex_hull_verification.png'")
+\ No newline at end of file
