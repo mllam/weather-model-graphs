@@ -142,6 +142,7 @@ def to_pyg(
     if list_from_attribute is None:
         edge_features_values = edge_features_values[0]
         edge_indecies = edge_indecies[0]
+        node_features_values = node_features_values[0]
 
     Path(output_directory).mkdir(exist_ok=True, parents=True)
     fp_edge_index = Path(output_directory) / f"{name}_edge_index.pt"

@@ -36,9 +36,9 @@ def create_all_graph_components(
     m2m_connectivity: str,
     m2g_connectivity: str,
     g2m_connectivity: str,
-    m2m_connectivity_kwargs={},
-    m2g_connectivity_kwargs={},
-    g2m_connectivity_kwargs={},
+    m2m_connectivity_kwargs=None,
+    m2g_connectivity_kwargs=None,
+    g2m_connectivity_kwargs=None,
     coords_crs: pyproj.crs.CRS | None = None,
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
@@ -95,6 +95,13 @@ def create_all_graph_components(
     `return_components` is a boolean flag, if True the function returns a dict with
     m2g, m2m and g2m as separate graphs. If false returns one combined graph.
     """
+    if m2m_connectivity_kwargs is None:
+        m2m_connectivity_kwargs = {}
+    if m2g_connectivity_kwargs is None:
+        m2g_connectivity_kwargs = {}
+    if g2m_connectivity_kwargs is None:
+        g2m_connectivity_kwargs = {}
+
     graph_components: dict[networkx.DiGraph] = {}
 
     assert (
@@ -102,7 +109,7 @@ def create_all_graph_components(
     ), "Grid node coordinates should be given as an array of shape [num_grid_nodes, 2]."
 
     # Translate between coordinate crs and crs to use for graph creation
-    if coords_crs is None and coords_crs is None:
+    if coords_crs is None and graph_crs is None:
         logger.debug(
             "No `coords_crs` given: Assuming `coords` contains in-projection Cartesian coordinates."
         )
