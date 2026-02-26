@@ -433,5 +433,17 @@ def connect_nodes_across_graphs(
                 G_connect.nodes[source_node]["pos"]
                 - G_connect.nodes[target_node]["pos"]
             )
+    
+    # Check for isolated target nodes resulting from this connection
+    in_degrees = dict(G_connect.in_degree(target_nodes_list))
+    isolated_targets = [node for node, deg in in_degrees.items() if deg == 0]
+    if isolated_targets:
+        logger.warning(
+            f"Found {len(isolated_targets)} isolated target nodes "
+            f"(out of {len(target_nodes_list)}) with no incoming edges from the source graph "
+            f"using method '{method}'. This can happen with sparse data (e.g., ship observations) "
+            f"if connection parameters (like 'max_dist') are too restrictive. "
+            f"Isolated nodes may cause downstream neural network models to fail or degrade."
+        )
 
     return G_connect
