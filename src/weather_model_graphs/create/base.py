@@ -433,7 +433,7 @@ def connect_nodes_across_graphs(
                 G_connect.nodes[source_node]["pos"]
                 - G_connect.nodes[target_node]["pos"]
             )
-    
+
     # Check for isolated target nodes resulting from this connection
     in_degrees = dict(G_connect.in_degree(target_nodes_list))
     isolated_targets = [node for node, deg in in_degrees.items() if deg == 0]
