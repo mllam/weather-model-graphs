@@ -15,12 +15,9 @@ def test_isolated_nodes_warning():
     )
 
     try:
-        # Create a small grid setup where max_dist is too small to reach the outer node
-        # Mesh nodes: a dense cluster
         xy_mesh = np.array([
             [0.1, 0.1], [0.1, 0.2], [0.2, 0.1], [0.2, 0.2]
         ])
-        # Grid nodes: one close to the mesh, one very far away (sparse)
         xy_grid = np.array([
             [0.15, 0.15], # Close, will connect
             [1.50, 1.50], # Far, will be isolated
