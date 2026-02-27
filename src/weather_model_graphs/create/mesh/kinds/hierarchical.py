@@ -119,9 +119,6 @@ def create_hierarchical_multiscale_mesh_graph(
         G_up.add_nodes_from(G_down.nodes(data=True))
         for u, v, data in G_down.edges(data=True):
             data = data.copy()
-            # Remove legacy keys to keep one consistent edge schema.
-            data.pop("level", None)
-            data.pop("levels", None)
             data["direction"] = "up"
             data["from_level"] = to_level
             data["to_level"] = from_level
