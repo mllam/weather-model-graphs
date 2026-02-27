@@ -95,7 +95,6 @@ def create_all_graph_components(
     `return_components` is a boolean flag, if True the function returns a dict with
     m2g, m2m and g2m as separate graphs. If false returns one combined graph.
     """
-
     graph_components: dict[networkx.DiGraph] = {}
 
     assert (
