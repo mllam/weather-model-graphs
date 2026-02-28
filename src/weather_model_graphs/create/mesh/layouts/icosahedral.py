@@ -88,3 +88,26 @@ def compute_max_edge_length(vertices, faces):
             dist = np.linalg.norm(vertices[face[i]] - vertices[face[j]])
             max_len = max(max_len, dist)
     return max_len
+
+def generate_icosahedral_mesh(refinement_level: int, radius: float = 1.0):
+    """
+    Generates a spherical icosahedral mesh using Trimesh.
+    This fulfills the mesh_layout='icosahedral' requirement.
+    
+    Args:
+        refinement_level (int): Number of subdivisions. 
+                                Level 0 is a base icosahedron (12 nodes).
+        radius (float): Radius of the sphere (default 1.0 for unit sphere).
+        
+    Returns:
+        nodes (np.ndarray): Shape (N, 3) Cartesian coordinates (x, y, z).
+        faces (np.ndarray): Shape (M, 3) Triangular faces connecting the nodes.
+    """
+    # Create the base icosphere with the specified refinement level
+    mesh = trimesh.creation.icosphere(subdivisions=refinement_level, radius=radius)
+    
+    # Extract nodes and faces
+    nodes = np.array(mesh.vertices)
+    faces = np.array(mesh.faces)
+    
+    return nodes, faces
