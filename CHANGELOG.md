@@ -109,3 +109,30 @@ and Oskarsson hierarchical graphs) deliniating the different connectivity
 options, background on graph-based data-driven models, 2D plotting utilities,
 JupyterBook based documentation. In this version the graph assumes grid
 coordinates are Cartesian coordinates.
+
+## [Unreleased]
+
+### Added
+- **Icosahedral mesh layout** (`mesh_layout='icosahedral'`) for global spherical graphs
+  - Mesh generation using `trimesh` (co-developed with @mandeepsingh2007)
+  - Grid-to-mesh (g2m) connectivity with radius-based queries in 3D Cartesian space
+  - Mesh-to-grid (m2g) barycentric interpolation via triangle containment
+  - Hierarchical variant with parent-child links between refinement levels
+  - Comprehensive test suite for spherical edge cases (anti-meridian, poles, etc.)
+  - Notebook demo in `/docs/icosahedral_global_graph.ipynb`
+  [\#76](https://github.com/mllam/weather-model-graphs/pull/76) @yuvraajnarula @mandeepsingh2007 @Joltsy10
+
+- **New connectivity method**: `containing_triangle` for mesh-to-grid edges
+  - Extends existing `containing_rectangle` pattern to spherical geometry
+  - Stores barycentric weights as edge attributes for interpolation
+  [\#76](https://github.com/mllam/weather-model-graphs/pull/76) @Joltsy10
+
+- **Coordinate utilities** for spherical geometry
+  - `lat_lon_to_cartesian` and `cartesian_to_lat_lon` conversions
+  - `compute_max_edge_length` for mesh distance calculations
+  - `find_containing_triangle` for point-in-triangle containment
+  [\#76](https://github.com/mllam/weather-model-graphs/pull/76) @yuvraajnarula
+
+### Changed
+- Extended `connect_nodes_across_graphs` to support 3D positions and spherical queries
+- Added CRS-aware warnings when using icosahedral layout with non-geographic CRS
