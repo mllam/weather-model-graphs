@@ -28,23 +28,6 @@ def create_icosahedral_mesh(subdivisions=3):
     
     return mesh_list  # Coarsest to finest
 
-
-def generate_icosahedral_mesh(refinement_level: int, radius: float = 1.0):
-    """
-    Generates a spherical icosahedral mesh using Trimesh.
-    
-    Args:
-        refinement_level (int): Number of subdivisions (0 = base icosahedron, 12 nodes)
-        radius (float): Radius of the sphere (default 1.0 for unit sphere)
-        
-    Returns:
-        nodes (np.ndarray): Shape (N, 3) Cartesian coordinates (x, y, z)
-        faces (np.ndarray): Shape (M, 3) Triangular faces connecting the nodes
-    """
-    mesh = trimesh.creation.icosphere(subdivisions=refinement_level, radius=radius)
-    return np.array(mesh.vertices), np.array(mesh.faces)
-
-
 def create_hierarchy_of_icosahedral_meshes(max_subdivisions: int, radius: float = 1.0):
     """
     Create a list of icosahedral meshes at different refinement levels.
@@ -138,68 +121,93 @@ def create_hierarchical_icosahedral_mesh_graph(
         networkx.DiGraph: Combined graph with all levels and inter-level edges
     """
     mesh_list = create_hierarchy_of_icosahedral_meshes(max_subdivisions, radius)
-    
+    # mesh_list[0] = coarsest (12 nodes), mesh_list[-1] = finest (642 nodes at level 3)
+
+    # Start with finest mesh as the base graph (level = max_subdivisions)
     DG = create_flat_icosahedral_mesh_graph(max_subdivisions, radius,
                                             add_edge_length, add_edge_vector)
-    
-    node_offset = len(DG.nodes)
-    
+    # Nodes 0..(N_finest-1) are already in DG at level=max_subdivisions (set by create_flat)
+    # Relabel their level correctly
+    for node in DG.nodes:
+        DG.nodes[node]["level"] = max_subdivisions
+    for u, v in DG.edges:
+        DG.edges[u, v]["level"] = max_subdivisions
+
+    node_offset = len(DG.nodes)  # = N_finest (e.g. 642)
+
+    # Add coarser levels: mesh_list[0..max_subdivisions-1]
     for level, (vertices, faces) in enumerate(mesh_list[:-1]):
-        lat_lon = cartesian_to_lat_lon(vertices)  # <-- convert to 2D
+        # level=0 -> coarsest (12 nodes), level=max_subdivisions-1 -> second finest
+        lat_lon = cartesian_to_lat_lon(vertices)
         level_nodes = []
-        
+
         for i, (x, y, z) in enumerate(vertices):
             node_id = node_offset + i
             DG.add_node(
                 node_id,
-                pos=lat_lon[i],              # 2D for KDTree compatibility
-                pos3d=np.array([x, y, z]),   # 3D for reference
+                pos=lat_lon[i],
+                pos3d=np.array([x, y, z]),
                 type="mesh",
-                level=level,
+                level=level,           # correct level label
             )
             level_nodes.append(node_id)
-        
+
+        # Intra-level edges
         for face in faces:
             for i in range(3):
-                for j in range(i+1, 3):
+                for j in range(i + 1, 3):
                     u, v = node_offset + face[i], node_offset + face[j]
                     if not DG.has_edge(u, v):
-                        vec = DG.nodes[u]["pos"] - DG.nodes[v]["pos"]   # 2D diff
-                        dist = np.linalg.norm(DG.nodes[u]["pos3d"] - DG.nodes[v]["pos3d"])  # 3D dist
+                        vec = DG.nodes[u]["pos"] - DG.nodes[v]["pos"]
+                        dist = np.linalg.norm(DG.nodes[u]["pos3d"] - DG.nodes[v]["pos3d"])
                         DG.add_edge(u, v, len=dist, vdiff=vec, level=level)
                         DG.add_edge(v, u, len=dist, vdiff=-vec, level=level)
-        
-        # inter-level edges
-        if level < max_subdivisions - 1:
-            finer_vertices = mesh_list[level + 1][0]
-            tree = KDTree(finer_vertices)
-            
-            for i, coarse_node in enumerate(level_nodes):
-                coarse_pos = vertices[i]
-                max_edge_len = compute_max_edge_length(finer_vertices, mesh_list[level + 1][1])
-                radius_query = 1.1 * max_edge_len
-                
-                fine_indices = tree.query_ball_point(coarse_pos, radius_query)
-                if fine_indices:
-                    for fine_idx in fine_indices:
-                        vec3d = coarse_pos - finer_vertices[fine_idx]
-                        dist = np.linalg.norm(vec3d)
-                        fine_node = node_offset - len(finer_vertices) + fine_idx
-                        coarse_lat_lon = DG.nodes[coarse_node]["pos"]
-                        fine_lat_lon = DG.nodes[fine_node]["pos"]
-                        vec2d = coarse_lat_lon - fine_lat_lon
 
-                        DG.add_edge(fine_node, coarse_node,
-                                    len=dist, vdiff=vec2d, level=f"{level}_to_{level+1}")
-                        DG.add_edge(coarse_node, fine_node,
-                                    len=dist, vdiff=-vec2d, level=f"{level+1}_to_{level}")
-        
+        # Inter-level edges: connect this coarse level to the next finer level
+        # Next finer level = level+1, already in the graph
+        # Its nodes start at: offset_of_finer_level
+        if level == max_subdivisions - 1:
+            # Next finer is the finest mesh, nodes 0..N_finest-1
+            finer_start = 0
+            finer_vertices = mesh_list[max_subdivisions][0]
+        else:
+            # Next finer is mesh_list[level+1], added after this iteration
+            # We compute its future offset: node_offset + len(vertices) 
+            finer_start = node_offset + len(vertices)
+            finer_vertices = mesh_list[level + 1][0]
+
+        tree = KDTree(finer_vertices)
+        max_edge_len = compute_max_edge_length(finer_vertices, mesh_list[level + 1][1]
+                                               if level < max_subdivisions - 1
+                                               else mesh_list[max_subdivisions][1])
+        radius_query = 1.1 * max_edge_len
+
+        for i, coarse_node in enumerate(level_nodes):
+            coarse_pos = vertices[i]
+            fine_indices = tree.query_ball_point(coarse_pos, radius_query)
+            for fine_idx in fine_indices:
+                fine_node = finer_start + fine_idx
+                coarse_lat_lon = DG.nodes[coarse_node]["pos"]
+                # fine_node may not exist yet if finer_start > node_offset (future level)
+                # so use coordinates directly
+                fine_lat_lon = cartesian_to_lat_lon(finer_vertices[fine_idx:fine_idx+1])[0]
+                vec3d = coarse_pos - finer_vertices[fine_idx]
+                dist = np.linalg.norm(vec3d)
+                vec2d = coarse_lat_lon - fine_lat_lon
+
+                DG.add_edge(fine_node, coarse_node,
+                            len=dist, vdiff=vec2d,
+                            level=f"{level+1}_to_{level}")
+                DG.add_edge(coarse_node, fine_node,
+                            len=dist, vdiff=-vec2d,
+                            level=f"{level}_to_{level+1}")
+
         node_offset += len(vertices)
-    
+
     DG.graph["mesh_layout"] = "icosahedral_hierarchical"
     DG.graph["max_subdivisions"] = max_subdivisions
     DG.graph["radius"] = radius
-    
+
     return DG
 
 
@@ -239,13 +247,33 @@ def connect_grid_to_mesh(grid_lat_lon, mesh_vertices, mesh_faces, radius_factor=
 
 def connect_mesh_to_grid(mesh_vertices, mesh_faces, grid_lat_lon):
     """
-    Mesh → Grid connections (m2g) adapted from create_global_mesh.py lines 245-259.
-    
-    For each grid point, find containing mesh triangle.
+    Mesh to Grid connections (m2g).
+    For each grid point, find containing mesh triangle and return
+    barycentric weights for interpolation.
+
+    Args:
+        mesh_vertices: (N_mesh, 3) cartesian coordinates
+        mesh_faces: (M, 3) face indices
+        grid_lat_lon: (N_grid, 2) array of [lat, lon] in degrees
+
+    Returns:
+        edge_index: (2, E) array of [mesh_node, grid_node] connections
+        weights: (E,) barycentric weights for each edge
     """
-    # This is more complex - need triangle containment in 3D
-    # We'll implement this after basic g2m works
-    pass
+    grid_cartesian = lat_lon_to_cartesian(grid_lat_lon[:, 0], grid_lat_lon[:, 1])
+
+    mesh_indices, grid_indices, weights = [], [], []
+
+    for grid_idx, point in enumerate(grid_cartesian):
+        face_idx, bary_weights = find_containing_triangle(point, mesh_vertices, mesh_faces)
+        if face_idx is not None:
+            for mesh_idx, w in zip(mesh_faces[face_idx], bary_weights):
+                mesh_indices.append(mesh_idx)
+                grid_indices.append(grid_idx)
+                weights.append(w)
+
+    return np.array([mesh_indices, grid_indices]), np.array(weights)
+
 
 
 def lat_lon_to_cartesian(lat, lon):

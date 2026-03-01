@@ -10,7 +10,7 @@ function uses `connect_nodes_across_graphs` to connect nodes across the componen
 
 
 from typing import Iterable
-
+import warnings
 import networkx
 import networkx as nx
 import numpy as np
@@ -156,14 +156,15 @@ def create_all_graph_components(
         )
 
         if graph_crs is None or not graph_crs.is_geographic:
-            print(
-                "Icosahedral mesh is designed for spherical/geographic coordinates. ",
-                "Using with non-geographic CRS may produce unexpected results."
+           warnings.warn(
+                "Icosahedral mesh is designed for geographic coordinates. "
+                "Using with non-geographic CRS may produce unexpected results.",
+                UserWarning
             )
 
         if m2m_connectivity_kwargs.get("hierarchical", False):
             graph_components["m2m"] = create_hierarchical_icosahedral_mesh_graph(
-                max_subdivisions=m2m_connectivity_kwargs.get("subdivisions", 3),
+                max_subdivisions=m2m_connectivity_kwargs.get("max_subdivisions", 3),
                 radius=m2m_connectivity_kwargs.get("radius", 1.0),
             )
 
@@ -252,6 +253,8 @@ def connect_nodes_across_graphs(
     max_dist=None,
     rel_max_dist=None,
     max_num_neighbours=None,
+    mesh_vertices=None,
+    mesh_faces=None,
 ):
     """
     Create a new graph containing the nodes in `G_source` and `G_target` and add
@@ -278,6 +281,9 @@ def connect_nodes_across_graphs(
             with 4 nodes as corners such that the `G_target` node is contained within it.
             Connect these 4 (or less along edges) corner nodes to the `G_target` node.
             Requires that `G_source` has dx and dy properties, i.e. is a quadrilateral mesh graph.
+        - "containing_triangle": For each node in `G_target`, find the spherical triangle in `G_source`
+            that contains it and connect the 3 corner mesh nodes with barycentric weights as edge attributes.
+            Requires mesh_vertices and mesh_faces to be passed.
     max_dist : float
         Maximum distance to search for neighbours in `G_target` for each node in `G_source`
     rel_max_dist : float
@@ -285,6 +291,10 @@ def connect_nodes_across_graphs(
         relative to longest edge in (bottom level of) `G_source` and `G_target`.
     max_num_neighbours : int
         Maximum number of neighbours to search for in `G_target` for each node in `G_source`
+    mesh_vertices : np.ndarray, optional
+        (N, 3) Cartesian coordinates of mesh vertices. Required for `containing_triangle` method.
+    mesh_faces : np.ndarray, optional
+        (M, 3) face indices of mesh triangles. Required for `containing_triangle` method.
 
     Returns
     -------
@@ -292,16 +302,21 @@ def connect_nodes_across_graphs(
         Graph containing the nodes in `G_source` and `G_target` and directed edges
         from nodes in `G_source` to nodes in `G_target`
     """
-    source_nodes_list = list(G_source.nodes)
-    target_nodes_list = list(G_target.nodes)
+    source_nodes_list = sorted(G_source.nodes)
+    target_nodes_list = sorted(G_target.nodes)
 
-    # build kd tree for source nodes (e.g. the mesh nodes when constructing m2g)
-    xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
+    # If so, build KDTree on 3D Cartesian coordinates instead of 2D lat/lon,
+    # so that radius queries are consistent with the edge lengths on the mesh.
+    sample_node = source_nodes_list[0]
+    use_3d = "pos3d" in G_source.nodes[sample_node]
+
+    if use_3d:
+        xy_source = np.array([G_source.nodes[n]["pos3d"] for n in source_nodes_list])
+    else:
+        xy_source = np.array([G_source.nodes[n]["pos"] for n in source_nodes_list])
+
     kdt_s = scipy.spatial.KDTree(xy_source)
 
-    # Determine method and perform checks once
-    # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in
-    # loop later
     if method == "containing_rectangle":
         if (
             max_dist is not None
@@ -309,32 +324,23 @@ def connect_nodes_across_graphs(
             or max_num_neighbours is not None
         ):
             raise Exception(
-                "to use `containing_rectangle` you should not set `max_dist`, `rel_max_dist`or `max_num_neighbours`"
+                "to use `containing_rectangle` you should not set `max_dist`, `rel_max_dist` or `max_num_neighbours`"
             )
         assert (
             "dx" in G_source.graph and "dy" in G_source.graph
         ), "Source graph must have dx and dy properties to connect nodes using method containing_rectangle"
 
-        # Connect to all nodes that could potentially be close enough,
-        # which is at a relative distance of 1. This relative distance is equal
-        # to the diagonal of one rectangle.
         rad_graph = connect_nodes_across_graphs(
             G_source, G_target, method="within_radius", rel_max_dist=1.0
         )
 
-        # Filter edges to those that fit within a rectangle of measurements dx,dy
         mesh_node_dx = G_source.graph["dx"]
         mesh_node_dy = G_source.graph["dy"]
 
         if isinstance(mesh_node_dx, dict):
-            # In hierarchical graph these properties are dicts, in that case use
-            # values for bottom level.
             mesh_node_dx = mesh_node_dx[0]
             mesh_node_dy = mesh_node_dy[0]
 
-        # This function is a filter that applies to edges, represented as vectors (vx, vy) in R^ 2.
-        # The filter is True if |vx| < dx & |vy| < dy, where dx and dy are the distance between
-        # rows and columns in source quadrilateral graph.
         def _edge_filter(edge_prop):
             abs_diffs = np.abs(edge_prop["vdiff"])
             return abs_diffs[0] < mesh_node_dx and abs_diffs[1] < mesh_node_dy
@@ -345,7 +351,6 @@ def connect_nodes_across_graphs(
             if _edge_filter(edge_prop)
         ]
 
-        # Construct subgraph with only filtered edges, but all nodes
         filtered_graph = networkx.DiGraph()
         filtered_graph.add_nodes_from(rad_graph.nodes(data=True))
         filtered_graph.add_edges_from(filtered_edges)
@@ -358,11 +363,11 @@ def connect_nodes_across_graphs(
             or max_num_neighbours is not None
         ):
             raise Exception(
-                "to use `nearest_neighbour` you should not set `max_dist`, `rel_max_dist`or `max_num_neighbours`"
+                "to use `nearest_neighbour` you should not set `max_dist`, `rel_max_dist` or `max_num_neighbours`"
             )
 
-        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idx = kdt_s.query(xy_target, 1)[1]
+        def _find_neighbour_node_idxs_in_source_mesh(query_point):
+            neigh_idx = kdt_s.query(query_point, 1)[1]
             return [neigh_idx]
 
     elif method == "nearest_neighbours":
@@ -375,8 +380,8 @@ def connect_nodes_across_graphs(
                 "to use `nearest_neighbours` you should not set `max_dist` or `rel_max_dist`"
             )
 
-        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idxs = kdt_s.query(xy_target, max_num_neighbours)[1]
+        def _find_neighbour_node_idxs_in_source_mesh(query_point):
+            neigh_idxs = kdt_s.query(query_point, max_num_neighbours)[1]
             return neigh_idxs
 
     elif method == "within_radius":
@@ -384,34 +389,28 @@ def connect_nodes_across_graphs(
             raise Exception(
                 "to use `within_radius` method you should not set `max_num_neighbours`"
             )
-        # Determine actual query length to use
         if max_dist is not None:
             if rel_max_dist is not None:
                 raise Exception(
-                    "to use `witin_radius` method you should only set one of `max_dist` or `rel_max_dist"
+                    "to use `within_radius` method you should only set one of `max_dist` or `rel_max_dist`"
                 )
             query_dist = max_dist
         elif rel_max_dist is not None:
             if max_dist is not None:
                 raise Exception(
-                    "to use `witin_radius` method you should only set one of `max_dist` or `rel_max_dist"
+                    "to use `within_radius` method you should only set one of `max_dist` or `rel_max_dist`"
                 )
-            # Figure out longest edge in (lowest level) mesh graph
             longest_edge = 0.0
             for edge_check_graph in (G_source, G_target):
-                # Check if graph has edges
                 if len(edge_check_graph.edges) > 0:
                     (
                         level_subgraph,
                         no_level_subgraph,
                     ) = split_on_edge_attribute_existance(edge_check_graph, "level")
 
-                    # Check if graph has levels (hierarchical or multi-scale edges)
                     if nx.is_empty(level_subgraph):
-                        # Consider edges in whole graph (whole graph is level 1)
-                        first_level_graph = edge_check_graph  # == no_level_subgraph
+                        first_level_graph = edge_check_graph
                     else:
-                        # Has levels, only consider edges in level 1 graph
                         first_level_graph = split_graph_by_edge_attribute(
                             level_subgraph, "level"
                         )[0]
@@ -423,87 +422,129 @@ def connect_nodes_across_graphs(
             query_dist = longest_edge * rel_max_dist
         else:
             raise Exception(
-                "to use `witin_radius` method you shold set `max_dist` or `rel_max_dist"
+                "to use `within_radius` method you should set `max_dist` or `rel_max_dist`"
             )
 
-        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idxs = kdt_s.query_ball_point(xy_target, query_dist)
+        def _find_neighbour_node_idxs_in_source_mesh(query_point):
+            neigh_idxs = kdt_s.query_ball_point(query_point, query_dist)
             return neigh_idxs
+
     elif method == "containing_triangle":
-        # Only for spherical/geographic coordinates
         from weather_model_graphs.create.mesh.layouts.icosahedral import (
-            lat_lon_to_cartesian, find_containing_triangle
+            lat_lon_to_cartesian,
+            find_containing_triangle,
         )
-        
-        G_source_cart = {}
-        for node in G_source.nodes:
-            if "lat" in G_source.nodes[node] and "lon" in G_source.nodes[node]:
-                cart = lat_lon_to_cartesian(
-                    np.array([G_source.nodes[node]["lat"]]),
-                    np.array([G_source.nodes[node]["lon"]])
-                )[0]
-                G_source_cart[node] = cart
-            else:
-                G_source_cart[node] = G_source.nodes[node].get("pos", np.array([0,0,0]))
-        
-        # For each target node (grid), find containing triangle in source (mesh)
-        edge_list = []
-        for target in G_target.nodes:
-            target_pos = G_target.nodes[target]["pos"]
-            if "lat" in G_target.nodes[target] and "lon" in G_target.nodes[target]:
-                target_cart = lat_lon_to_cartesian(
-                    np.array([G_target.nodes[target]["lat"]]),
-                    np.array([G_target.nodes[target]["lon"]])
-                )[0]
-            else:
-                target_cart = target_pos
-            
-            face_idx, weights = find_containing_triangle(
-                target_cart,
-                mesh_vertices,
-                mesh_faces
+
+        if mesh_vertices is None or mesh_faces is None:
+            raise ValueError(
+                "containing_triangle method requires mesh_vertices and mesh_faces "
+                "to be passed to connect_nodes_across_graphs."
             )
-            
-            if face_idx is not None:
-                face_vertices = mesh_faces[face_idx]
-                for i, weight in zip(face_vertices, weights):
-                    source_node = list(G_source.nodes)[i]
-                    edge_list.append((source_node, target, {"weight": weight}))
-        
-        # Create subgraph with these edges
-        G_m2g = nx.DiGraph()
-        G_m2g.add_edges_from(edge_list)
+
+        G_connect = networkx.DiGraph()
+        G_connect.add_nodes_from(sorted(G_source.nodes(data=True)))
+        G_connect.add_nodes_from(sorted(G_target.nodes(data=True)))
+        target_sample = target_nodes_list[0]
+        use_3d_target = "pos3d" in G_target.nodes[target_sample]
+        if use_3d_target and not use_3d:
+            # g2m case: source=grid (2D only), target=mesh (has pos3d)
+            # Rebuild KDTree on target's 3D positions for querying
+            xy_target_3d = np.array([G_target.nodes[n]["pos3d"] for n in source_nodes_list
+                                    if n in G_target.nodes])
+            # Actually we need source KDTree on source nodes but queried with 3D points.
+            # The KDTree was built on source (grid, 2D). Instead rebuild on target mesh in 3D
+            # and for each source (grid) node, find neighbours in target (mesh).
+            # But connect_nodes_across_graphs goes source->target directionally.
+            # The KDTree must be on SOURCE. So convert source grid lat/lon to 3D:
+            from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
+            xy_source_3d = np.array([
+                lat_lon_to_cartesian(
+                    np.array([G_source.nodes[n]["pos"][0]]),
+                    np.array([G_source.nodes[n]["pos"][1]])
+                )[0]
+                for n in source_nodes_list
+            ])
+            kdt_s = scipy.spatial.KDTree(xy_source_3d)
+
+        for target_node in target_nodes_list:
+            target_pos_2d = G_target.nodes[target_node]["pos"]
+
+            # Convert target query point to 3D if KDTree was built in 3D
+            if use_3d or use_3d_target:
+                from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
+                query_point = lat_lon_to_cartesian(
+                    np.array([target_pos_2d[0]]),
+                    np.array([target_pos_2d[1]])
+                )[0]
+            else:
+                query_point = target_pos_2d
+
+            neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(query_point)
+
+            for i in neigh_idxs:
+                source_node = source_nodes_list[i]
+                source_pos_2d = G_connect.nodes[source_node]["pos"]
+
+                # Distance: use 3D if either side is icosahedral
+                if use_3d:
+                    source_pos_3d = G_connect.nodes[source_node]["pos3d"]
+                    d = np.sqrt(np.sum((source_pos_3d - query_point) ** 2))
+                elif use_3d_target:
+                    # source is grid, convert to 3D for distance
+                    d = np.sqrt(np.sum((query_point - lat_lon_to_cartesian(  # query_point is target in 3D
+                        np.array([source_pos_2d[0]]),
+                        np.array([source_pos_2d[1]])
+                    )[0]) ** 2))
+                else:
+                    d = np.sqrt(np.sum((source_pos_2d - target_pos_2d) ** 2))
+
+                G_connect.add_edge(source_node, target_node)
+                G_connect.edges[source_node, target_node]["len"] = d
+                G_connect.edges[source_node, target_node]["vdiff"] = (
+                    source_pos_2d - target_pos_2d  # always 2D lat/lon for consistency
+                )
+
+        return G_connect  # early return, skips generic block below
+
     else:
         raise NotImplementedError(method)
 
+    # Generic edge-building block for all non-early-return methods
+    # (nearest_neighbour, nearest_neighbours, within_radius)
     G_connect = networkx.DiGraph()
     G_connect.add_nodes_from(sorted(G_source.nodes(data=True)))
     G_connect.add_nodes_from(sorted(G_target.nodes(data=True)))
 
-    # sort nodes by index
-    source_nodes_list = sorted(G_source.nodes)
-
-    # add edges
     for target_node in target_nodes_list:
-        xy_target = G_target.nodes[target_node]["pos"]
-        neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(xy_target)
+        target_pos_2d = G_target.nodes[target_node]["pos"]  # always lat/lon
+
+        if use_3d:
+            from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
+            query_point = lat_lon_to_cartesian(
+                np.array([target_pos_2d[0]]),
+                np.array([target_pos_2d[1]])
+            )[0]
+        else:
+            query_point = target_pos_2d
+
+        neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(query_point)
+
         for i in neigh_idxs:
             source_node = source_nodes_list[i]
-            # add edge from source to target
+            source_pos_2d = G_connect.nodes[source_node]["pos"]  # lat/lon
+
+            # Compute distance in 3D if icosahedral, else 2D
+            if use_3d:
+                source_pos_3d = G_connect.nodes[source_node]["pos3d"]
+                d = np.sqrt(np.sum((source_pos_3d - query_point) ** 2))
+            else:
+                d = np.sqrt(np.sum((source_pos_2d - target_pos_2d) ** 2))
+
             G_connect.add_edge(source_node, target_node)
-            d = np.sqrt(
-                np.sum(
-                    (
-                        G_connect.nodes[source_node]["pos"]
-                        - G_connect.nodes[target_node]["pos"]
-                    )
-                    ** 2
-                )
-            )
             G_connect.edges[source_node, target_node]["len"] = d
+            # vdiff always kept in 2D lat/lon space for consistency with rest of codebase
             G_connect.edges[source_node, target_node]["vdiff"] = (
-                G_connect.nodes[source_node]["pos"]
-                - G_connect.nodes[target_node]["pos"]
+                source_pos_2d - target_pos_2d
             )
 
     return G_connect
