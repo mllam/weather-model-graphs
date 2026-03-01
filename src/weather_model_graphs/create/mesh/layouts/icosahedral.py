@@ -101,6 +101,7 @@ def create_flat_icosahedral_mesh_graph(
         # Store the wrapped difference
         vec = np.array([dlat, dlon])
 
+        # Use 3D positions for distance calculation
         dist = np.linalg.norm(DG.nodes[u]["pos3d"] - DG.nodes[v]["pos3d"])
 
         DG.add_edge(u, v, len=dist, vdiff=vec, level=0)
@@ -111,8 +112,6 @@ def create_flat_icosahedral_mesh_graph(
     DG.graph["radius"] = radius
 
     return DG
-
-
 
 
 def create_hierarchical_icosahedral_mesh_graph(
@@ -381,23 +380,38 @@ def find_containing_triangle(
     
     return best_face, best_weights
 
-
 def generate_icosahedral_mesh(refinement_level: int, radius: float = 1.0):
     """
     Generates a spherical icosahedral mesh using Trimesh.
-    This fulfills the mesh_layout='icosahedral' requirement.
     
     Args:
-        refinement_level (int): Number of subdivisions. 
-                                Level 0 is a base icosahedron (12 nodes).
+        refinement_level (int): Number of subdivisions. Must be non-negative.
         radius (float): Radius of the sphere (default 1.0 for unit sphere).
         
     Returns:
         nodes (np.ndarray): Shape (N, 3) Cartesian coordinates (x, y, z).
         faces (np.ndarray): Shape (M, 3) Triangular faces connecting the nodes.
+        
+    Raises:
+        ValueError: If refinement_level is negative.
+        ImportError: If trimesh is not available.
     """
-    # Create the base icosphere with the specified refinement level
-    mesh = trimesh.creation.icosphere(subdivisions=refinement_level, radius=radius)
+    if refinement_level < 0:
+        raise ValueError("subdivisions must be non-negative")
+    
+    # Try to import trimesh
+    try:
+        import trimesh
+    except ImportError as e:
+        raise ImportError("trimesh is required for icosahedral mesh generation. "
+                         "Please install it with: pip install trimesh") from e
+    
+    try:
+        mesh = trimesh.creation.icosphere(subdivisions=refinement_level, radius=radius)
+    except ImportError as e:
+        # re-raise with our custom message
+        raise ImportError("trimesh is required for icosahedral mesh generation. "
+                         "Please install it with: pip install trimesh") from e
     
     # Extract nodes and faces
     nodes = np.array(mesh.vertices)

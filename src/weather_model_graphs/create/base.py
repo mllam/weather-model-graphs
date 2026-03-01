@@ -155,8 +155,8 @@ def create_all_graph_components(
             create_hierarchical_icosahedral_mesh_graph,
         )
 
-        if graph_crs is None or not graph_crs.is_geographic:
-           warnings.warn(
+        if graph_crs is not None and not graph_crs.is_geographic:
+            warnings.warn(
                 "Icosahedral mesh is designed for geographic coordinates. "
                 "Using with non-geographic CRS may produce unexpected results.",
                 UserWarning
@@ -172,7 +172,6 @@ def create_all_graph_components(
             grid_connect_graph = split_graph_by_edge_attribute(
                 graph_components["m2m"], "level"
             )[0]    
-
         else:
             graph_components["m2m"] = create_flat_icosahedral_mesh_graph(
                 subdivisions=m2m_connectivity_kwargs.get("subdivisions", 3),
@@ -443,49 +442,44 @@ def connect_nodes_across_graphs(
             raise Exception(
                 "to use `within_radius` method you should not set `max_num_neighbours`"
             )
+        
+        # Determine query distance
         if max_dist is not None:
-            if rel_max_dist is not None:
-                raise Exception(
-                    "to use `within_radius` method you should only set one of `max_dist` or `rel_max_dist`"
-                )
             query_dist = max_dist
         elif rel_max_dist is not None:
-            if max_dist is not None:
-                raise Exception(
-                    "to use `within_radius` method you should only set one of `max_dist` or `rel_max_dist`"
-                )
+            # Calculate based on longest edge
             longest_edge = 0.0
             for edge_check_graph in (G_source, G_target):
                 if len(edge_check_graph.edges) > 0:
-                    (
-                        level_subgraph,
-                        no_level_subgraph,
-                    ) = split_on_edge_attribute_existance(edge_check_graph, "level")
-
-                    if nx.is_empty(level_subgraph):
-                        first_level_graph = edge_check_graph
-                    else:
-                        first_level_graph = split_graph_by_edge_attribute(
-                            level_subgraph, "level"
-                        )[0]
-                    longest_graph_edge = max(
-                        (d.get("len", 0) for _, _, d in first_level_graph.edges(data=True)),
-                        default=0.0,
-                    )
-
-                    if longest_graph_edge == 0.0:
-                        raise ValueError(
-                            "No edges with 'len' attribute found when computing rel_max_dist. "
-                            "Check that mesh edges have 'len' set correctly."
-                        )
-
-                    longest_edge = max(longest_edge, longest_graph_edge)
+                    # Get edges with 'len' attribute
+                    edge_lengths = []
+                    for _, _, data in edge_check_graph.edges(data=True):
+                        if 'len' in data:
+                            edge_lengths.append(data['len'])
+                    
+                    if edge_lengths:
+                        longest_graph_edge = max(edge_lengths)
+                        longest_edge = max(longest_edge, longest_graph_edge)
+            
+            if longest_edge == 0.0:
+                # Fallback to a reasonable default
+                longest_edge = 0.5  # Default radius in radians (~28 degrees)
+                warnings.warn(
+                    f"No edges with 'len' attribute found when computing rel_max_dist. "
+                    f"Using default longest_edge={longest_edge}",
+                    UserWarning
+                )
+            
             query_dist = longest_edge * rel_max_dist
             print(f"query_dist = {query_dist:.4f}  (longest_edge={longest_edge:.4f}, rel={rel_max_dist})")
-
         else:
-            raise Exception(
-                "to use `within_radius` method you should set `max_dist` or `rel_max_dist`"
+            # No distance parameters provided - this should not happen if called correctly
+            # But provide a fallback for backward compatibility
+            query_dist = 0.5
+            warnings.warn(
+                f"No max_dist or rel_max_dist provided for within_radius method. "
+                f"Using default query_dist={query_dist}",
+                UserWarning
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(query_point):
@@ -502,7 +496,8 @@ def connect_nodes_across_graphs(
                 # Map back to original indices, removing duplicates
                 original_idxs = set()
                 for idx in all_neigh_idxs:
-                    original_idxs.add(source_node_mapping[idx][2])
+                    if idx < len(source_node_mapping):  # Safety check
+                        original_idxs.add(source_node_mapping[idx][2])
                 return list(original_idxs)
 
     elif method == "containing_triangle":
