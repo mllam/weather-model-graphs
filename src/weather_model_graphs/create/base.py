@@ -305,17 +305,31 @@ def connect_nodes_across_graphs(
     source_nodes_list = sorted(G_source.nodes)
     target_nodes_list = sorted(G_target.nodes)
 
-    # If so, build KDTree on 3D Cartesian coordinates instead of 2D lat/lon,
-    # so that radius queries are consistent with the edge lengths on the mesh.
-    sample_node = source_nodes_list[0]
-    use_3d = "pos3d" in G_source.nodes[sample_node]
+    sample_source = source_nodes_list[0]
+    sample_target = target_nodes_list[0]
 
-    if use_3d:
+    source_has_3d = "pos3d" in G_source.nodes[sample_source]
+    target_has_3d = "pos3d" in G_target.nodes[sample_target]
+
+    if source_has_3d:
+        # m2g: mesh is source, use its native 3D positions
         xy_source = np.array([G_source.nodes[n]["pos3d"] for n in source_nodes_list])
+        use_3d = True
+    elif target_has_3d:
+        # g2m: grid is source, project lat/lon → 3D to match mesh edge-length units
+        from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
+        xy_source = lat_lon_to_cartesian(
+            np.array([G_source.nodes[n]["pos"][0] for n in source_nodes_list]),
+            np.array([G_source.nodes[n]["pos"][1] for n in source_nodes_list]),
+        )
+        use_3d = True   # query points must also be 3D
     else:
+        # plain 2D (rectilinear grids, no icosahedral mesh)
         xy_source = np.array([G_source.nodes[n]["pos"] for n in source_nodes_list])
+        use_3d = False
 
     kdt_s = scipy.spatial.KDTree(xy_source)
+
 
     if method == "containing_rectangle":
         if (
@@ -534,8 +548,17 @@ def connect_nodes_across_graphs(
             source_pos_2d = G_connect.nodes[source_node]["pos"]  # lat/lon
 
             # Compute distance in 3D if icosahedral, else 2D
-            if use_3d:
+            if source_has_3d:
+                # m2g: source is mesh, pos3d exists natively
                 source_pos_3d = G_connect.nodes[source_node]["pos3d"]
+                d = np.sqrt(np.sum((source_pos_3d - query_point) ** 2))
+            elif target_has_3d:
+                # g2m: source is grid, no pos3d stored — project on the fly
+                from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
+                source_pos_3d = lat_lon_to_cartesian(
+                    np.array([source_pos_2d[0]]),
+                    np.array([source_pos_2d[1]])
+                )[0]
                 d = np.sqrt(np.sum((source_pos_3d - query_point) ** 2))
             else:
                 d = np.sqrt(np.sum((source_pos_2d - target_pos_2d) ** 2))
@@ -543,8 +566,9 @@ def connect_nodes_across_graphs(
             G_connect.add_edge(source_node, target_node)
             G_connect.edges[source_node, target_node]["len"] = d
             # vdiff always kept in 2D lat/lon space for consistency with rest of codebase
-            G_connect.edges[source_node, target_node]["vdiff"] = (
-                source_pos_2d - target_pos_2d
-            )
+            dlat = source_pos_2d[0] - target_pos_2d[0]
+            dlon = source_pos_2d[1] - target_pos_2d[1]
+            dlon = (dlon + 180) % 360 - 180  # wrap longitude to [-180, 180]
+            G_connect.edges[source_node, target_node]["vdiff"] = np.array([dlat, dlon])
 
     return G_connect

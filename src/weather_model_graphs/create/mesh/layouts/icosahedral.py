@@ -88,7 +88,13 @@ def create_flat_icosahedral_mesh_graph(
     DG.add_nodes_from(G.nodes(data=True))
 
     for u, v in G.edges():
-        vec = DG.nodes[u]["pos"] - DG.nodes[v]["pos"]   # 2D diff for vdiff
+        pos_u = DG.nodes[u]["pos"]
+        pos_v = DG.nodes[v]["pos"]
+        dlat = pos_u[0] - pos_v[0]
+        dlon = pos_u[1] - pos_v[1]
+        dlon = (dlon + 180) % 360 - 180  # wrap to [-180, 180]
+        vec = np.array([dlat, dlon])
+
         dist = np.linalg.norm(DG.nodes[u]["pos3d"] - DG.nodes[v]["pos3d"])  # 3D dist
 
         DG.add_edge(u, v, len=dist, vdiff=vec, level=0)
