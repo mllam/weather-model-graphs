@@ -61,7 +61,7 @@ def connect_grid_to_mesh(grid_lat_lon, mesh_vertices, mesh_faces, radius_factor=
 
 def connect_mesh_to_grid(mesh_vertices, mesh_faces, grid_lat_lon):
     """
-    Mesh → Grid connections (m2g) adapted from create_global_mesh.py lines 245-259.
+    Mesh -> Grid connections (m2g) adapted from create_global_mesh.py lines 245-259.
     
     For each grid point, find containing mesh triangle.
     """
