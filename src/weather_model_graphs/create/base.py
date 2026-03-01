@@ -150,27 +150,34 @@ def create_all_graph_components(
         grid_connect_graph = graph_components["m2m"]
     elif m2m_connectivity == "icosahedral":
         from weather_model_graphs.create.mesh.layouts.icosahedral import (
-            create_icosahedral_mesh,
             create_flat_icosahedral_mesh_graph,
-            create_hierarchical_icosahedral_mesh_graph
+            generate_icosahedral_mesh,
+            create_hierarchical_icosahedral_mesh_graph,
         )
-        
-        # Check if we're working with geographic coordinates
+
         if graph_crs is None or not graph_crs.is_geographic:
-            logger.warning(
-                "Icosahedral mesh is designed for spherical/geographic coordinates. "
+            print(
+                "Icosahedral mesh is designed for spherical/geographic coordinates. ",
                 "Using with non-geographic CRS may produce unexpected results."
             )
-        
+
         if m2m_connectivity_kwargs.get("hierarchical", False):
             graph_components["m2m"] = create_hierarchical_icosahedral_mesh_graph(
+                max_subdivisions=m2m_connectivity_kwargs.get("subdivisions", 3),
+                radius=m2m_connectivity_kwargs.get("radius", 1.0),
+            )
+
+            # Connect grid to finest level only
+            grid_connect_graph = split_graph_by_edge_attribute(
+                graph_components["m2m"], "level"
+            )[0]    
+
+        else:
+            graph_components["m2m"] = create_flat_icosahedral_mesh_graph(
                 subdivisions=m2m_connectivity_kwargs.get("subdivisions", 3),
                 radius=m2m_connectivity_kwargs.get("radius", 1.0),
             )
-            # Connect grid to finest level
-            grid_connect_graph = split_graph_by_edge_attribute(
-                graph_components["m2m"], "level"
-            )[0]
+            grid_connect_graph = graph_components["m2m"]
     else:
         graph_components["m2m"] = create_flat_icosahedral_mesh_graph(
             subdivisions=m2m_connectivity_kwargs.get("subdivisions", 3),
