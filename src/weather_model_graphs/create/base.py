@@ -148,8 +148,37 @@ def create_all_graph_components(
             **m2m_connectivity_kwargs,
         )
         grid_connect_graph = graph_components["m2m"]
+    elif m2m_connectivity == "icosahedral":
+        from weather_model_graphs.create.mesh.layouts.icosahedral import (
+            create_icosahedral_mesh,
+            create_flat_icosahedral_mesh_graph,
+            create_hierarchical_icosahedral_mesh_graph
+        )
+        
+        # Check if we're working with geographic coordinates
+        if graph_crs is None or not graph_crs.is_geographic:
+            logger.warning(
+                "Icosahedral mesh is designed for spherical/geographic coordinates. "
+                "Using with non-geographic CRS may produce unexpected results."
+            )
+        
+        if m2m_connectivity_kwargs.get("hierarchical", False):
+            graph_components["m2m"] = create_hierarchical_icosahedral_mesh_graph(
+                subdivisions=m2m_connectivity_kwargs.get("subdivisions", 3),
+                radius=m2m_connectivity_kwargs.get("radius", 1.0),
+            )
+            # Connect grid to finest level
+            grid_connect_graph = split_graph_by_edge_attribute(
+                graph_components["m2m"], "level"
+            )[0]
     else:
-        raise NotImplementedError(f"Kind {m2m_connectivity} not implemented")
+        graph_components["m2m"] = create_flat_icosahedral_mesh_graph(
+            subdivisions=m2m_connectivity_kwargs.get("subdivisions", 3),
+            radius=m2m_connectivity_kwargs.get("radius", 1.0),
+        )
+        grid_connect_graph = graph_components["m2m"]
+    # else:
+    #     raise NotImplementedError(f"Kind {m2m_connectivity} not implemented")
 
     G_grid = create_grid_graph_nodes(xy=xy)
 
@@ -393,7 +422,50 @@ def connect_nodes_across_graphs(
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
             neigh_idxs = kdt_s.query_ball_point(xy_target, query_dist)
             return neigh_idxs
-
+    elif method == "containing_triangle":
+        # Only for spherical/geographic coordinates
+        from weather_model_graphs.create.mesh.layouts.icosahedral import (
+            lat_lon_to_cartesian, find_containing_triangle
+        )
+        
+        G_source_cart = {}
+        for node in G_source.nodes:
+            if "lat" in G_source.nodes[node] and "lon" in G_source.nodes[node]:
+                cart = lat_lon_to_cartesian(
+                    np.array([G_source.nodes[node]["lat"]]),
+                    np.array([G_source.nodes[node]["lon"]])
+                )[0]
+                G_source_cart[node] = cart
+            else:
+                G_source_cart[node] = G_source.nodes[node].get("pos", np.array([0,0,0]))
+        
+        # For each target node (grid), find containing triangle in source (mesh)
+        edge_list = []
+        for target in G_target.nodes:
+            target_pos = G_target.nodes[target]["pos"]
+            if "lat" in G_target.nodes[target] and "lon" in G_target.nodes[target]:
+                target_cart = lat_lon_to_cartesian(
+                    np.array([G_target.nodes[target]["lat"]]),
+                    np.array([G_target.nodes[target]["lon"]])
+                )[0]
+            else:
+                target_cart = target_pos
+            
+            face_idx, weights = find_containing_triangle(
+                target_cart,
+                mesh_vertices,
+                mesh_faces
+            )
+            
+            if face_idx is not None:
+                face_vertices = mesh_faces[face_idx]
+                for i, weight in zip(face_vertices, weights):
+                    source_node = list(G_source.nodes)[i]
+                    edge_list.append((source_node, target, {"weight": weight}))
+        
+        # Create subgraph with these edges
+        G_m2g = nx.DiGraph()
+        G_m2g.add_edges_from(edge_list)
     else:
         raise NotImplementedError(method)
 
