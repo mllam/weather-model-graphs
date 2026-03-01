@@ -311,6 +311,7 @@ def connect_nodes_across_graphs(
     source_has_3d = "pos3d" in G_source.nodes[sample_source]
     target_has_3d = "pos3d" in G_target.nodes[sample_target]
 
+    # Prepare source points for KDTree
     if source_has_3d:
         # m2g: mesh is source, use its native 3D positions
         xy_source = np.array([G_source.nodes[n]["pos3d"] for n in source_nodes_list])
@@ -318,18 +319,31 @@ def connect_nodes_across_graphs(
     elif target_has_3d:
         # g2m: grid is source, project lat/lon → 3D to match mesh edge-length units
         from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
-        xy_source = lat_lon_to_cartesian(
-            np.array([G_source.nodes[n]["pos"][0] for n in source_nodes_list]),
-            np.array([G_source.nodes[n]["pos"][1] for n in source_nodes_list]),
-        )
-        use_3d = True   # query points must also be 3D
+        source_lats = np.array([G_source.nodes[n]["pos"][0] for n in source_nodes_list])
+        source_lons = np.array([G_source.nodes[n]["pos"][1] for n in source_nodes_list])
+        xy_source = lat_lon_to_cartesian(source_lats, source_lons)
+        use_3d = True
     else:
         # plain 2D (rectilinear grids, no icosahedral mesh)
-        xy_source = np.array([G_source.nodes[n]["pos"] for n in source_nodes_list])
+        # Need to handle longitude wrapping by duplicating points
+        source_lat_lon = np.array([G_source.nodes[n]["pos"] for n in source_nodes_list])
+        
+        # Create three copies shifted by -360°, 0°, and +360° in longitude
+        source_positions = []
+        for offset in [-360, 0, 360]:
+            shifted = source_lat_lon.copy()
+            shifted[:, 1] += offset
+            source_positions.append(shifted)
+        
+        xy_source = np.vstack(source_positions)
+        # Store mapping from KDTree index to original node
+        source_node_mapping = []
+        for offset_idx, offset in enumerate([-360, 0, 360]):
+            for orig_idx, node in enumerate(source_nodes_list):
+                source_node_mapping.append((node, offset, orig_idx))
         use_3d = False
 
     kdt_s = scipy.spatial.KDTree(xy_source)
-
 
     if method == "containing_rectangle":
         if (
@@ -381,8 +395,21 @@ def connect_nodes_across_graphs(
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(query_point):
-            neigh_idx = kdt_s.query(query_point, 1)[1]
-            return [neigh_idx]
+            if use_3d:
+                neigh_idx = kdt_s.query(query_point, 1)[1]
+                return [neigh_idx]
+            else:
+                # For 2D, query all three copies and map back
+                all_neigh_idxs = []
+                for qp in query_point:
+                    neigh_idx = kdt_s.query(qp, 1)[1]
+                    all_neigh_idxs.append(neigh_idx)
+                
+                # Map back to original indices
+                original_idxs = set()
+                for idx in all_neigh_idxs:
+                    original_idxs.add(source_node_mapping[idx][2])  # orig_idx
+                return list(original_idxs)
 
     elif method == "nearest_neighbours":
         if max_num_neighbours is None:
@@ -395,8 +422,21 @@ def connect_nodes_across_graphs(
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(query_point):
-            neigh_idxs = kdt_s.query(query_point, max_num_neighbours)[1]
-            return neigh_idxs
+            if use_3d:
+                neigh_idxs = kdt_s.query(query_point, max_num_neighbours)[1]
+                return neigh_idxs
+            else:
+                # For 2D, query all three copies
+                all_neigh_idxs = []
+                for qp in query_point:
+                    neigh_idxs = kdt_s.query(qp, max_num_neighbours)[1]
+                    all_neigh_idxs.extend(neigh_idxs)
+                
+                # Map back to original indices, removing duplicates
+                original_idxs = set()
+                for idx in all_neigh_idxs:
+                    original_idxs.add(source_node_mapping[idx][2])
+                return list(original_idxs)
 
     elif method == "within_radius":
         if max_num_neighbours is not None:
@@ -429,19 +469,41 @@ def connect_nodes_across_graphs(
                             level_subgraph, "level"
                         )[0]
                     longest_graph_edge = max(
-                        first_level_graph.edges(data=True),
-                        key=lambda x: x[2].get("len", 0),
-                    )[2]["len"]
+                        (d.get("len", 0) for _, _, d in first_level_graph.edges(data=True)),
+                        default=0.0,
+                    )
+
+                    if longest_graph_edge == 0.0:
+                        raise ValueError(
+                            "No edges with 'len' attribute found when computing rel_max_dist. "
+                            "Check that mesh edges have 'len' set correctly."
+                        )
+
                     longest_edge = max(longest_edge, longest_graph_edge)
             query_dist = longest_edge * rel_max_dist
+            print(f"query_dist = {query_dist:.4f}  (longest_edge={longest_edge:.4f}, rel={rel_max_dist})")
+
         else:
             raise Exception(
                 "to use `within_radius` method you should set `max_dist` or `rel_max_dist`"
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(query_point):
-            neigh_idxs = kdt_s.query_ball_point(query_point, query_dist)
-            return neigh_idxs
+            if use_3d:
+                neigh_idxs = kdt_s.query_ball_point(query_point, query_dist)
+                return neigh_idxs
+            else:
+                # For 2D, query all three copies
+                all_neigh_idxs = []
+                for qp in query_point:
+                    neigh_idxs = kdt_s.query_ball_point(qp, query_dist)
+                    all_neigh_idxs.extend(neigh_idxs)
+                
+                # Map back to original indices, removing duplicates
+                original_idxs = set()
+                for idx in all_neigh_idxs:
+                    original_idxs.add(source_node_mapping[idx][2])
+                return list(original_idxs)
 
     elif method == "containing_triangle":
         from weather_model_graphs.create.mesh.layouts.icosahedral import (
@@ -510,13 +572,20 @@ def connect_nodes_across_graphs(
                         np.array([source_pos_2d[1]])
                     )[0]) ** 2))
                 else:
-                    d = np.sqrt(np.sum((source_pos_2d - target_pos_2d) ** 2))
+                    # 2D distance with longitude wrapping
+                    dlat = source_pos_2d[0] - target_pos_2d[0]
+                    dlon = source_pos_2d[1] - target_pos_2d[1]
+                    dlon = (dlon + 180) % 360 - 180
+                    d = np.sqrt(dlat**2 + dlon**2)
 
                 G_connect.add_edge(source_node, target_node)
                 G_connect.edges[source_node, target_node]["len"] = d
-                G_connect.edges[source_node, target_node]["vdiff"] = (
-                    source_pos_2d - target_pos_2d  # always 2D lat/lon for consistency
-                )
+                
+                # Store wrapped vector difference
+                dlat = source_pos_2d[0] - target_pos_2d[0]
+                dlon = source_pos_2d[1] - target_pos_2d[1]
+                dlon = (dlon + 180) % 360 - 180
+                G_connect.edges[source_node, target_node]["vdiff"] = np.array([dlat, dlon])
 
         return G_connect  # early return, skips generic block below
 
@@ -530,7 +599,7 @@ def connect_nodes_across_graphs(
     G_connect.add_nodes_from(sorted(G_target.nodes(data=True)))
 
     for target_node in target_nodes_list:
-        target_pos_2d = G_target.nodes[target_node]["pos"]  # always lat/lon
+        target_pos_2d = G_target.nodes[target_node]["pos"]
 
         if use_3d:
             from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
@@ -538,20 +607,31 @@ def connect_nodes_across_graphs(
                 np.array([target_pos_2d[0]]),
                 np.array([target_pos_2d[1]])
             )[0]
+            query_points_for_kdt = query_point
         else:
-            query_point = target_pos_2d
+            # For 2D queries with wrapping, create three query points
+            query_points_for_kdt = np.array([
+                [target_pos_2d[0], target_pos_2d[1] - 360],
+                [target_pos_2d[0], target_pos_2d[1]],
+                [target_pos_2d[0], target_pos_2d[1] + 360]
+            ])
 
-        neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(query_point)
+        neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(query_points_for_kdt)
 
         for i in neigh_idxs:
             source_node = source_nodes_list[i]
-            source_pos_2d = G_connect.nodes[source_node]["pos"]  # lat/lon
+            source_pos_2d = G_connect.nodes[source_node]["pos"]
 
-            # Compute distance in 3D if icosahedral, else 2D
+            # Compute distance in 3D if icosahedral, else 2D with wrapping
             if source_has_3d:
                 # m2g: source is mesh, pos3d exists natively
                 source_pos_3d = G_connect.nodes[source_node]["pos3d"]
-                d = np.sqrt(np.sum((source_pos_3d - query_point) ** 2))
+                # Convert target to 3D for distance
+                target_pos_3d = lat_lon_to_cartesian(
+                    np.array([target_pos_2d[0]]),
+                    np.array([target_pos_2d[1]])
+                )[0]
+                d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
             elif target_has_3d:
                 # g2m: source is grid, no pos3d stored — project on the fly
                 from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
@@ -559,13 +639,19 @@ def connect_nodes_across_graphs(
                     np.array([source_pos_2d[0]]),
                     np.array([source_pos_2d[1]])
                 )[0]
-                d = np.sqrt(np.sum((source_pos_3d - query_point) ** 2))
+                target_pos_3d = G_connect.nodes[target_node]["pos3d"]
+                d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
             else:
-                d = np.sqrt(np.sum((source_pos_2d - target_pos_2d) ** 2))
+                # 2D distance with longitude wrapping
+                dlat = source_pos_2d[0] - target_pos_2d[0]
+                dlon = source_pos_2d[1] - target_pos_2d[1]
+                dlon = (dlon + 180) % 360 - 180
+                d = np.sqrt(dlat**2 + dlon**2)
 
             G_connect.add_edge(source_node, target_node)
             G_connect.edges[source_node, target_node]["len"] = d
-            # vdiff always kept in 2D lat/lon space for consistency with rest of codebase
+            
+            # vdiff always kept in 2D lat/lon space with proper wrapping
             dlat = source_pos_2d[0] - target_pos_2d[0]
             dlon = source_pos_2d[1] - target_pos_2d[1]
             dlon = (dlon + 180) % 360 - 180  # wrap longitude to [-180, 180]

@@ -65,14 +65,14 @@ def create_flat_icosahedral_mesh_graph(
         networkx.DiGraph: Directed graph with mesh nodes and edges
     """
     vertices, faces = generate_icosahedral_mesh(subdivisions, radius)
-    lat_lon = cartesian_to_lat_lon(vertices)  # (N, 2) -> [lat, lon] in degrees
+    lat_lon = cartesian_to_lat_lon(vertices)
 
     G = nx.Graph()
     for i, (x, y, z) in enumerate(vertices):
         G.add_node(
             i,
-            pos=lat_lon[i],        # 2D (lat, lon) for KDTree compatibility
-            pos3d=np.array([x, y, z]),  # 3D for distance calculations
+            pos=lat_lon[i],
+            pos3d=np.array([x, y, z]),
             type="mesh",
             level=0,
         )
@@ -90,12 +90,18 @@ def create_flat_icosahedral_mesh_graph(
     for u, v in G.edges():
         pos_u = DG.nodes[u]["pos"]
         pos_v = DG.nodes[v]["pos"]
+        
+        # Calculate latitude difference (no wrap needed)
         dlat = pos_u[0] - pos_v[0]
+        
+        # Calculate longitude difference with proper wrapping
         dlon = pos_u[1] - pos_v[1]
         dlon = (dlon + 180) % 360 - 180  # wrap to [-180, 180]
+        
+        # Store the wrapped difference
         vec = np.array([dlat, dlon])
 
-        dist = np.linalg.norm(DG.nodes[u]["pos3d"] - DG.nodes[v]["pos3d"])  # 3D dist
+        dist = np.linalg.norm(DG.nodes[u]["pos3d"] - DG.nodes[v]["pos3d"])
 
         DG.add_edge(u, v, len=dist, vdiff=vec, level=0)
         DG.add_edge(v, u, len=dist, vdiff=-vec, level=0)
@@ -105,6 +111,7 @@ def create_flat_icosahedral_mesh_graph(
     DG.graph["radius"] = radius
 
     return DG
+
 
 
 
@@ -295,15 +302,30 @@ def lat_lon_to_cartesian(lat, lon):
 
 
 def cartesian_to_lat_lon(vertices):
-    """Convert cartesian coordinates to lat/lon degrees."""
+    """Convert cartesian coordinates to lat/lon degrees.
+    
+    Args:
+        vertices: (N, 3) array of (x, y, z) coordinates on unit sphere
+        
+    Returns:
+        (N, 2) array of (latitude, longitude) in degrees
+        Latitude range: [-90, 90]
+        Longitude range: [-180, 180]
+    """
     x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
     
     # Convert to spherical coordinates
+    # atan2(y, x) gives range which maps to [-180°, 180°]
     lon = np.degrees(np.arctan2(y, x))
-    lat = np.degrees(np.arctan2(z, np.sqrt(x**2 + y**2)))
+    
+    # For points on unit sphere, radius = 1, so we can compute latitude directly
+    lat = np.degrees(np.arcsin(z))  # arcsin gives range 
+    
+    # Alternative safer computation (works even if not perfectly normalized):
+    # r = np.sqrt(x**2 + y**2 + z**2)
+    # lat = np.degrees(np.arcsin(z / r))
     
     return np.column_stack([lat, lon])
-
 
 def compute_max_edge_length(vertices, faces):
     """Compute longest edge in mesh."""
