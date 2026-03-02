@@ -26,13 +26,10 @@ from ..networkx_utils import (
 from .grid import create_grid_graph_nodes
 from .mesh.kinds.flat import (
     create_flat_multiscale_from_coordinates,
-    create_flat_multiscale_mesh_graph,
     create_flat_singlescale_from_coordinates,
-    create_flat_singlescale_mesh_graph,
 )
 from .mesh.kinds.hierarchical import (
     create_hierarchical_from_coordinates,
-    create_hierarchical_multiscale_mesh_graph,
 )
 from .mesh.mesh import (
     create_multirange_2d_mesh_coordinates,
