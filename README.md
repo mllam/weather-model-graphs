@@ -98,7 +98,7 @@ for component, graph in graph_components.items():
 
 # NetworkX Backend Compatibility
 
-`weather-model-graphs` supports using the [nx-cugraph](https://github.com/rapidsai/nx-cugraph)
+`weather-model-graphs` supports the [nx-cugraph](https://github.com/rapidsai/nx-cugraph)
 NetworkX backend.
 
 To enable the cuGraph backend when running notebooks:

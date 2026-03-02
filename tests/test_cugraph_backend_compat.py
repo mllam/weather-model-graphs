@@ -10,21 +10,25 @@ from weather_model_graphs.create.mesh.mesh import create_single_level_2d_mesh_gr
 xy_data = np.array([[0.0, 0.0], [1.0, 1.0], [0.0, 1.0], [1.0, 0.0]])
 
 
-@pytest.mark.parametrize("pos_type", [tuple, list])
-def test_flat_mesh_supports_non_array_positions(monkeypatch, pos_type):
-    """
-    Simulate backend-returned node positions without requiring GPU/nx-cugraph in CI.
-    """
+def _patch_pos_to_type(monkeypatch, pos_type):
+    """Coerce `pos` attributes to mimic backend-returned Python containers."""
     original_digraph = networkx.DiGraph
 
-    def mock_digraph(g, *args, **kwargs):
+    def mock_digraph(g=None, *args, **kwargs):
         dg = original_digraph(g, *args, **kwargs)
-        for node in dg.nodes:
-            if "pos" in dg.nodes[node]:
-                dg.nodes[node]["pos"] = pos_type(dg.nodes[node]["pos"])
+        if g is not None:
+            for node in dg.nodes:
+                if "pos" in dg.nodes[node]:
+                    dg.nodes[node]["pos"] = pos_type(dg.nodes[node]["pos"])
         return dg
 
     monkeypatch.setattr(networkx, "DiGraph", mock_digraph)
+
+
+@pytest.mark.parametrize("pos_type", [tuple, list])
+def test_flat_mesh_supports_non_array_positions(monkeypatch, pos_type):
+    """Regression test for tuple/list `pos` values seen with alternate backends."""
+    _patch_pos_to_type(monkeypatch, pos_type)
 
     dg = create_single_level_2d_mesh_graph(xy_data, nx=2, ny=2)
 
@@ -36,24 +40,14 @@ def test_flat_mesh_supports_non_array_positions(monkeypatch, pos_type):
 
 
 def test_flat_mesh_supports_numpy_positions():
-    """Test standard numpy array positions."""
+    """Sanity check for the default path (numpy positions)."""
     dg = create_single_level_2d_mesh_graph(xy_data, nx=2, ny=2)
     assert len(dg.nodes) > 0
 
 
 def test_hierarchical_mesh_supports_tuple_positions(monkeypatch):
-    """Test hierarchical mesh logic handles tuple positions (e.g., for cuGraph)."""
-    original_digraph = networkx.DiGraph
-
-    def mock_digraph(g=None, *args, **kwargs):
-        dg = original_digraph(g, *args, **kwargs)
-        if g is not None:
-            for node in dg.nodes:
-                if "pos" in dg.nodes[node]:
-                    dg.nodes[node]["pos"] = tuple(dg.nodes[node]["pos"])
-        return dg
-
-    monkeypatch.setattr(networkx, "DiGraph", mock_digraph)
+    """The hierarchical builder should also tolerate tuple-backed `pos` values."""
+    _patch_pos_to_type(monkeypatch, tuple)
 
     x = np.linspace(0, 100, 50)
     y = np.linspace(0, 100, 50)
