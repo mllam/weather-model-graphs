@@ -98,12 +98,12 @@ for component, graph in graph_components.items():
 
 # NetworkX Backend Compatibility
 
-`weather-model-graphs` normalises all node position arithmetic to use `numpy.ndarray`, making it compatible with alternative [NetworkX backends](https://networkx.org/documentation/stable/reference/backends.html) such as [nx-cugraph](https://github.com/rapidsai/nx-cugraph).
+`weather-model-graphs` supports using alternative [NetworkX backends](https://networkx.org/documentation/stable/reference/backends.html) such as [nx-cugraph](https://github.com/rapidsai/nx-cugraph) for GPU-accelerated graph operations.
 
-The GPU-accelerated `nx-cugraph` backend can be enabled with a single environment variable:
+To enable the cuGraph backend when running the example notebooks, set the environment variable before launching Jupyter:
 
 ```bash
-NX_CUGRAPH_AUTOCONFIG=True python your_script.py
+NX_CUGRAPH_AUTOCONFIG=True uv run jupyter notebook
 ```
 
 > **Note:** Actual speedups depend on graph size and which NetworkX algorithms are GPU-accelerated. See the benchmark helper in `examples/benchmark_graph_build_backend.py` to measure the effect on your workload.
