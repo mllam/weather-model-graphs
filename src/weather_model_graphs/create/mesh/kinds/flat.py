@@ -7,15 +7,18 @@ from .. import mesh as mesh_graph
 
 def create_flat_multiscale_from_coordinates(
     G_coords_list,
-    intra_level=None,
-    inter_level=None,
+    pattern="8-star",
 ):
     """
     Create flat multiscale mesh graph from a list of coordinate graphs.
 
     This is the connectivity creation step for flat multiscale meshes.
     It takes undirected coordinate graphs (one per level) and produces a
-    single directed mesh graph with intra-level connectivity.
+    single directed mesh graph where all levels are merged into one flat graph.
+
+    In a flat multiscale graph, coarser levels are merged into the finer level
+    by coincident node positions (no separate inter-level connectivity needed).
+    The ``pattern`` controls the intra-level edge connectivity for each level.
 
     Parameters
     ----------
@@ -23,33 +26,15 @@ def create_flat_multiscale_from_coordinates(
         List of undirected coordinate graphs, one per level. Each should have
         nodes with "pos" and "type" attributes, and edges with "adjacency_type"
         attributes. Created by create_multirange_2d_mesh_coordinates.
-    intra_level : dict or None
-        Intra-level connectivity options. Supports:
-        - pattern: str, "4-star" or "8-star" (default: "8-star")
-    inter_level : dict or None
-        Inter-level connectivity options. Supports:
-        - pattern: str, "coincident" (default: "coincident")
-        Currently only "coincident" is supported (coarser level nodes are
-        exactly coincident with a subset of finer level nodes).
+    pattern : str
+        Connectivity pattern for intra-level edges: "4-star" or "8-star"
+        (default: "8-star")
 
     Returns
     -------
     G_tot : networkx.DiGraph
         The merged flat multiscale mesh graph
     """
-    if intra_level is None:
-        intra_level = {"pattern": "8-star"}
-    if inter_level is None:
-        inter_level = {"pattern": "coincident"}
-
-    intra_pattern = intra_level.get("pattern", "8-star")
-    inter_pattern = inter_level.get("pattern", "coincident")
-
-    if inter_pattern != "coincident":
-        raise NotImplementedError(
-            f"Inter-level pattern '{inter_pattern}' is not yet supported. "
-            "Only 'coincident' is currently implemented."
-        )
 
     # Retrieve interlevel_refinement_factor from graph attributes
     interlevel_refinement_factor = G_coords_list[0].graph.get(
@@ -68,7 +53,7 @@ def create_flat_multiscale_from_coordinates(
 
     # Convert each level's coordinate graph to directed graph with chosen pattern
     G_all_levels = [
-        mesh_graph.create_directed_mesh_graph(g_coords, pattern=intra_pattern)
+        mesh_graph.create_directed_mesh_graph(g_coords, pattern=pattern)
         for g_coords in G_coords_list
     ]
 
@@ -184,8 +169,7 @@ def create_flat_multiscale_mesh_graph(
 
     return create_flat_multiscale_from_coordinates(
         G_coords_list,
-        intra_level={"pattern": "8-star"},
-        inter_level={"pattern": "coincident"},
+        pattern="8-star",
     )
 
 

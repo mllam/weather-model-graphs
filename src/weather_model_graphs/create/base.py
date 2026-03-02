@@ -85,14 +85,14 @@ def create_all_graph_components(
 
     mesh_layout_kwargs (for mesh_layout="rectilinear"):
     - grid_spacing: float, distance between mesh nodes in coordinate units
-    - interlevel_refinement_factor: int, refinement factor between levels (for multi-level)
-    - max_num_levels: int, maximum number of mesh levels (for multi-level)
+    - refinement_factor: int, refinement factor between levels (for multi-level)
+    - max_num_refinement_levels: int, maximum number of mesh levels (for multi-level)
 
     m2m_connectivity:
     - "flat": Create a single-level directed mesh graph.
         m2m_connectivity_kwargs: pattern="4-star" or "8-star" (default: "8-star")
     - "flat_multiscale": Create a flat multiscale mesh graph.
-        m2m_connectivity_kwargs: intra_level=dict(pattern=...), inter_level=dict(pattern=...)
+        m2m_connectivity_kwargs: pattern="4-star" or "8-star" (default: "8-star")
     - "hierarchical": Create a hierarchical mesh graph with up/down connections.
         m2m_connectivity_kwargs: intra_level=dict(pattern=...), inter_level=dict(pattern=..., k=...)
 
@@ -144,24 +144,24 @@ def create_all_graph_components(
         mesh_layout_kwargs["grid_spacing"] = m2m_connectivity_kwargs.pop(
             "mesh_node_distance"
         )
-    if "level_refinement_factor" in m2m_connectivity_kwargs and "interlevel_refinement_factor" not in mesh_layout_kwargs:
+    if "level_refinement_factor" in m2m_connectivity_kwargs and "refinement_factor" not in mesh_layout_kwargs:
         warnings.warn(
             "Passing 'level_refinement_factor' in m2m_connectivity_kwargs is deprecated. "
-            "Use mesh_layout_kwargs=dict(interlevel_refinement_factor=...) instead.",
+            "Use mesh_layout_kwargs=dict(refinement_factor=...) instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        mesh_layout_kwargs["interlevel_refinement_factor"] = (
+        mesh_layout_kwargs["refinement_factor"] = (
             m2m_connectivity_kwargs.pop("level_refinement_factor")
         )
-    if "max_num_levels" in m2m_connectivity_kwargs and "max_num_levels" not in mesh_layout_kwargs:
+    if "max_num_levels" in m2m_connectivity_kwargs and "max_num_refinement_levels" not in mesh_layout_kwargs:
         warnings.warn(
             "Passing 'max_num_levels' in m2m_connectivity_kwargs is deprecated. "
-            "Use mesh_layout_kwargs=dict(max_num_levels=...) instead.",
+            "Use mesh_layout_kwargs=dict(max_num_refinement_levels=...) instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        mesh_layout_kwargs["max_num_levels"] = m2m_connectivity_kwargs.pop(
+        mesh_layout_kwargs["max_num_refinement_levels"] = m2m_connectivity_kwargs.pop(
             "max_num_levels"
         )
 
@@ -235,20 +235,20 @@ def create_all_graph_components(
         # --- Step 1: Coordinate creation based on mesh_layout ---
         if mesh_layout == "rectilinear":
             grid_spacing = mesh_layout_kwargs.get("grid_spacing")
-            interlevel_refinement_factor = mesh_layout_kwargs.get(
-                "interlevel_refinement_factor"
+            refinement_factor = mesh_layout_kwargs.get("refinement_factor")
+            max_num_refinement_levels = mesh_layout_kwargs.get(
+                "max_num_refinement_levels"
             )
-            max_num_levels = mesh_layout_kwargs.get("max_num_levels")
             if grid_spacing is None:
                 raise ValueError(
                     "mesh_layout='rectilinear' with m2m_connectivity='hierarchical' "
                     "requires 'grid_spacing' in mesh_layout_kwargs."
                 )
             G_coords_list = create_multirange_2d_mesh_coordinates(
-                max_num_levels=max_num_levels,
+                max_num_levels=max_num_refinement_levels,
                 xy=xy,
                 grid_spacing=grid_spacing,
-                interlevel_refinement_factor=interlevel_refinement_factor,
+                interlevel_refinement_factor=refinement_factor,
             )
         else:
             raise NotImplementedError(
@@ -280,20 +280,20 @@ def create_all_graph_components(
         # --- Step 1: Coordinate creation based on mesh_layout ---
         if mesh_layout == "rectilinear":
             grid_spacing = mesh_layout_kwargs.get("grid_spacing")
-            interlevel_refinement_factor = mesh_layout_kwargs.get(
-                "interlevel_refinement_factor"
+            refinement_factor = mesh_layout_kwargs.get("refinement_factor")
+            max_num_refinement_levels = mesh_layout_kwargs.get(
+                "max_num_refinement_levels"
             )
-            max_num_levels = mesh_layout_kwargs.get("max_num_levels")
             if grid_spacing is None:
                 raise ValueError(
                     "mesh_layout='rectilinear' with m2m_connectivity='flat_multiscale' "
                     "requires 'grid_spacing' in mesh_layout_kwargs."
                 )
             G_coords_list = create_multirange_2d_mesh_coordinates(
-                max_num_levels=max_num_levels,
+                max_num_levels=max_num_refinement_levels,
                 xy=xy,
                 grid_spacing=grid_spacing,
-                interlevel_refinement_factor=interlevel_refinement_factor,
+                interlevel_refinement_factor=refinement_factor,
             )
         else:
             raise NotImplementedError(
@@ -302,16 +302,10 @@ def create_all_graph_components(
             )
 
         # --- Step 2: Connectivity creation ---
-        intra_level = m2m_connectivity_kwargs.get(
-            "intra_level", {"pattern": "8-star"}
-        )
-        inter_level = m2m_connectivity_kwargs.get(
-            "inter_level", {"pattern": "coincident"}
-        )
+        pattern = m2m_connectivity_kwargs.get("pattern", "8-star")
         graph_components["m2m"] = create_flat_multiscale_from_coordinates(
             G_coords_list,
-            intra_level=intra_level,
-            inter_level=inter_level,
+            pattern=pattern,
         )
         grid_connect_graph = graph_components["m2m"]
     else:
