@@ -61,7 +61,7 @@ if __name__ == "__main__":
     label = "cuGraph" if cugraph_active else "standard NetworkX"
 
     print("=" * 60)
-    print("  weather-model-graphs  –  Graph Build Backend Benchmark")
+    print("  weather-model-graphs  -  Graph Build Backend Benchmark")
     print("=" * 60)
     print(f"\nBackend : {label}")
 
