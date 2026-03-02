@@ -98,9 +98,10 @@ for component, graph in graph_components.items():
 
 # NetworkX Backend Compatibility
 
-`weather-model-graphs` supports using alternative [NetworkX backends](https://networkx.org/documentation/stable/reference/backends.html) such as [nx-cugraph](https://github.com/rapidsai/nx-cugraph) for GPU-accelerated graph operations.
+`weather-model-graphs` supports using the [nx-cugraph](https://github.com/rapidsai/nx-cugraph)
+NetworkX backend.
 
-To enable the cuGraph backend when running the example notebooks, set the environment variable before launching Jupyter:
+To enable the cuGraph backend when running notebooks:
 
 ```bash
 NX_CUGRAPH_AUTOCONFIG=True uv run jupyter notebook
