@@ -386,10 +386,13 @@ def find_containing_triangle(
         
         if weights is not None and np.all(weights >= -0.01) and np.all(weights <= 1.01):
             weight_sum = np.sum(weights)
-            if abs(weight_sum - 1.0) < abs(best_sum - 1.0):
-                best_sum = weight_sum
-                best_face = face_idx
-                best_weights = weights / weight_sum
+            if abs(weight_sum - 1.0) < 1e-6:
+                return face_idx, weights / weight_sum
+            else:
+                if abs(weight_sum - 1.0) < abs(best_sum - 1.0):
+                    best_sum = weight_sum
+                    best_face = face_idx
+                    best_weights = weights / weight_sum
     
     return best_face, best_weights
 
