@@ -3,7 +3,7 @@ import networkx as nx
 import pytest
 import pyproj
 from unittest.mock import patch, MagicMock
-
+from scipy.spatial import KDTree 
 from weather_model_graphs.create.mesh.layouts.icosahedral import (
     generate_icosahedral_mesh,
     create_hierarchy_of_icosahedral_meshes,
@@ -268,8 +268,18 @@ class TestMeshToGridConnectivity:
         # This is a simple test - in practice we'd need more thorough testing
         test_point = np.array([0.5, 0.5, 0.5])
         test_point = test_point / np.linalg.norm(test_point)
+        face_centroids = vertices[faces].mean(axis=1)
+        centroid_tree = KDTree(face_centroids)
         
-        face_idx, weights = find_containing_triangle(test_point, vertices, faces)
+
+        face_idx, weights = find_containing_triangle(
+            test_point, 
+            vertices, 
+            faces,
+            face_centroids=face_centroids,
+            centroid_tree=centroid_tree
+        )
+
         
         # Either found or not found is acceptable for this test
         if face_idx is not None:

@@ -367,7 +367,12 @@ def find_containing_triangle(
     """
 
     point_norm = point_cartesian / np.linalg.norm(point_cartesian)
+    # Fallback: compute centroids and tree if not provided
+    if face_centroids is None or centroid_tree is None:
+        face_centroids = mesh_vertices[mesh_faces].mean(axis=1)
+        centroid_tree = KDTree(face_centroids)
     
+
     # Get candidate faces from spatial index
     candidate_indices = centroid_tree.query(point_norm, k=k_candidates)[1]
     

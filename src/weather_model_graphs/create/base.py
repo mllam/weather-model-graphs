@@ -244,7 +244,6 @@ def create_all_graph_components(
 
     return G_tot
 
-
 def connect_nodes_across_graphs(
     G_source,
     G_target,
