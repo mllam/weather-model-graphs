@@ -576,11 +576,20 @@ def connect_nodes_across_graphs(
                 G_connect.add_edge(source_node, target_node)
                 G_connect.edges[source_node, target_node]["len"] = d
                 
-                # Store wrapped vector difference
-                dlat = source_pos_2d[0] - target_pos_2d[0]
-                dlon = source_pos_2d[1] - target_pos_2d[1]
-                dlon = (dlon + 180) % 360 - 180
-                G_connect.edges[source_node, target_node]["vdiff"] = np.array([dlat, dlon])
+                # Use 3D Cartesian vdiff for icosahedral graphs, 2D lat/lon for rectilinear
+                if use_3d:
+                    source_pos_3d = G_connect.nodes[source_node]["pos3d"]
+                    vdiff = source_pos_3d - query_point
+                elif use_3d_target:
+                    source_pos_3d = lat_lon_to_cartesian(
+                        np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
+                    )[0]
+                    vdiff = source_pos_3d - query_point
+                else:
+                    dlat = source_pos_2d[0] - target_pos_2d[0]
+                    dlon = (source_pos_2d[1] - target_pos_2d[1] + 180) % 360 - 180
+                    vdiff = np.array([dlat, dlon])
+                G_connect.edges[source_node, target_node]["vdiff"] = vdiff
 
         return G_connect  # early return, skips generic block below
 
@@ -646,10 +655,23 @@ def connect_nodes_across_graphs(
             G_connect.add_edge(source_node, target_node)
             G_connect.edges[source_node, target_node]["len"] = d
             
-            # vdiff always kept in 2D lat/lon space with proper wrapping
-            dlat = source_pos_2d[0] - target_pos_2d[0]
-            dlon = source_pos_2d[1] - target_pos_2d[1]
-            dlon = (dlon + 180) % 360 - 180  # wrap longitude to [-180, 180]
-            G_connect.edges[source_node, target_node]["vdiff"] = np.array([dlat, dlon])
+            # Use 3D Cartesian vdiff for icosahedral graphs, 2D lat/lon for rectilinear
+            if source_has_3d:
+                source_pos_3d = G_connect.nodes[source_node]["pos3d"]
+                target_pos_3d = lat_lon_to_cartesian(
+                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
+                )[0]
+                vdiff = source_pos_3d - target_pos_3d
+            elif target_has_3d:
+                source_pos_3d = lat_lon_to_cartesian(
+                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
+                )[0]
+                target_pos_3d = G_connect.nodes[target_node]["pos3d"]
+                vdiff = source_pos_3d - target_pos_3d
+            else:
+                dlat = source_pos_2d[0] - target_pos_2d[0]
+                dlon = (source_pos_2d[1] - target_pos_2d[1] + 180) % 360 - 180
+                vdiff = np.array([dlat, dlon])
+            G_connect.edges[source_node, target_node]["vdiff"] = vdiff
 
     return G_connect

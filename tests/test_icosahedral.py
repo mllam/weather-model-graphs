@@ -4,6 +4,8 @@ import pytest
 import pyproj
 from unittest.mock import patch, MagicMock
 
+import tests.utils as test_utils
+import weather_model_graphs as wmg
 from weather_model_graphs.create.mesh.layouts.icosahedral import (
     generate_icosahedral_mesh,
     create_hierarchy_of_icosahedral_meshes,
@@ -132,12 +134,9 @@ class TestIcosahedralMeshGraphs:
             assert data["len"] > 0
             # Vector difference should match lat/lon positions
             vec = data["vdiff"]
-            pos_u = G.nodes[u]["pos"]
-            pos_v = G.nodes[v]["pos"]
-            expected_vec = pos_u - pos_v
-            # Handle longitude wrapping in the comparison
-            if abs(expected_vec[1]) > 180:
-                expected_vec[1] = (expected_vec[1] + 180) % 360 - 180
+            pos3d_u = G.nodes[u]["pos3d"]
+            pos3d_v = G.nodes[v]["pos3d"]
+            expected_vec = pos3d_u - pos3d_v
             assert np.allclose(vec, expected_vec, atol=1e-10)
 
 
@@ -176,6 +175,35 @@ class TestIcosahedralMeshGraphs:
         edges = set(G.edges())
         for u, v in list(edges):
             assert (v, u) in edges
+
+    def test_vdiff_is_3d_for_icosahedral(self):
+        """
+        Test that vdiff is 3D Cartesian for icosahedral graphs.
+        """
+        G = create_flat_icosahedral_mesh_graph(subdivisions=1)
+
+        for u, v, data in G.edges(data=True):
+            vdiff = data["vdiff"]
+            # vdiff should be 3d
+            assert vdiff.shape == (3, ), f"Expected vdiff shape (3,), got {vdiff.shape}"
+            # vdiff should be consistent with pos3d difference
+            expected = G.nodes[u]["pos3d"] - G.nodes[v]["pos3d"]
+            assert np.allclose(vdiff, expected, atol=1e-10)
+
+    def test_vdiff_is_2d_for_rectilinear(self):
+        """
+        Test that vdiff remains 2D fore rectilinear graphs, preserving the backward compatibility
+        """
+        xy = test_utils.create_fake_xy(N=16)
+        G = wmg.create.mesh.create_single_level_2d_mesh_graph(xy=xy, nx=4, ny=4)
+        G_grid = wmg.create.grid.create_grid_graph_nodes(xy)
+        G_connect = wmg.create.base.connect_nodes_across_graphs(
+            G_source=G, G_target=G_grid, method="nearest_neighbour"
+        )
+
+        for u, v, data in G_connect.edges(data=True):
+            vdiff = data["vdiff"]
+            assert vdiff.shape == (2,), f"Expected vdiff shape (2,), got {vdiff.shape}"
 
 
 class TestCoordinateConversions:

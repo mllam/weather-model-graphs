@@ -88,21 +88,9 @@ def create_flat_icosahedral_mesh_graph(
     DG.add_nodes_from(G.nodes(data=True))
 
     for u, v in G.edges():
-        pos_u = DG.nodes[u]["pos"]
-        pos_v = DG.nodes[v]["pos"]
-        
-        # Calculate latitude difference (no wrap needed)
-        dlat = pos_u[0] - pos_v[0]
-        
-        # Calculate longitude difference with proper wrapping
-        dlon = pos_u[1] - pos_v[1]
-        dlon = (dlon + 180) % 360 - 180  # wrap to [-180, 180]
-        
-        # Store the wrapped difference
-        vec = np.array([dlat, dlon])
-
-        # Use 3D positions for distance calculation
-        dist = np.linalg.norm(DG.nodes[u]["pos3d"] - DG.nodes[v]["pos3d"])
+        # Use 3D positions for both distance and direction
+        vec = DG.nodes[u]["pos3d"] - DG.nodes[v]["pos3d"]
+        dist = np.linalg.norm(vec)
 
         DG.add_edge(u, v, len=dist, vdiff=vec, level=0)
         DG.add_edge(v, u, len=dist, vdiff=-vec, level=0)
@@ -170,8 +158,8 @@ def create_hierarchical_icosahedral_mesh_graph(
                 for j in range(i + 1, 3):
                     u, v = node_offset + face[i], node_offset + face[j]
                     if not DG.has_edge(u, v):
-                        vec = DG.nodes[u]["pos"] - DG.nodes[v]["pos"]
-                        dist = np.linalg.norm(DG.nodes[u]["pos3d"] - DG.nodes[v]["pos3d"])
+                        vec = DG.nodes[u]["pos3d"] - DG.nodes[v]["pos3d"]
+                        dist = np.linalg.norm(vec)
                         DG.add_edge(u, v, len=dist, vdiff=vec, level=level)
                         DG.add_edge(v, u, len=dist, vdiff=-vec, level=level)
 
@@ -199,19 +187,16 @@ def create_hierarchical_icosahedral_mesh_graph(
             fine_indices = tree.query_ball_point(coarse_pos, radius_query)
             for fine_idx in fine_indices:
                 fine_node = finer_start + fine_idx
-                coarse_lat_lon = DG.nodes[coarse_node]["pos"]
                 # fine_node may not exist yet if finer_start > node_offset (future level)
                 # so use coordinates directly
-                fine_lat_lon = cartesian_to_lat_lon(finer_vertices[fine_idx:fine_idx+1])[0]
-                vec3d = coarse_pos - finer_vertices[fine_idx]
-                dist = np.linalg.norm(vec3d)
-                vec2d = coarse_lat_lon - fine_lat_lon
+                vec = coarse_pos - finer_vertices[fine_idx]
+                dist = np.linalg.norm(vec)
 
                 DG.add_edge(fine_node, coarse_node,
-                            len=dist, vdiff=vec2d,
+                            len=dist, vdiff=vec,
                             level=f"{level+1}_to_{level}")
                 DG.add_edge(coarse_node, fine_node,
-                            len=dist, vdiff=-vec2d,
+                            len=dist, vdiff=-vec,
                             level=f"{level}_to_{level+1}")
 
         node_offset += len(vertices)
