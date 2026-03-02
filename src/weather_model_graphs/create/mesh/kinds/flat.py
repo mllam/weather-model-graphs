@@ -5,12 +5,156 @@ from ....networkx_utils import prepend_node_index
 from .. import mesh as mesh_graph
 
 
+def create_flat_multiscale_from_coordinates(
+    G_coords_list,
+    intra_level=None,
+    inter_level=None,
+):
+    """
+    Create flat multiscale mesh graph from a list of coordinate graphs.
+
+    This is the connectivity creation step for flat multiscale meshes.
+    It takes undirected coordinate graphs (one per level) and produces a
+    single directed mesh graph with intra-level connectivity.
+
+    Parameters
+    ----------
+    G_coords_list : list of networkx.Graph
+        List of undirected coordinate graphs, one per level. Each should have
+        nodes with "pos" and "type" attributes, and edges with "adjacency_type"
+        attributes. Created by create_multirange_2d_mesh_coordinates.
+    intra_level : dict or None
+        Intra-level connectivity options. Supports:
+        - pattern: str, "4-star" or "8-star" (default: "8-star")
+    inter_level : dict or None
+        Inter-level connectivity options. Supports:
+        - pattern: str, "coincident" (default: "coincident")
+        Currently only "coincident" is supported (coarser level nodes are
+        exactly coincident with a subset of finer level nodes).
+
+    Returns
+    -------
+    G_tot : networkx.DiGraph
+        The merged flat multiscale mesh graph
+    """
+    if intra_level is None:
+        intra_level = {"pattern": "8-star"}
+    if inter_level is None:
+        inter_level = {"pattern": "coincident"}
+
+    intra_pattern = intra_level.get("pattern", "8-star")
+    inter_pattern = inter_level.get("pattern", "coincident")
+
+    if inter_pattern != "coincident":
+        raise NotImplementedError(
+            f"Inter-level pattern '{inter_pattern}' is not yet supported. "
+            "Only 'coincident' is currently implemented."
+        )
+
+    # Retrieve interlevel_refinement_factor from graph attributes
+    interlevel_refinement_factor = G_coords_list[0].graph.get(
+        "interlevel_refinement_factor", 3
+    )
+
+    # Check that interlevel_refinement_factor is an odd integer
+    if (
+        int(interlevel_refinement_factor) != interlevel_refinement_factor
+        or interlevel_refinement_factor % 2 != 1
+    ):
+        raise ValueError(
+            "The `interlevel_refinement_factor` must be an odd integer. "
+            f"Given value: {interlevel_refinement_factor}."
+        )
+
+    # Convert each level's coordinate graph to directed graph with chosen pattern
+    G_all_levels = [
+        mesh_graph.create_directed_mesh_graph(g_coords, pattern=intra_pattern)
+        for g_coords in G_coords_list
+    ]
+
+    # combine all levels to one graph
+    G_tot = G_all_levels[0]
+    # First node at level l+1 share position with node (offset, offset) at level l
+    level_offset = interlevel_refinement_factor // 2
+
+    first_level_nodes = list(G_all_levels[0].nodes)
+    # Last nodes in first layer has pos (nx-1, ny-1)
+    num_nodes_x = first_level_nodes[-1][0] + 1
+    num_nodes_y = first_level_nodes[-1][1] + 1
+
+    for lev in range(1, len(G_all_levels)):
+        nodes = list(G_all_levels[lev - 1].nodes)
+        ij = (
+            np.array(nodes)
+            .reshape((num_nodes_x, num_nodes_y, 2))[
+                level_offset::interlevel_refinement_factor,
+                level_offset::interlevel_refinement_factor,
+                :,
+            ]
+            .reshape(
+                int(
+                    num_nodes_x
+                    * num_nodes_y
+                    / (interlevel_refinement_factor**2)
+                ),
+                2,
+            )
+        )
+        ij = [tuple(x) for x in ij]
+        G_all_levels[lev] = networkx.relabel_nodes(
+            G_all_levels[lev], dict(zip(G_all_levels[lev].nodes, ij))
+        )
+        G_tot = networkx.compose(G_tot, G_all_levels[lev])
+
+        # Update number of nodes in x- and y-direction for next iteration
+        num_nodes_x //= interlevel_refinement_factor
+        num_nodes_y //= interlevel_refinement_factor
+
+    # Relabel mesh nodes to start with 0
+    G_tot = prepend_node_index(G_tot, 0)
+
+    # add dx and dy to graph
+    G_tot.graph["dx"] = {i: g.graph["dx"] for i, g in enumerate(G_all_levels)}
+    G_tot.graph["dy"] = {i: g.graph["dy"] for i, g in enumerate(G_all_levels)}
+
+    return G_tot
+
+
+def create_flat_singlescale_from_coordinates(G_coords, pattern="8-star"):
+    """
+    Create a flat single-scale directed mesh graph from a coordinate graph.
+
+    This is the connectivity creation step for flat single-scale meshes.
+    It converts an undirected coordinate graph to a directed mesh graph
+    using the specified connectivity pattern.
+
+    Parameters
+    ----------
+    G_coords : networkx.Graph
+        Undirected coordinate graph with nodes having "pos" attributes and
+        edges having "adjacency_type" attributes. Created by
+        create_single_level_2d_mesh_coordinates.
+    pattern : str
+        Connectivity pattern: "4-star" or "8-star" (default: "8-star")
+
+    Returns
+    -------
+    networkx.DiGraph
+        The flat single-scale directed mesh graph
+    """
+    return mesh_graph.create_directed_mesh_graph(G_coords, pattern=pattern)
+
+
 def create_flat_multiscale_mesh_graph(
     xy, mesh_node_distance: float, level_refinement_factor: int, max_num_levels: int
 ):
     """
     Create flat mesh graph by merging the single-level mesh
     graphs across all levels in `G_all_levels`.
+
+    Internally uses the two-step process:
+    1. create_multirange_2d_mesh_coordinates (coordinate creation)
+    2. create_flat_multiscale_from_coordinates (connectivity creation)
 
     Parameters
     ----------
@@ -31,67 +175,27 @@ def create_flat_multiscale_mesh_graph(
     G_tot : networkx.Graph
         The merged mesh graph
     """
-    # Check that level_refinement_factor is an odd integer
-    if (
-        int(level_refinement_factor) != level_refinement_factor
-        or level_refinement_factor % 2 != 1
-    ):
-        raise ValueError(
-            "The `level_refinement_factor` must be an odd integer. "
-            f"Given value: {level_refinement_factor}."
-        )
-
-    G_all_levels: list[networkx.DiGraph] = mesh_graph.create_multirange_2d_mesh_graphs(
+    G_coords_list = mesh_graph.create_multirange_2d_mesh_coordinates(
         max_num_levels=max_num_levels,
         xy=xy,
-        mesh_node_distance=mesh_node_distance,
-        level_refinement_factor=level_refinement_factor,
+        grid_spacing=mesh_node_distance,
+        interlevel_refinement_factor=level_refinement_factor,
     )
 
-    # combine all levels to one graph
-    G_tot = G_all_levels[0]
-    # First node at level l+1 share position with node (offset, offset) at level l
-    level_offset = level_refinement_factor // 2
-
-    first_level_nodes = list(G_all_levels[0].nodes)
-    # Last nodes in first layer has pos (nx-1, ny-1)
-    num_nodes_x = first_level_nodes[-1][0] + 1
-    num_nodes_y = first_level_nodes[-1][1] + 1
-
-    for lev in range(1, len(G_all_levels)):
-        nodes = list(G_all_levels[lev - 1].nodes)
-        ij = (
-            np.array(nodes)
-            .reshape((num_nodes_x, num_nodes_y, 2))[
-                level_offset::level_refinement_factor,
-                level_offset::level_refinement_factor,
-                :,
-            ]
-            .reshape(int(num_nodes_x * num_nodes_y / (level_refinement_factor**2)), 2)
-        )
-        ij = [tuple(x) for x in ij]
-        G_all_levels[lev] = networkx.relabel_nodes(
-            G_all_levels[lev], dict(zip(G_all_levels[lev].nodes, ij))
-        )
-        G_tot = networkx.compose(G_tot, G_all_levels[lev])
-
-        # Update number of nodes in x- and y-direction for next iteraion
-        num_nodes_x //= level_refinement_factor
-        num_nodes_y //= level_refinement_factor
-
-    # Relabel mesh nodes to start with 0
-    G_tot = prepend_node_index(G_tot, 0)
-
-    # add dx and dy to graph
-    G_tot.graph["dx"] = {i: g.graph["dx"] for i, g in enumerate(G_all_levels)}
-    G_tot.graph["dy"] = {i: g.graph["dy"] for i, g in enumerate(G_all_levels)}
-
-    return G_tot
+    return create_flat_multiscale_from_coordinates(
+        G_coords_list,
+        intra_level={"pattern": "8-star"},
+        inter_level={"pattern": "coincident"},
+    )
 
 
 def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
     """
     Create flat mesh graph of single level
+
+    Internally uses the two-step process:
+    1. create_single_level_2d_mesh_coordinates (coordinate creation)
+    2. create_directed_mesh_graph (connectivity creation, pattern="8-star")
 
     Parameters
     ----------
