@@ -244,7 +244,6 @@ def create_all_graph_components(
 
     return G_tot
 
-
 def connect_nodes_across_graphs(
     G_source,
     G_target,
@@ -505,6 +504,7 @@ def connect_nodes_across_graphs(
             lat_lon_to_cartesian,
             find_containing_triangle,
         )
+        from scipy.spatial import KDTree 
 
         if mesh_vertices is None or mesh_faces is None:
             raise ValueError(
@@ -512,87 +512,92 @@ def connect_nodes_across_graphs(
                 "to be passed to connect_nodes_across_graphs."
             )
 
+        # Precompute spatial index ONCE 
+        # Compute face centroids
+        face_centroids = mesh_vertices[mesh_faces].mean(axis=1)
+        # Build KDTree on centroids
+        centroid_tree = KDTree(face_centroids)
+
         G_connect = networkx.DiGraph()
         G_connect.add_nodes_from(sorted(G_source.nodes(data=True)))
         G_connect.add_nodes_from(sorted(G_target.nodes(data=True)))
+        
+        # Determine coordinate systems
         target_sample = target_nodes_list[0]
         use_3d_target = "pos3d" in G_target.nodes[target_sample]
-        if use_3d_target and not use_3d:
-            # g2m case: source=grid (2D only), target=mesh (has pos3d)
-            # Rebuild KDTree on target's 3D positions for querying
-            xy_target_3d = np.array([G_target.nodes[n]["pos3d"] for n in source_nodes_list
-                                    if n in G_target.nodes])
-            # Actually we need source KDTree on source nodes but queried with 3D points.
-            # The KDTree was built on source (grid, 2D). Instead rebuild on target mesh in 3D
-            # and for each source (grid) node, find neighbours in target (mesh).
-            # But connect_nodes_across_graphs goes source->target directionally.
-            # The KDTree must be on SOURCE. So convert source grid lat/lon to 3D:
-            from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
-            xy_source_3d = np.array([
-                lat_lon_to_cartesian(
-                    np.array([G_source.nodes[n]["pos"][0]]),
-                    np.array([G_source.nodes[n]["pos"][1]])
-                )[0]
-                for n in source_nodes_list
-            ])
-            kdt_s = scipy.spatial.KDTree(xy_source_3d)
-
+        
+        # For each target node (grid point), find containing triangle
         for target_node in target_nodes_list:
             target_pos_2d = G_target.nodes[target_node]["pos"]
+            
+            # Convert target to 3D cartesian for triangle containment
+            query_point = lat_lon_to_cartesian(
+                np.array([target_pos_2d[0]]),
+                np.array([target_pos_2d[1]])
+            )[0]
+            
+            #  USING OPTIMIZED PRECOMPUTED METHOD
+            face_idx, bary_weights = find_containing_triangle(
+                query_point,
+                mesh_vertices,
+                mesh_faces,
+                face_centroids=face_centroids,  # Pass precomputed
+                centroid_tree=centroid_tree,    # Pass precomputed
+                k_candidates=10                 
+            )
+            
+            if face_idx is not None:
+                # Connect to the three vertices of the containing triangle
+                for mesh_idx, weight in zip(mesh_faces[face_idx], bary_weights):
+                    source_node = source_nodes_list[mesh_idx]  # mesh node
+                    
+                    # Get positions for distance calculation
+                    source_pos_2d = G_connect.nodes[source_node]["pos"]
+                    
+                    # Calculate 3D distance for edge length
+                    if use_3d or use_3d_target:
+                        # Use 3D positions if available
+                        if "pos3d" in G_connect.nodes[source_node]:
+                            source_pos_3d = G_connect.nodes[source_node]["pos3d"]
+                        else:
+                            # Convert source to 3D if needed
+                            source_pos_3d = lat_lon_to_cartesian(
+                                np.array([source_pos_2d[0]]),
+                                np.array([source_pos_2d[1]])
+                            )[0]
+                        
+                        target_pos_3d = query_point  # Already in 3D
+                        d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
+                    else:
+                        # 2D distance with longitude wrapping
+                        dlat = source_pos_2d[0] - target_pos_2d[0]
+                        dlon = source_pos_2d[1] - target_pos_2d[1]
+                        dlon = (dlon + 180) % 360 - 180
+                        d = np.sqrt(dlat**2 + dlon**2)
+                    
+                    # Add edge with attributes
+                    G_connect.add_edge(source_node, target_node)
+                    G_connect.edges[source_node, target_node]["len"] = d
+                    G_connect.edges[source_node, target_node]["barycentric_weight"] = weight
 
-            # Convert target query point to 3D if KDTree was built in 3D
-            if use_3d or use_3d_target:
-                from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
-                query_point = lat_lon_to_cartesian(
-                    np.array([target_pos_2d[0]]),
-                    np.array([target_pos_2d[1]])
-                )[0]
-            else:
-                query_point = target_pos_2d
-
-            neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(query_point)
-
-            for i in neigh_idxs:
-                source_node = source_nodes_list[i]
-                source_pos_2d = G_connect.nodes[source_node]["pos"]
-
-                # Distance: use 3D if either side is icosahedral
-                if use_3d:
-                    source_pos_3d = G_connect.nodes[source_node]["pos3d"]
-                    d = np.sqrt(np.sum((source_pos_3d - query_point) ** 2))
-                elif use_3d_target:
-                    # source is grid, convert to 3D for distance
-                    d = np.sqrt(np.sum((query_point - lat_lon_to_cartesian(  # query_point is target in 3D
-                        np.array([source_pos_2d[0]]),
-                        np.array([source_pos_2d[1]])
-                    )[0]) ** 2))
-                else:
-                    # 2D distance with longitude wrapping
-                    dlat = source_pos_2d[0] - target_pos_2d[0]
-                    dlon = source_pos_2d[1] - target_pos_2d[1]
-                    dlon = (dlon + 180) % 360 - 180
-                    d = np.sqrt(dlat**2 + dlon**2)
-
-                G_connect.add_edge(source_node, target_node)
-                G_connect.edges[source_node, target_node]["len"] = d
-                
-                # Use 3D Cartesian vdiff for icosahedral graphs, 2D lat/lon for rectilinear
-                if use_3d:
-                    source_pos_3d = G_connect.nodes[source_node]["pos3d"]
-                    vdiff = source_pos_3d - query_point
-                elif use_3d_target:
-                    source_pos_3d = lat_lon_to_cartesian(
-                        np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
-                    )[0]
-                    vdiff = source_pos_3d - query_point
-                else:
-                    dlat = source_pos_2d[0] - target_pos_2d[0]
-                    dlon = (source_pos_2d[1] - target_pos_2d[1] + 180) % 360 - 180
-                    vdiff = np.array([dlat, dlon])
-                G_connect.edges[source_node, target_node]["vdiff"] = vdiff
+                    # Use 3D Cartesian vdiff for icosahedral graphs, 2D lat/lon for rectilinear
+                    if use_3d:
+                        source_pos_3d = G_connect.nodes[source_node]["pos3d"]
+                        vdiff = source_pos_3d - query_point
+                    elif use_3d_target:
+                        source_pos_3d = lat_lon_to_cartesian(
+                            np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
+                        )[0]
+                        vdiff = source_pos_3d - query_point
+                    else:
+                        dlat = source_pos_2d[0] - target_pos_2d[0]
+                        dlon = (source_pos_2d[1] - target_pos_2d[1] + 180) % 360 - 180
+                        vdiff = np.array([dlat, dlon])
+                    G_connect.edges[source_node, target_node]["vdiff"] = vdiff
+                    
+                    
 
         return G_connect  # early return, skips generic block below
-
     else:
         raise NotImplementedError(method)
 

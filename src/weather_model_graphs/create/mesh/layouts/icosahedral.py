@@ -257,18 +257,25 @@ def connect_mesh_to_grid(mesh_vertices, mesh_faces, grid_lat_lon):
         edge_index: (2, E) array of [mesh_node, grid_node] connections
         weights: (E,) barycentric weights for each edge
     """
+    # Precompute face centroids and KDTree
     grid_cartesian = lat_lon_to_cartesian(grid_lat_lon[:, 0], grid_lat_lon[:, 1])
 
+    face_centroids = mesh_vertices[mesh_faces].mean(axis=1)
+    centroid_tree = KDTree(face_centroids)
+    
     mesh_indices, grid_indices, weights = [], [], []
-
+    
     for grid_idx, point in enumerate(grid_cartesian):
-        face_idx, bary_weights = find_containing_triangle(point, mesh_vertices, mesh_faces)
+        face_idx, bary_weights = find_containing_triangle(
+            point, mesh_vertices, mesh_faces, 
+            face_centroids, centroid_tree, k_candidates=10
+        )
         if face_idx is not None:
             for mesh_idx, w in zip(mesh_faces[face_idx], bary_weights):
                 mesh_indices.append(mesh_idx)
                 grid_indices.append(grid_idx)
                 weights.append(w)
-
+    
     return np.array([mesh_indices, grid_indices]), np.array(weights)
 
 
@@ -325,45 +332,85 @@ def find_containing_triangle(
     point_cartesian: np.ndarray,
     mesh_vertices: np.ndarray,
     mesh_faces: np.ndarray,
+    face_centroids: np.ndarray = None,  # Precomputed
+    centroid_tree: KDTree = None,  #Precomputed
+    k_candidates: int = 10,
 ):
     """
-    Find the triangle containing a point on the sphere.
-    Used for mesh-to-grid (m2g) connectivity.
+    Optimized triangle containment using spatial indexing.
     
     Args:
         point_cartesian: (3,) cartesian point on sphere
         mesh_vertices: (N_mesh, 3) mesh vertices
         mesh_faces: (M, 3) face indices
+        face_centroids: Precomputed centroids of faces
+        centroid_tree: Precomputed KDTree on centroids
+        k_candidates: Number of candidate faces to check
         
     Returns:
         tuple: (face_index, barycentric_weights) or (None, None) if not found
     """
-    # Normalize point (should already be on sphere, but just in case)
+
     point_norm = point_cartesian / np.linalg.norm(point_cartesian)
+    # Fallback: compute centroids and tree if not provided
+    if face_centroids is None or centroid_tree is None:
+        face_centroids = mesh_vertices[mesh_faces].mean(axis=1)
+        centroid_tree = KDTree(face_centroids)
+    
+
+    # Get candidate faces from spatial index
+    candidate_indices = centroid_tree.query(point_norm, k=k_candidates)[1]
     
     best_face = None
     best_weights = None
     best_sum = float('inf')
     
-    for face_idx, face in enumerate(mesh_faces):
+    # Only check candidate faces
+    for face_idx in candidate_indices:
+        face = mesh_faces[face_idx]
         a, b, c = mesh_vertices[face]
         
-        # Check if point is in spherical triangle using barycentric coordinates
-        # Convert to 3D barycentric with normalization
-        matrix = np.column_stack([a, b, c])
-        try:
-            weights = np.linalg.solve(matrix, point_norm)
-            # Weights should be positive and sum to ~1
-            if np.all(weights >= -0.01) and np.all(weights <= 1.01):
-                weight_sum = np.sum(weights)
+        # Optional: Use barycentric with cross products instead of solve
+        # This is even faster than np.linalg.solve
+        weights = barycentric_coordinates(point_norm, a, b, c)
+        
+        if weights is not None and np.all(weights >= -0.01) and np.all(weights <= 1.01):
+            weight_sum = np.sum(weights)
+            if abs(weight_sum - 1.0) < 1e-6:
+                return face_idx, weights / weight_sum
+            else:
                 if abs(weight_sum - 1.0) < abs(best_sum - 1.0):
                     best_sum = weight_sum
                     best_face = face_idx
-                    best_weights = weights / weight_sum  # Normalize
-        except np.linalg.LinAlgError:
-            continue
+                    best_weights = weights / weight_sum
     
     return best_face, best_weights
+
+def barycentric_coordinates(p, a, b, c):
+    """
+    Compute barycentric coordinates using cross products (no matrix solve).
+    Much faster than np.linalg.solve.
+    """
+    v0 = b - a
+    v1 = c - a
+    v2 = p - a
+    
+    d00 = np.dot(v0, v0)
+    d01 = np.dot(v0, v1)
+    d11 = np.dot(v1, v1)
+    d20 = np.dot(v2, v0)
+    d21 = np.dot(v2, v1)
+    
+    denom = d00 * d11 - d01 * d01
+    if abs(denom) < 1e-12:
+        return None
+    
+    v = (d11 * d20 - d01 * d21) / denom
+    w = (d00 * d21 - d01 * d20) / denom
+    u = 1.0 - v - w
+    
+    return np.array([u, v, w])
+
 
 def generate_icosahedral_mesh(refinement_level: int, radius: float = 1.0):
     """
