@@ -1,0 +1,307 @@
+"""
+Tests for :class:`weather_model_graphs.spatial.SpatialCoordinateValuesSelector`.
+
+Covers:
+- Initialisation (valid / invalid metric)
+- Euclidean k-nearest-to and with_radius queries
+- Haversine k-nearest-to and with_radius queries (distances in metres)
+- Factory method SpatialCoordinateValuesSelector.for_crs()
+- Warning emitted for rectilinear mesh + geographic CRS in create_all_graph_components
+"""
+
+import warnings
+
+import cartopy.crs as ccrs
+import numpy as np
+import pyproj
+import pytest
+
+import weather_model_graphs as wmg
+from weather_model_graphs.spatial import SpatialCoordinateValuesSelector
+
+
+# Fixtures
+@pytest.fixture()
+def simple_euclidean_coords():
+    """Five points on a horizontal line: x = 0, 1, 2, 3, 4; y = 0."""
+    return np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0]])
+
+
+@pytest.fixture()
+def simple_geo_coords():
+    """Five lon/lat points along the equator (y = 0 °), 0–40 ° longitude."""
+    return np.array(
+        [[0.0, 0.0], [10.0, 0.0], [20.0, 0.0], [30.0, 0.0], [40.0, 0.0]]
+    )
+
+
+# Initialisation
+class TestInit:
+    def test_euclidean_metric_stored(self, simple_euclidean_coords):
+        sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
+        assert sel.distance_metric == "euclidean"
+
+    def test_haversine_metric_stored(self, simple_geo_coords):
+        sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
+        assert sel.distance_metric == "haversine"
+
+    def test_invalid_metric_raises(self, simple_euclidean_coords):
+        with pytest.raises(ValueError, match="distance_metric must be one of"):
+            SpatialCoordinateValuesSelector("manhattan", simple_euclidean_coords)
+
+    def test_coords_stored_as_float_array(self, simple_euclidean_coords):
+        sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
+        assert sel._coords.dtype == np.float64
+
+
+# Euclidean – k_nearest_to
+class TestEuclideanKNearest:
+    def test_self_distance_is_zero(self, simple_euclidean_coords):
+        sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
+        idxs, dists = sel.k_nearest_to([0.0, 0.0], k=1)
+        assert idxs[0] == 0
+        assert dists[0] == pytest.approx(0.0)
+
+    def test_nearest_of_two(self):
+        coords = np.array([[0.0, 0.0], [10.0, 0.0]])
+        sel = SpatialCoordinateValuesSelector("euclidean", coords)
+        idxs, dists = sel.k_nearest_to([3.0, 0.0], k=1)
+        assert idxs[0] == 0  # [0,0] is closer than [10,0]
+
+    def test_k_neighbours_returned(self, simple_euclidean_coords):
+        sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
+        idxs, dists = sel.k_nearest_to([2.0, 0.0], k=3)
+        assert len(idxs) == 3
+        assert len(dists) == 3
+
+    def test_distances_sorted_ascending(self, simple_euclidean_coords):
+        sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
+        idxs, dists = sel.k_nearest_to([0.5, 0.0], k=3)
+        assert list(dists) == sorted(dists)
+
+    def test_known_euclidean_distance(self):
+        # Two points: (0,0) and (3,4) – distance = 5
+        coords = np.array([[0.0, 0.0], [3.0, 4.0]])
+        sel = SpatialCoordinateValuesSelector("euclidean", coords)
+        idxs, dists = sel.k_nearest_to([0.0, 0.0], k=2)
+        assert dists[1] == pytest.approx(5.0)
+
+
+# Euclidean – with_radius
+class TestEuclideanWithRadius:
+    def test_returns_points_within_radius(self, simple_euclidean_coords):
+        sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
+        idxs, dists = sel.with_radius([2.0, 0.0], radius=1.5)
+        # should include indices 1, 2, 3  (x=1, 2, 3)
+        assert set(idxs) == {1, 2, 3}
+
+    def test_excludes_points_beyond_radius(self, simple_euclidean_coords):
+        sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
+        idxs, _ = sel.with_radius([2.0, 0.0], radius=0.5)
+        assert set(idxs) == {2}
+
+    def test_distances_within_radius(self, simple_euclidean_coords):
+        sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
+        idxs, dists = sel.with_radius([2.0, 0.0], radius=1.5)
+        # All returned distances must be ≤ radius
+        assert all(d <= 1.5 + 1e-9 for d in dists)
+
+    def test_zero_radius_returns_only_self(self, simple_euclidean_coords):
+        sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
+        idxs, dists = sel.with_radius([1.0, 0.0], radius=0.0)
+        assert set(idxs) == {1}
+        assert dists[0] == pytest.approx(0.0)
+
+
+
+# Haversine – k_nearest_to
+class TestHaversineKNearest:
+    def test_self_distance_is_zero(self, simple_geo_coords):
+        sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
+        idxs, dists = sel.k_nearest_to([0.0, 0.0], k=1)
+        assert idxs[0] == 0
+        assert dists[0] == pytest.approx(0.0, abs=1e-3)
+
+    def test_distances_in_metres(self, simple_geo_coords):
+        """10° longitude at equator ≈ 1,111,945 m (great-circle)."""
+        sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
+        idxs, dists = sel.k_nearest_to([0.0, 0.0], k=2)
+        # nearest is self (0 m), second is [10, 0] ≈ 1,111,945 m
+        expected_m = np.deg2rad(10.0) * 6_371_000.0
+        assert dists[1] == pytest.approx(expected_m, rel=1e-4)
+
+    def test_distances_larger_than_euclidean(self):
+        """For geographic coords, haversine distances are in metres and
+        therefore much larger than the raw degree-difference."""
+        coords = np.array([[0.0, 0.0], [1.0, 0.0]])
+        sel_hav = SpatialCoordinateValuesSelector("haversine", coords)
+        sel_euc = SpatialCoordinateValuesSelector("euclidean", coords)
+        _, d_hav = sel_hav.k_nearest_to([0.0, 0.0], k=2)
+        _, d_euc = sel_euc.k_nearest_to([0.0, 0.0], k=2)
+        # Haversine dist ≈ 111_195 m >> euclidean dist = 1 (degree)
+        assert d_hav[1] > d_euc[1] * 100
+
+
+# Haversine – with_radius
+class TestHaversineWithRadius:
+    def test_radius_in_metres_inclusive(self, simple_geo_coords):
+        """Points at 0° and 10° lon are ~1,111,945 m apart.
+        A radius of 1.2e6 m from the origin should include both."""
+        sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
+        radius_m = 1.2e6
+        idxs, dists = sel.with_radius([0.0, 0.0], radius=radius_m)
+        assert 0 in idxs  # self
+        assert 1 in idxs  # 10° lon ≈ 1.11e6 m away
+
+    def test_radius_in_metres_exclusive(self, simple_geo_coords):
+        """A radius of 0.5e6 m from the origin should include only the origin."""
+        sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
+        radius_m = 0.5e6
+        idxs, _ = sel.with_radius([0.0, 0.0], radius=radius_m)
+        assert set(idxs) == {0}
+
+
+
+# Factory: for_crs
+class TestForCrs:
+    def test_geographic_crs_gives_haversine(self):
+        coords = np.random.default_rng(0).random((10, 2))
+        # pyproj.CRS('EPSG:4326') is a true geographic CRS: is_geographic=True
+        sel = SpatialCoordinateValuesSelector.for_crs(pyproj.CRS("EPSG:4326"), coords)
+        assert sel.distance_metric == "haversine"
+
+    def test_projected_crs_gives_euclidean(self):
+        coords = np.random.default_rng(0).random((10, 2)) * 1e6
+        sel = SpatialCoordinateValuesSelector.for_crs(ccrs.LambertConformal(), coords)
+        assert sel.distance_metric == "euclidean"
+
+    def test_mollweide_projected_gives_euclidean(self):
+        coords = np.random.default_rng(0).random((10, 2)) * 1e6
+        sel = SpatialCoordinateValuesSelector.for_crs(ccrs.Mollweide(), coords)
+        assert sel.distance_metric == "euclidean"
+
+    def test_equivalent_to_manual_construction_euclidean(self):
+        """for_crs on a projected CRS should produce the same results as the
+        manually constructed euclidean selector."""
+        rng = np.random.default_rng(1)
+        coords = rng.random((20, 2)) * 1e5
+        query = [5e4, 5e4]
+        sel_factory = SpatialCoordinateValuesSelector.for_crs(ccrs.LambertConformal(), coords)
+        sel_manual = SpatialCoordinateValuesSelector("euclidean", coords)
+        idxs_f, dists_f = sel_factory.k_nearest_to(query, k=3)
+        idxs_m, dists_m = sel_manual.k_nearest_to(query, k=3)
+        np.testing.assert_array_equal(idxs_f, idxs_m)
+        np.testing.assert_allclose(dists_f, dists_m)
+
+
+
+# Integration: rectilinear + geographic warning
+class TestRectilinearGeographicWarning:
+    """
+    When create_all_graph_components is called with a geographic graph_crs and
+    a rectilinear m2m_connectivity, a UserWarning should be raised.
+    """
+
+    def _make_lonlat_coords(self, n=10):
+        lon = np.linspace(-10.0, 10.0, n)
+        lat = np.linspace(50.0, 60.0, n)
+        lo, la = np.meshgrid(lon, lat)
+        return np.column_stack([lo.ravel(), la.ravel()])
+
+    @pytest.mark.parametrize("m2m", ["flat", "flat_multiscale", "hierarchical"])
+    def test_warning_raised_for_geographic_crs(self, m2m):
+        # Use a 30x30 grid over a ~29-degree domain so hierarchical can build >=2 levels
+        lon = np.linspace(0.0, 29.0, 30)
+        lat = np.linspace(45.0, 74.0, 30)
+        lo, la = np.meshgrid(lon, lat)
+        large_coords = np.column_stack([lo.ravel(), la.ravel()])
+
+        # pyproj EPSG:4326 has is_geographic=True → triggers warning
+        geo_crs = pyproj.CRS("EPSG:4326")
+
+        kwargs = dict(
+            coords=large_coords,
+            m2m_connectivity=m2m,
+            g2m_connectivity="nearest_neighbour",
+            m2g_connectivity="nearest_neighbour",
+            graph_crs=geo_crs,
+        )
+        if m2m == "flat":
+            kwargs["m2m_connectivity_kwargs"] = dict(mesh_node_distance=3)
+        elif m2m == "flat_multiscale":
+            kwargs["m2m_connectivity_kwargs"] = dict(
+                max_num_levels=2, mesh_node_distance=3, level_refinement_factor=3
+            )
+        elif m2m == "hierarchical":
+            kwargs["m2m_connectivity_kwargs"] = dict(
+                max_num_levels=2, mesh_node_distance=3, level_refinement_factor=3
+            )
+        with pytest.warns(UserWarning, match="rectilinear"):
+            wmg.create.create_all_graph_components(**kwargs)
+
+    def test_no_warning_for_projected_crs(self):
+        """No UserWarning for a projected CRS."""
+        # Use a small Cartesian grid (pretend it's in some projected CRS)
+        coords = np.column_stack([
+            np.linspace(0, 1e5, 20), np.linspace(0, 1e5, 20)
+        ])
+
+        class _FakeProjectedCRS:
+            """Minimal projected CRS stub."""
+            is_geographic = False
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            # Should *not* raise
+            wmg.create.create_all_graph_components(
+                coords=coords,
+                m2m_connectivity="flat",
+                m2m_connectivity_kwargs=dict(mesh_node_distance=3000),
+                g2m_connectivity="nearest_neighbour",
+                m2g_connectivity="nearest_neighbour",
+                graph_crs=_FakeProjectedCRS(),
+            )
+
+
+# Integration: graph creation uses correct metric end-to-end
+class TestIntegrationGraphCreation:
+    """
+    Smoke-test that graph creation completes without error when a geographic
+    CRS is supplied, and that the haversine-based edge lengths are physically
+    reasonable (order of ~10^5 – 10^6 m for a ~10° domain).
+    """
+
+    def _make_lonlat_coords(self, n=8):
+        lon = np.linspace(0.0, 9.0, n)
+        lat = np.linspace(50.0, 59.0, n)
+        lo, la = np.meshgrid(lon, lat)
+        return np.column_stack([lo.ravel(), la.ravel()])
+
+    def test_graph_created_with_geographic_crs(self):
+        coords = self._make_lonlat_coords()
+        # pyproj EPSG:4326 has is_geographic=True → haversine metric used, warning raised
+        with pytest.warns(UserWarning, match="rectilinear"):
+            G = wmg.create.create_all_graph_components(
+                coords=coords,
+                m2m_connectivity="flat",
+                m2m_connectivity_kwargs=dict(mesh_node_distance=3),
+                g2m_connectivity="nearest_neighbour",
+                m2g_connectivity="nearest_neighbour",
+                graph_crs=pyproj.CRS("EPSG:4326"),
+                return_components=False,
+            )
+        # The g2m / m2g edges use haversine (distances in metres).
+        # The m2m internal mesh edges still use Euclidean (degrees) because
+        # create_single_level_2d_mesh_graph does not receive the CRS.
+        g2m_m2g_lens = [
+            d["len"]
+            for _, _, d in G.edges(data=True)
+            if d.get("component") in ("g2m", "m2g") and "len" in d
+        ]
+        assert len(g2m_m2g_lens) > 0, "Expected g2m/m2g edges with 'len' attribute"
+        # For a ~9 degree domain, haversine edge lengths should be >> 1 km
+        # (confirms the distances are in metres, not degrees)
+        assert all(1e3 < l < 2e6 for l in g2m_m2g_lens), (
+            f"g2m/m2g edge lengths out of expected haversine range: "
+            f"min={min(g2m_m2g_lens):.0f} m, max={max(g2m_m2g_lens):.0f} m"
+        )
