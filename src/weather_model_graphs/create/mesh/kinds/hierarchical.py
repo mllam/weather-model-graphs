@@ -1,7 +1,7 @@
 import networkx
 import numpy as np
-import scipy
 
+from ....spatial import SpatialCoordinateValuesSelector
 from ....networkx_utils import prepend_node_index
 from .. import mesh as mesh_graph
 
@@ -11,6 +11,7 @@ def create_hierarchical_multiscale_mesh_graph(
     mesh_node_distance: float,
     level_refinement_factor: float,
     max_num_levels: int,
+    distance_metric: str = "euclidean",
 ):
     """
     Create a hierarchical multiscale mesh graph with nearest neighbour
@@ -31,6 +32,10 @@ def create_hierarchical_multiscale_mesh_graph(
         Refinement factor between grid points and bottom level of mesh hierarchy
     max_num_levels: int
         The number of levels in the hierarchical mesh graph.
+    distance_metric : {'euclidean', 'haversine'}, default 'euclidean'
+        Distance metric used when computing inter-level nearest-neighbour edges
+        and storing edge ``"len"`` attributes.  Pass ``'haversine'`` when *xy*
+        contains longitude/latitude coordinates (geographic CRS).
 
     Returns
     -------
@@ -85,22 +90,26 @@ def create_hierarchical_multiscale_mesh_graph(
         # Add nodes of to level
         G_down.add_nodes_from(G_to.nodes(data=True))
 
-        # build kd tree for mesh point pos
+        # build spatial index for source (coarser) mesh node positions
         # order in vm should be same as in vm_xy
         v_to_list = list(G_to.nodes)
         v_from_list = list(G_from.nodes)
         v_from_xy = np.array([xy for _, xy in G_from.nodes.data("pos")])
-        kdt_m = scipy.spatial.KDTree(v_from_xy)
+        spatial_idx = SpatialCoordinateValuesSelector(distance_metric, v_from_xy)
 
         # add edges from mesh to grid
         for v in v_to_list:
-            # find 1(?) nearest neighbours (index to vm_xy)
-            neigh_idx = kdt_m.query(G_down.nodes[v]["pos"], 1)[1]
+            # find nearest neighbour in coarser level
+            neigh_idxs, neigh_dists = spatial_idx.k_nearest_to(
+                G_down.nodes[v]["pos"], k=1
+            )
+            neigh_idx = int(neigh_idxs[0])
+            d = float(neigh_dists[0])
             u = v_from_list[neigh_idx]
 
             # add edge from mesh to grid
             G_down.add_edge(u, v)
-            d = np.sqrt(np.sum((G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]) ** 2))
+            d_euclidean = np.sqrt(np.sum((G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]) ** 2))
             G_down.edges[u, v]["len"] = d
             G_down.edges[u, v]["vdiff"] = (
                 G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]
