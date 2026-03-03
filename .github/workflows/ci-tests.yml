@@ -1,7 +1,7 @@
-# cicd workflow for running tests with pytest
-# needs to first install pdm, then install torch cpu manually and then install the package
-# then run the tests
-
+# CI/CD workflow to run test suite using pytest
+# Installs project dependencies using PDM
+# Torch (CPU version) is installed separately due to custom wheel source
+# Finally, runs the test suite to validate functionality
 name: tests
 
 on: [push, pull_request]
@@ -9,14 +9,19 @@ on: [push, pull_request]
 jobs:
   tests:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v2
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          python-version: 3.8
+          python-version: ${{ matrix.python-version }}
 
       - name: Install pdm
         run: |
