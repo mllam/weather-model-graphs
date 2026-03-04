@@ -209,16 +209,32 @@ def connect_grid_to_mesh(grid_lat_lon, mesh_vertices, mesh_faces, radius_factor=
     # KD-tree for mesh vertices
     tree = KDTree(mesh_vertices)
     
-    # Query for each grid point
-    grid_indices, mesh_indices = [], []
-    for i, point in enumerate(grid_cartesian):
-        neighbors = tree.query_ball_point(point, query_radius)
+    # VECTORIZED: Query all points at once
+    # Returns a list of lists, but we can process efficiently
+    neighbor_lists = tree.query_ball_point(grid_cartesian, query_radius)
+    
+    # Use numpy operations to build the edge index
+    # Count total connections
+    total_connections = sum(len(neighbors) for neighbors in neighbor_lists)
+    
+    if total_connections == 0:
+        return np.array([[], []])  # Empty edge index
+    
+    # Pre-allocate arrays
+    grid_indices = np.zeros(total_connections, dtype=int)
+    mesh_indices = np.zeros(total_connections, dtype=int)
+    
+    # Fill arrays using cumulative indexing
+    start_idx = 0
+    for i, neighbors in enumerate(neighbor_lists):
         if neighbors:
-            grid_indices.extend([i] * len(neighbors))
-            mesh_indices.extend(neighbors)
+            n_neighbors = len(neighbors)
+            end_idx = start_idx + n_neighbors
+            grid_indices[start_idx:end_idx] = i
+            mesh_indices[start_idx:end_idx] = neighbors
+            start_idx = end_idx
     
     return np.array([grid_indices, mesh_indices])
-
 
 def connect_mesh_to_grid(mesh_vertices, mesh_faces, grid_lat_lon, fallback_to_nearest=True):
     """
