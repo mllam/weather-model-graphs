@@ -36,64 +36,89 @@ def create_all_graph_components(
     m2m_connectivity: str,
     m2g_connectivity: str,
     g2m_connectivity: str,
-    m2m_connectivity_kwargs={},
-    m2g_connectivity_kwargs={},
-    g2m_connectivity_kwargs={},
+    mesh_layout_kwargs: dict = {},
+    m2m_connectivity_kwargs: dict = {},
+    m2g_connectivity_kwargs: dict = {},
+    g2m_connectivity_kwargs: dict = {},
     coords_crs: pyproj.crs.CRS | None = None,
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
+    mesh_layout: str = "rectilinear",  
 ):
     """
     Create all graph components used in creating the message-passing graph,
         grid-to-mesh (g2m), mesh-to-mesh (m2m) and mesh-to-grid (m2g),
     representing the encode-process-decode respectively.
 
-    For each graph component, the method for connecting nodes across graphs
-    should be specified (with the `*_connectivity` arguments, e.g. `m2g_connectivity`).
-    And the method-specific arguments should be passed as keyword arguments using
-    the `*_connectivity_kwargs` arguments (e.g. `m2g_connectivity_kwargs`).
+    Parameters
+    ----------
+    coords : np.ndarray
+        Grid point coordinates, shape [num_grid_nodes, 2]
+    mesh_layout : str, default="rectilinear"
+        Type of mesh to create. Options:
+        - "rectilinear": Regular 2D grid mesh
+        - "icosahedral": Spherical icosahedral mesh for global domains
+    m2m_connectivity : str
+        Method for mesh-to-mesh connections
+    m2g_connectivity : str
+        Method for mesh-to-grid connections
+    g2m_connectivity : str
+        Method for grid-to-mesh connections
+    mesh_layout_kwargs : dict, optional
+        Keyword arguments for mesh layout creation.
+        For "icosahedral" layout:
+        - subdivisions : int (default=3) - Refinement level for flat mesh
+        - max_subdivisions : int (default=3) - Max refinement for hierarchical
+        - hierarchical : bool (default=False) - Use hierarchical mesh
+        - radius : float (default=1.0) - Sphere radius
+        - grid_spacing : float, optional - Desired grid spacing in degrees
+          (alternative to subdivisions/max_subdivisions)
+    m2m_connectivity_kwargs : dict, optional
+        Keyword arguments for mesh-to-mesh connectivity method
+    m2g_connectivity_kwargs : dict, optional
+        Keyword arguments for mesh-to-grid connectivity method
+    g2m_connectivity_kwargs : dict, optional
+        Keyword arguments for grid-to-mesh connectivity method
+    coords_crs : pyproj.crs.CRS, optional
+        Coordinate reference system of input coordinates
+    graph_crs : pyproj.crs.CRS, optional
+        Coordinate reference system for graph construction
+    decode_mask : Iterable[bool], optional
+        Mask for which grid nodes to include in m2g (decode step)
+    return_components : bool, default=False
+        If True, return dict of component graphs instead of merged graph
 
-    The following methods are available for connecting nodes across graphs:
+    Returns
+    -------
+    networkx.DiGraph or dict
+        Either merged graph or dict of component graphs
+
+    Notes
+    -----
+    Available connectivity methods:
 
     g2m_connectivity:
-    - "nearest_neighbour": Find the nearest neighbour in grid for each node in mesh
-    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in grid for each node in mesh
-    - "within_radius": Find all neighbours in grid within an absolute distance
-        of `max_dist` or relative distance of `rel_max_dist` from each node in mesh
+    - "nearest_neighbour": Find nearest neighbour in grid for each mesh node
+    - "nearest_neighbours": Find k nearest neighbours in grid for each mesh node
+    - "within_radius": Find all grid nodes within radius of each mesh node
 
-    m2m_connectivity:
-    - "flat": Create a single-level 2D mesh graph with `mesh_node_distance`,
-        similar to Keisler et al. (2022)
-    - "flat_multiscale": Create a flat multiscale mesh graph with `max_num_levels`,
-        `mesh_node_distance` and `level_refinement_factor`,
-        similar to GraphCast, Lam et al. (2023)
-    - "hierarchical": Create a hierarchical mesh graph with `max_num_levels`,
-        `mesh_node_distance` and `level_refinement_factor`,
-        similar to Oskarsson et al. (2023)
+    m2m_connectivity (for mesh_layout="rectilinear"):
+    - "flat": Single-level 2D mesh graph
+    - "flat_multiscale": Flat multiscale mesh with multiple levels
+    - "hierarchical": Hierarchical mesh with up/down connections
+
+    m2m_connectivity (for mesh_layout="icosahedral"):
+    - "flat": Single-level icosahedral mesh (ignored, mesh determines connectivity)
+    - "hierarchical": Multi-level icosahedral mesh with inter-level connections
 
     m2g_connectivity:
-    - "nearest_neighbour": Find the nearest neighbour in mesh for each node in grid
-    - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in mesh for each node in grid
-    - "within_radius": Find all neighbours in mesh within an absolute distance
-        of `max_dist` or relative distance of `rel_max_dist` from each node in grid
-    - "containing_rectangle": For each grid node, find the rectangle with 4 mesh nodes as corners
-        such that the grid node is contained within it. Connect these 4 (or less along edges)
-        mesh nodes to the grid node.
-
-    `coords_crs` and `graph_crs` should either be a pyproj.crs.CRS or None.
-    Note that this includes a cartopy.crs.CRS. If both are given the coordinates
-    will be transformed from their original Coordinate Reference System (`coords_crs`)
-    to the CRS where the graph creation should take place (`graph_crs`).
-    If any one of them is None the graph creation is carried out using the original coords.
-
-    `decode_mask` should be an Iterable of booleans, masking which grid positions should be
-    decoded to (included in the m2g subgraph), i.e. which positions should be output. It should have the same length as the number of
-    grid position coordinates given in `coords`.  The mask being set to True means that corresponding
-    grid nodes should be included in g2m. If `decode_mask=None` (default), all grid nodes are included.
-
-    `return_components` is a boolean flag, if True the function returns a dict with
-    m2g, m2m and g2m as separate graphs. If false returns one combined graph.
+    - "nearest_neighbour": Find nearest mesh node for each grid node
+    - "nearest_neighbours": Find k nearest mesh nodes for each grid node
+    - "within_radius": Find all mesh nodes within radius of each grid node
+    - "containing_rectangle": Find containing rectangle in rectilinear mesh
+    - "containing_triangle": Find containing triangle in icosahedral mesh
+      (requires mesh_layout="icosahedral")
     """
     graph_components: dict[networkx.DiGraph] = {}
 
@@ -102,7 +127,7 @@ def create_all_graph_components(
     ), "Grid node coordinates should be given as an array of shape [num_grid_nodes, 2]."
 
     # Translate between coordinate crs and crs to use for graph creation
-    if coords_crs is None and coords_crs is None:
+    if coords_crs is None and graph_crs is None:
         logger.debug(
             "No `coords_crs` given: Assuming `coords` contains in-projection Cartesian coordinates."
         )
@@ -118,43 +143,51 @@ def create_all_graph_components(
         logger.debug(
             f"Projecting coords from CRS({coords_crs}) to CRS({graph_crs}) for graph creation."
         )
-        # Convert from coords_crs to to graph_crs
+        # Convert from coords_crs to graph_crs
         coord_transformer = pyproj.Transformer.from_crs(
             coords_crs, graph_crs, always_xy=True
         )
         xy_tuple = coord_transformer.transform(xx=coords[:, 0], yy=coords[:, 1])
         xy = np.stack(xy_tuple, axis=1)
 
-    if m2m_connectivity == "flat":
-        graph_components["m2m"] = create_flat_singlescale_mesh_graph(
-            xy,
-            **m2m_connectivity_kwargs,
-        )
-        grid_connect_graph = graph_components["m2m"]
-    elif m2m_connectivity == "hierarchical":
-        # hierarchical mesh graph have three sub-graphs:
-        # `m2m` (mesh-to-mesh), `mesh_up` (up edge connections) and `mesh_down` (down edge connections)
-        graph_components["m2m"] = create_hierarchical_multiscale_mesh_graph(
-            xy=xy,
-            **m2m_connectivity_kwargs,
-        )
-        # Only connect grid to bottom level of hierarchy
-        grid_connect_graph = split_graph_by_edge_attribute(
-            graph_components["m2m"], "level"
-        )[0]
-    elif m2m_connectivity == "flat_multiscale":
-        graph_components["m2m"] = create_flat_multiscale_mesh_graph(
-            xy=xy,
-            **m2m_connectivity_kwargs,
-        )
-        grid_connect_graph = graph_components["m2m"]
-    elif m2m_connectivity == "icosahedral":
+    # Create mesh graph based on mesh_layout
+    
+    if mesh_layout == "rectilinear":
+        # Original rectilinear mesh creation logic
+        if m2m_connectivity == "flat":
+            graph_components["m2m"] = create_flat_singlescale_mesh_graph(
+                xy,
+                **m2m_connectivity_kwargs,
+            )
+            grid_connect_graph = graph_components["m2m"]
+        elif m2m_connectivity == "hierarchical":
+            graph_components["m2m"] = create_hierarchical_multiscale_mesh_graph(
+                xy=xy,
+                **m2m_connectivity_kwargs,
+            )
+            grid_connect_graph = split_graph_by_edge_attribute(
+                graph_components["m2m"], "level"
+            )[0]
+        elif m2m_connectivity == "flat_multiscale":
+            graph_components["m2m"] = create_flat_multiscale_mesh_graph(
+                xy=xy,
+                **m2m_connectivity_kwargs,
+            )
+            grid_connect_graph = graph_components["m2m"]
+        else:
+            raise ValueError(
+                f"Unknown m2m_connectivity '{m2m_connectivity}' for mesh_layout='rectilinear'"
+            )
+    
+    elif mesh_layout == "icosahedral":
         from weather_model_graphs.create.mesh.layouts.icosahedral import (
             create_flat_icosahedral_mesh_graph,
             generate_icosahedral_mesh,
             create_hierarchical_icosahedral_mesh_graph,
+            refinement_level_from_grid_spacing,
         )
 
+        # Issue #8: CRS warning
         if graph_crs is not None and not graph_crs.is_geographic:
             warnings.warn(
                 "Icosahedral mesh is designed for geographic coordinates. "
@@ -162,41 +195,52 @@ def create_all_graph_components(
                 UserWarning
             )
 
-        if m2m_connectivity_kwargs.get("hierarchical", False):
-            max_subdivisions = m2m_connectivity_kwargs.get("max_subdivisions", 3)
-            radius = m2m_connectivity_kwargs.get("radius", 1.0)
+        # Extract mesh parameters
+        radius = mesh_layout_kwargs.get("radius", 1.0)
+        grid_spacing = mesh_layout_kwargs.get("grid_spacing")
+        hierarchical = mesh_layout_kwargs.get("hierarchical", False)
+        
+        # Issue #6: Handle grid_spacing vs explicit refinement level
+        if grid_spacing is not None:
+            # Check for conflict
+            if "subdivisions" in mesh_layout_kwargs or "max_subdivisions" in mesh_layout_kwargs:
+                raise ValueError(
+                    "Cannot specify both grid_spacing and subdivisions/max_subdivisions. "
+                    "Choose one method."
+                )
+            
+            # Convert grid_spacing to refinement level
+            refinement_level = refinement_level_from_grid_spacing(grid_spacing, radius)
+            
+            if hierarchical:
+                mesh_layout_kwargs["max_subdivisions"] = refinement_level
+                logger.debug(f"grid_spacing={grid_spacing}° mapped to max_subdivisions={refinement_level}")
+            else:
+                mesh_layout_kwargs["subdivisions"] = refinement_level
+                logger.debug(f"grid_spacing={grid_spacing}° mapped to subdivisions={refinement_level}")
+        
+        # Create mesh based on hierarchical flag
+        if hierarchical:
+            max_subdivisions = mesh_layout_kwargs.get("max_subdivisions", 3)
             
             graph_components["m2m"] = create_hierarchical_icosahedral_mesh_graph(
                 max_subdivisions=max_subdivisions,
                 radius=radius,
             )
-
+            
             # Connect grid to finest level only
             grid_connect_graph = split_graph_by_edge_attribute(
                 graph_components["m2m"], "level"
             )[0]
             
-            # Store mesh geometry for the finest level (for containing_triangle method)
+            # Store mesh geometry for containing_triangle method
             finest_vertices, finest_faces = generate_icosahedral_mesh(
                 refinement_level=max_subdivisions,
                 radius=radius
             )
-            grid_connect_graph.graph["mesh_vertices"] = finest_vertices
-            grid_connect_graph.graph["mesh_faces"] = finest_faces
-            
-            # Also store in the main graph for reference
-            graph_components["m2m"].graph["mesh_vertices_by_level"] = [
-                generate_icosahedral_mesh(level, radius)[0] 
-                for level in range(max_subdivisions + 1)
-            ]
-            graph_components["m2m"].graph["mesh_faces_by_level"] = [
-                generate_icosahedral_mesh(level, radius)[1] 
-                for level in range(max_subdivisions + 1)
-            ]
             
         else:
-            subdivisions = m2m_connectivity_kwargs.get("subdivisions", 3)
-            radius = m2m_connectivity_kwargs.get("radius", 1.0)
+            subdivisions = mesh_layout_kwargs.get("subdivisions", 3)
             
             graph_components["m2m"] = create_flat_icosahedral_mesh_graph(
                 subdivisions=subdivisions,
@@ -204,28 +248,35 @@ def create_all_graph_components(
             )
             grid_connect_graph = graph_components["m2m"]
             
-            # Store mesh geometry (for containing_triangle method)
-            vertices, faces = generate_icosahedral_mesh(
+            # Store mesh geometry
+            finest_vertices, finest_faces = generate_icosahedral_mesh(
                 refinement_level=subdivisions,
                 radius=radius
             )
-            grid_connect_graph.graph["mesh_vertices"] = vertices
-            grid_connect_graph.graph["mesh_faces"] = faces
-            
-            # Also store in the main graph
-            graph_components["m2m"].graph["mesh_vertices"] = vertices
-            graph_components["m2m"].graph["mesh_faces"] = faces
+        
+        # Store geometry in graph attributes (for containing_triangle method)
+        grid_connect_graph.graph["mesh_vertices"] = finest_vertices
+        grid_connect_graph.graph["mesh_faces"] = finest_faces
+        graph_components["m2m"].graph["mesh_vertices"] = finest_vertices
+        graph_components["m2m"].graph["mesh_faces"] = finest_faces
+        
+        # Also store CRS in graph for downstream checks
+        if graph_crs is not None:
+            graph_components["m2m"].graph["crs"] = graph_crs
+            grid_connect_graph.graph["crs"] = graph_crs
+    
     else:
-        graph_components["m2m"] = create_flat_icosahedral_mesh_graph(
-            subdivisions=m2m_connectivity_kwargs.get("subdivisions", 3),
-            radius=m2m_connectivity_kwargs.get("radius", 1.0),
+        raise ValueError(
+            f"Unknown mesh_layout '{mesh_layout}'. "
+            "Supported: 'rectilinear', 'icosahedral'"
         )
-        grid_connect_graph = graph_components["m2m"]
-    # else:
-    #     raise NotImplementedError(f"Kind {m2m_connectivity} not implemented")
 
+    # Create grid graph
     G_grid = create_grid_graph_nodes(xy=xy)
+    if graph_crs is not None:
+        G_grid.graph["crs"] = graph_crs
 
+    # Create grid-to-mesh (g2m) connections
     G_g2m = connect_nodes_across_graphs(
         G_source=G_grid,
         G_target=grid_connect_graph,
@@ -234,48 +285,75 @@ def create_all_graph_components(
     )
     graph_components["g2m"] = G_g2m
 
+    # Handle decode mask for mesh-to-grid (m2g) connections
     if decode_mask is None:
-        # decode to all grid nodes
         decode_grid = G_grid
     else:
-        # Select subset of grid nodes to decode to, where m2g should connect
         filter_nodes = [
             n for n, include in zip(G_grid.nodes, decode_mask, strict=True) if include
         ]
         decode_grid = G_grid.subgraph(filter_nodes)
 
-    G_m2g = connect_nodes_across_graphs(
-        G_source=grid_connect_graph,
-        G_target=decode_grid,
-        method=m2g_connectivity,
-        **m2g_connectivity_kwargs,
-    )
+    # Create mesh-to-grid (m2g) connections
+    if m2g_connectivity == "containing_triangle":
+        if mesh_layout != "icosahedral":
+            raise ValueError(
+                f"containing_triangle method is only valid for mesh_layout='icosahedral'. "
+                f"Got mesh_layout='{mesh_layout}'"
+            )
+        
+        G_m2g = connect_nodes_across_graphs(
+            G_source=grid_connect_graph,
+            G_target=decode_grid,
+            method=m2g_connectivity,
+            mesh_vertices=grid_connect_graph.graph.get("mesh_vertices"),
+            mesh_faces=grid_connect_graph.graph.get("mesh_faces"),
+            **m2g_connectivity_kwargs,
+        )
+    elif m2g_connectivity == "containing_rectangle":
+        if mesh_layout != "rectilinear":
+            raise ValueError(
+                f"containing_rectangle method is only valid for mesh_layout='rectilinear'. "
+                f"Got mesh_layout='{mesh_layout}'"
+            )
+        G_m2g = connect_nodes_across_graphs(
+            G_source=grid_connect_graph,
+            G_target=decode_grid,
+            method=m2g_connectivity,
+            **m2g_connectivity_kwargs,
+        )
+    else:
+        G_m2g = connect_nodes_across_graphs(
+            G_source=grid_connect_graph,
+            G_target=decode_grid,
+            method=m2g_connectivity,
+            **m2g_connectivity_kwargs,
+        )
     graph_components["m2g"] = G_m2g
 
-    # add graph component identifier to each edge in each component graph
+    # Add component identifiers to edges
     for name, graph in graph_components.items():
         for edge in graph.edges:
             graph.edges[edge]["component"] = name
 
     if return_components:
-        # Because merging to a single graph and then splitting again leads to changes in node indexing when converting to `pyg.Data` objects (this in part is due to the to `m2g` and `g2m` having a different set of grid nodes) the ability to return the graph components (`g2m`, `m2m` and `m2g`) has been added here. See https://github.com/mllam/weather-model-graphs/pull/34#issuecomment-2507980752 for details
-        # Give each component unique ids
         graph_components = {
             comp_name: replace_node_labels_with_unique_ids(subgraph)
             for comp_name, subgraph in graph_components.items()
         }
         return graph_components
 
-    # merge to single graph
+    # Merge to single graph
     G_tot = networkx.compose_all(graph_components.values())
-    # only keep graph attributes that are the same for all components
+    
+    # Only keep graph attributes that are the same for all components
     for key in graph_components["m2m"].graph.keys():
         if not all(
             graph.graph.get(key, None) == graph_components["m2m"].graph[key]
             for graph in graph_components.values()
         ):
-            # delete
-            del G_tot.graph[key]
+            if key in G_tot.graph:
+                del G_tot.graph[key]
 
     G_tot = replace_node_labels_with_unique_ids(graph=G_tot)
 
