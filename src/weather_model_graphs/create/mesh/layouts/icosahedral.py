@@ -122,90 +122,90 @@ def create_hierarchical_icosahedral_mesh_graph(
     """
     mesh_list = create_hierarchy_of_icosahedral_meshes(max_subdivisions, radius)
     # mesh_list[0] = coarsest (12 nodes), mesh_list[-1] = finest (642 nodes at level 3)
-
-    # Start with finest mesh as the base graph (level = max_subdivisions)
-    DG = create_flat_icosahedral_mesh_graph(max_subdivisions, radius,
-                                            add_edge_length, add_edge_vector)
-    # Nodes 0..(N_finest-1) are already in DG at level=max_subdivisions (set by create_flat)
-    # Relabel their level correctly
-    for node in DG.nodes:
-        DG.nodes[node]["level"] = max_subdivisions
-    for u, v in DG.edges:
-        DG.edges[u, v]["level"] = max_subdivisions
-
-    node_offset = len(DG.nodes)  # = N_finest (e.g. 642)
-
-    # Add coarser levels: mesh_list[0..max_subdivisions-1]
-    for level, (vertices, faces) in enumerate(mesh_list[:-1]):
-        # level=0 -> coarsest (12 nodes), level=max_subdivisions-1 -> second finest
+    level_offsets = {}
+    current_offset = 0
+    # First, calculate offsets for all levels (from finest to coarsest)
+    for level in range(max_subdivisions, -1, -1):
+        level_offsets[level] = current_offset
+        vertices = mesh_list[level][0]
+        current_offset += len(vertices)
+        # Create empty directed graph
+    DG = nx.DiGraph()
+    
+    # Add all nodes from all levels
+    for level in range(max_subdivisions + 1):
+        vertices, faces = mesh_list[level]
         lat_lon = cartesian_to_lat_lon(vertices)
-        level_nodes = []
-
+        offset = level_offsets[level]
+        
         for i, (x, y, z) in enumerate(vertices):
-            node_id = node_offset + i
+            node_id = offset + i
             DG.add_node(
                 node_id,
                 pos=lat_lon[i],
                 pos3d=np.array([x, y, z]),
                 type="mesh",
-                level=level,           # correct level label
+                level=level,
             )
-            level_nodes.append(node_id)
-
-        # Intra-level edges
+    
+    # Add intra-level edges for each level
+    for level in range(max_subdivisions + 1):
+        vertices, faces = mesh_list[level]
+        offset = level_offsets[level]
+        
         for face in faces:
             for i in range(3):
                 for j in range(i + 1, 3):
-                    u, v = node_offset + face[i], node_offset + face[j]
+                    u = offset + face[i]
+                    v = offset + face[j]
                     if not DG.has_edge(u, v):
                         vec = DG.nodes[u]["pos3d"] - DG.nodes[v]["pos3d"]
                         dist = np.linalg.norm(vec)
                         DG.add_edge(u, v, len=dist, vdiff=vec, level=level)
                         DG.add_edge(v, u, len=dist, vdiff=-vec, level=level)
-
-        # Inter-level edges: connect this coarse level to the next finer level
-        # Next finer level = level+1, already in the graph
-        # Its nodes start at: offset_of_finer_level
-        if level == max_subdivisions - 1:
-            # Next finer is the finest mesh, nodes 0..N_finest-1
-            finer_start = 0
-            finer_vertices = mesh_list[max_subdivisions][0]
-        else:
-            # Next finer is mesh_list[level+1], added after this iteration
-            # We compute its future offset: node_offset + len(vertices) 
-            finer_start = node_offset + len(vertices)
-            finer_vertices = mesh_list[level + 1][0]
-
-        tree = KDTree(finer_vertices)
-        max_edge_len = compute_max_edge_length(finer_vertices, mesh_list[level + 1][1]
-                                               if level < max_subdivisions - 1
-                                               else mesh_list[max_subdivisions][1])
+    
+    # Add inter-level edges between consecutive levels
+    for coarse_level in range(max_subdivisions):
+        fine_level = coarse_level + 1
+        
+        coarse_vertices, coarse_faces = mesh_list[coarse_level]
+        fine_vertices, fine_faces = mesh_list[fine_level]
+        
+        coarse_offset = level_offsets[coarse_level]
+        fine_offset = level_offsets[fine_level]
+        
+        # Build KD-tree for fine level vertices
+        tree = KDTree(fine_vertices)
+        max_edge_len = compute_max_edge_length(fine_vertices, fine_faces)
         radius_query = 1.1 * max_edge_len
-
-        for i, coarse_node in enumerate(level_nodes):
-            coarse_pos = vertices[i]
+        
+        # Connect each coarse node to nearby fine nodes
+        for i, coarse_pos in enumerate(coarse_vertices):
+            coarse_node = coarse_offset + i
             fine_indices = tree.query_ball_point(coarse_pos, radius_query)
+            
             for fine_idx in fine_indices:
-                fine_node = finer_start + fine_idx
-                # fine_node may not exist yet if finer_start > node_offset (future level)
-                # so use coordinates directly
-                vec = coarse_pos - finer_vertices[fine_idx]
+                fine_node = fine_offset + fine_idx
+                vec = coarse_pos - fine_vertices[fine_idx]
                 dist = np.linalg.norm(vec)
-
+                
+                # Add bidirectional edges
                 DG.add_edge(fine_node, coarse_node,
-                            len=dist, vdiff=vec,
-                            level=f"{level+1}_to_{level}")
+                           len=dist, vdiff=vec,
+                           level=f"{fine_level}_to_{coarse_level}")
                 DG.add_edge(coarse_node, fine_node,
-                            len=dist, vdiff=-vec,
-                            level=f"{level}_to_{level+1}")
-
-        node_offset += len(vertices)
-
+                           len=dist, vdiff=-vec,
+                           level=f"{coarse_level}_to_{fine_level}")
+    
     DG.graph["mesh_layout"] = "icosahedral_hierarchical"
     DG.graph["max_subdivisions"] = max_subdivisions
     DG.graph["radius"] = radius
-
+    DG.graph["level_offsets"] = level_offsets
+    DG.graph["vertices_by_level"] = [v for v, _ in mesh_list]
+    DG.graph["faces_by_level"] = [f for _, f in mesh_list]
+    
     return DG
+
 
 
 def connect_grid_to_mesh(grid_lat_lon, mesh_vertices, mesh_faces, radius_factor=0.6):
