@@ -163,21 +163,58 @@ def create_all_graph_components(
             )
 
         if m2m_connectivity_kwargs.get("hierarchical", False):
+            max_subdivisions = m2m_connectivity_kwargs.get("max_subdivisions", 3)
+            radius = m2m_connectivity_kwargs.get("radius", 1.0)
+            
             graph_components["m2m"] = create_hierarchical_icosahedral_mesh_graph(
-                max_subdivisions=m2m_connectivity_kwargs.get("max_subdivisions", 3),
-                radius=m2m_connectivity_kwargs.get("radius", 1.0),
+                max_subdivisions=max_subdivisions,
+                radius=radius,
             )
 
             # Connect grid to finest level only
             grid_connect_graph = split_graph_by_edge_attribute(
                 graph_components["m2m"], "level"
-            )[0]    
+            )[0]
+            
+            # Store mesh geometry for the finest level (for containing_triangle method)
+            finest_vertices, finest_faces = generate_icosahedral_mesh(
+                refinement_level=max_subdivisions,
+                radius=radius
+            )
+            grid_connect_graph.graph["mesh_vertices"] = finest_vertices
+            grid_connect_graph.graph["mesh_faces"] = finest_faces
+            
+            # Also store in the main graph for reference
+            graph_components["m2m"].graph["mesh_vertices_by_level"] = [
+                generate_icosahedral_mesh(level, radius)[0] 
+                for level in range(max_subdivisions + 1)
+            ]
+            graph_components["m2m"].graph["mesh_faces_by_level"] = [
+                generate_icosahedral_mesh(level, radius)[1] 
+                for level in range(max_subdivisions + 1)
+            ]
+            
         else:
+            subdivisions = m2m_connectivity_kwargs.get("subdivisions", 3)
+            radius = m2m_connectivity_kwargs.get("radius", 1.0)
+            
             graph_components["m2m"] = create_flat_icosahedral_mesh_graph(
-                subdivisions=m2m_connectivity_kwargs.get("subdivisions", 3),
-                radius=m2m_connectivity_kwargs.get("radius", 1.0),
+                subdivisions=subdivisions,
+                radius=radius,
             )
             grid_connect_graph = graph_components["m2m"]
+            
+            # Store mesh geometry (for containing_triangle method)
+            vertices, faces = generate_icosahedral_mesh(
+                refinement_level=subdivisions,
+                radius=radius
+            )
+            grid_connect_graph.graph["mesh_vertices"] = vertices
+            grid_connect_graph.graph["mesh_faces"] = faces
+            
+            # Also store in the main graph
+            graph_components["m2m"].graph["mesh_vertices"] = vertices
+            graph_components["m2m"].graph["mesh_faces"] = faces
     else:
         graph_components["m2m"] = create_flat_icosahedral_mesh_graph(
             subdivisions=m2m_connectivity_kwargs.get("subdivisions", 3),
@@ -502,9 +539,9 @@ def connect_nodes_across_graphs(
     elif method == "containing_triangle":
         from weather_model_graphs.create.mesh.layouts.icosahedral import (
             lat_lon_to_cartesian,
-            find_containing_triangle,
+            connect_mesh_to_grid,
         )
-        from scipy.spatial import KDTree 
+        import warnings
 
         if mesh_vertices is None or mesh_faces is None:
             raise ValueError(
@@ -512,92 +549,102 @@ def connect_nodes_across_graphs(
                 "to be passed to connect_nodes_across_graphs."
             )
 
-        # Precompute spatial index ONCE 
-        # Compute face centroids
-        face_centroids = mesh_vertices[mesh_faces].mean(axis=1)
-        # Build KDTree on centroids
-        centroid_tree = KDTree(face_centroids)
-
+        # Extract grid coordinates from target graph (G_target contains grid nodes)
+        grid_lat_lon = np.array([G_target.nodes[n]["pos"] for n in target_nodes_list])
+        
+        # Use the enhanced connect_mesh_to_grid function with fallback
+        edge_index, weights = connect_mesh_to_grid(
+            mesh_vertices=mesh_vertices,
+            mesh_faces=mesh_faces,
+            grid_lat_lon=grid_lat_lon,
+            fallback_to_nearest=True  # Enable fallback for robustness
+        )
+        
+        # Build the connection graph from edge_index and weights
         G_connect = networkx.DiGraph()
         G_connect.add_nodes_from(sorted(G_source.nodes(data=True)))
         G_connect.add_nodes_from(sorted(G_target.nodes(data=True)))
         
-        # Determine coordinate systems
-        target_sample = target_nodes_list[0]
-        use_3d_target = "pos3d" in G_target.nodes[target_sample]
+        # Track statistics for warning
+        total_edges = edge_index.shape[1]
+        fallback_connections = 0
         
-        # For each target node (grid point), find containing triangle
-        for target_node in target_nodes_list:
-            target_pos_2d = G_target.nodes[target_node]["pos"]
+        # Create a mapping from edge_index columns to track unique grid points with fallback
+        grid_points_with_fallback = set()
+        
+        # Add edges from the edge_index
+        for col in range(edge_index.shape[1]):
+            mesh_idx = edge_index[0, col]      # Source (mesh node)
+            grid_idx = edge_index[1, col]      # Target (grid node)
+            weight = weights[col]
             
-            # Convert target to 3D cartesian for triangle containment
-            query_point = lat_lon_to_cartesian(
-                np.array([target_pos_2d[0]]),
-                np.array([target_pos_2d[1]])
-            )[0]
+            source_node = source_nodes_list[mesh_idx]
+            target_node = target_nodes_list[grid_idx]
             
-            #  USING OPTIMIZED PRECOMPUTED METHOD
-            face_idx, bary_weights = find_containing_triangle(
-                query_point,
-                mesh_vertices,
-                mesh_faces,
-                face_centroids=face_centroids,  # Pass precomputed
-                centroid_tree=centroid_tree,    # Pass precomputed
-                k_candidates=10                 
+            # Check if this is a fallback connection (single edge with weight 1.0)
+            # Fallback connections have exactly one edge per grid point with weight 1.0
+            if abs(weight - 1.0) < 1e-10:
+                # Count unique grid points that have fallback connections
+                grid_points_with_fallback.add(grid_idx)
+                fallback_connections += 1
+            
+            # Get positions for attribute computation
+            source_pos_2d = G_connect.nodes[source_node]["pos"]
+            target_pos_2d = G_connect.nodes[target_node]["pos"]
+            
+            # Calculate distance and vector difference
+            # Prefer 3D if available (icosahedral case)
+            if "pos3d" in G_connect.nodes[source_node]:
+                # Source has 3D position (mesh node)
+                source_pos_3d = G_connect.nodes[source_node]["pos3d"]
+                target_pos_3d = lat_lon_to_cartesian(
+                    np.array([target_pos_2d[0]]),
+                    np.array([target_pos_2d[1]])
+                )[0]
+                d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
+                vdiff = source_pos_3d - target_pos_3d
+            elif "pos3d" in G_connect.nodes[target_node]:
+                # Target has 3D position (unusual, but handle it)
+                source_pos_3d = lat_lon_to_cartesian(
+                    np.array([source_pos_2d[0]]),
+                    np.array([source_pos_2d[1]])
+                )[0]
+                target_pos_3d = G_connect.nodes[target_node]["pos3d"]
+                d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
+                vdiff = source_pos_3d - target_pos_3d
+            else:
+                # Fallback to 2D distance with wrapping
+                dlat = source_pos_2d[0] - target_pos_2d[0]
+                dlon = source_pos_2d[1] - target_pos_2d[1]
+                dlon = (dlon + 180) % 360 - 180
+                d = np.sqrt(dlat**2 + dlon**2)
+                vdiff = np.array([dlat, dlon])
+            
+            # Add edge with all attributes
+            G_connect.add_edge(source_node, target_node)
+            G_connect.edges[source_node, target_node].update({
+                "len": d,
+                "vdiff": vdiff,
+                "barycentric_weight": weight,
+                "component": "m2g"  # Add component identifier
+            })
+        
+        # Warn if fallback was used
+        num_fallback_points = len(grid_points_with_fallback)
+        if num_fallback_points > 0:
+            total_grid_points = len(target_nodes_list)
+            warnings.warn(
+                f"Triangle containment failed for {num_fallback_points}/{total_grid_points} "
+                f"({num_fallback_points/total_grid_points*100:.1f}%) grid points. "
+                f"Used nearest neighbour fallback.",
+                UserWarning
             )
-            
-            if face_idx is not None:
-                # Connect to the three vertices of the containing triangle
-                for mesh_idx, weight in zip(mesh_faces[face_idx], bary_weights):
-                    source_node = source_nodes_list[mesh_idx]  # mesh node
-                    
-                    # Get positions for distance calculation
-                    source_pos_2d = G_connect.nodes[source_node]["pos"]
-                    
-                    # Calculate 3D distance for edge length
-                    if use_3d or use_3d_target:
-                        # Use 3D positions if available
-                        if "pos3d" in G_connect.nodes[source_node]:
-                            source_pos_3d = G_connect.nodes[source_node]["pos3d"]
-                        else:
-                            # Convert source to 3D if needed
-                            source_pos_3d = lat_lon_to_cartesian(
-                                np.array([source_pos_2d[0]]),
-                                np.array([source_pos_2d[1]])
-                            )[0]
-                        
-                        target_pos_3d = query_point  # Already in 3D
-                        d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
-                    else:
-                        # 2D distance with longitude wrapping
-                        dlat = source_pos_2d[0] - target_pos_2d[0]
-                        dlon = source_pos_2d[1] - target_pos_2d[1]
-                        dlon = (dlon + 180) % 360 - 180
-                        d = np.sqrt(dlat**2 + dlon**2)
-                    
-                    # Add edge with attributes
-                    G_connect.add_edge(source_node, target_node)
-                    G_connect.edges[source_node, target_node]["len"] = d
-                    G_connect.edges[source_node, target_node]["barycentric_weight"] = weight
-
-                    # Use 3D Cartesian vdiff for icosahedral graphs, 2D lat/lon for rectilinear
-                    if use_3d:
-                        source_pos_3d = G_connect.nodes[source_node]["pos3d"]
-                        vdiff = source_pos_3d - query_point
-                    elif use_3d_target:
-                        source_pos_3d = lat_lon_to_cartesian(
-                            np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
-                        )[0]
-                        vdiff = source_pos_3d - query_point
-                    else:
-                        dlat = source_pos_2d[0] - target_pos_2d[0]
-                        dlon = (source_pos_2d[1] - target_pos_2d[1] + 180) % 360 - 180
-                        vdiff = np.array([dlat, dlon])
-                    G_connect.edges[source_node, target_node]["vdiff"] = vdiff
-                    
-                    
-
-        return G_connect  # early return, skips generic block below
+        
+        # Store mesh geometry in graph attributes for reference
+        G_connect.graph["mesh_vertices"] = mesh_vertices
+        G_connect.graph["mesh_faces"] = mesh_faces
+        
+        return G_connect     # early return, skips generic block below
     else:
         raise NotImplementedError(method)
 

@@ -6,28 +6,6 @@ import trimesh
 from scipy.spatial import KDTree
 import warnings
 
-
-def create_icosahedral_mesh(subdivisions=3):
-    """
-    Generate icosahedral mesh hierarchy using trimesh.
-    
-    This is Mandeep's part - we'll use his output format.
-    Returns list of (vertices, faces) for each level.
-    """
-    mesh = trimesh.creation.icosphere(subdivisions=0)
-    vertices, faces = mesh.vertices, mesh.faces
-    
-    mesh_list = [(vertices, faces)]
-    
-    for level in range(1, subdivisions + 1):
-        # Subdivide and project to sphere
-        vertices, faces = trimesh.remesh.subdivide(*mesh_list[-1])
-        norms = np.linalg.norm(vertices, axis=1, keepdims=True)
-        vertices = vertices / norms
-        mesh_list.append((vertices, faces))
-    
-    return mesh_list  # Coarsest to finest
-
 def create_hierarchy_of_icosahedral_meshes(max_subdivisions: int, radius: float = 1.0):
     """
     Create a list of icosahedral meshes at different refinement levels.
@@ -242,7 +220,7 @@ def connect_grid_to_mesh(grid_lat_lon, mesh_vertices, mesh_faces, radius_factor=
     return np.array([grid_indices, mesh_indices])
 
 
-def connect_mesh_to_grid(mesh_vertices, mesh_faces, grid_lat_lon):
+def connect_mesh_to_grid(mesh_vertices, mesh_faces, grid_lat_lon, fallback_to_nearest=True):
     """
     Mesh to Grid connections (m2g).
     For each grid point, find containing mesh triangle and return
@@ -252,29 +230,66 @@ def connect_mesh_to_grid(mesh_vertices, mesh_faces, grid_lat_lon):
         mesh_vertices: (N_mesh, 3) cartesian coordinates
         mesh_faces: (M, 3) face indices
         grid_lat_lon: (N_grid, 2) array of [lat, lon] in degrees
+        fallback_to_nearest: If True, use nearest neighbour when triangle not found
 
     Returns:
         edge_index: (2, E) array of [mesh_node, grid_node] connections
         weights: (E,) barycentric weights for each edge
     """
-    # Precompute face centroids and KDTree
+    # Convert grid to cartesian
     grid_cartesian = lat_lon_to_cartesian(grid_lat_lon[:, 0], grid_lat_lon[:, 1])
 
+    # Precompute spatial index for triangles
     face_centroids = mesh_vertices[mesh_faces].mean(axis=1)
     centroid_tree = KDTree(face_centroids)
     
+    # Precompute for nearest neighbour fallback
+    if fallback_to_nearest:
+        vertex_tree = KDTree(mesh_vertices)
+    
     mesh_indices, grid_indices, weights = [], [], []
+    failed_points = 0
     
     for grid_idx, point in enumerate(grid_cartesian):
+        # First try: find containing triangle
         face_idx, bary_weights = find_containing_triangle(
             point, mesh_vertices, mesh_faces, 
             face_centroids, centroid_tree, k_candidates=10
         )
+        
         if face_idx is not None:
+            # Success: use barycentric weights
             for mesh_idx, w in zip(mesh_faces[face_idx], bary_weights):
                 mesh_indices.append(mesh_idx)
                 grid_indices.append(grid_idx)
                 weights.append(w)
+        elif fallback_to_nearest:
+            # Fallback: find nearest vertex
+            failed_points += 1
+            dist, nearest_idx = vertex_tree.query(point)
+            # Connect to single nearest vertex with weight 1.0
+            mesh_indices.append(nearest_idx)
+            grid_indices.append(grid_idx)
+            weights.append(1.0)
+            
+            # Optional: Could also connect to 3 nearest with equal weights
+            # nearest_idxs = vertex_tree.query(point, k=3)[1]
+            # for mesh_idx in nearest_idxs:
+            #     mesh_indices.append(mesh_idx)
+            #     grid_indices.append(grid_idx)
+            #     weights.append(1.0/3.0)
+        else:
+            # No fallback, skip this point
+            failed_points += 1
+    
+    if failed_points > 0:
+        total_points = len(grid_cartesian)
+        warnings.warn(
+            f"Triangle containment failed for {failed_points}/{total_points} "
+            f"({failed_points/total_points*100:.1f}%) grid points. "
+            f"{'Used nearest neighbour fallback.' if fallback_to_nearest else 'Points were skipped.'}",
+            UserWarning
+        )
     
     return np.array([mesh_indices, grid_indices]), np.array(weights)
 
