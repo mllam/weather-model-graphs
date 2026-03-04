@@ -31,10 +31,67 @@ from .mesh.kinds.flat import (
 from .mesh.kinds.hierarchical import (
     create_hierarchical_from_coordinates,
 )
-from .mesh.mesh import (
-    create_multirange_2d_mesh_coordinates,
-    create_single_level_2d_mesh_coordinates,
+from .mesh.coords import (
+    create_multirange_2d_mesh_primitives,
+    create_single_level_2d_mesh_primitive,
 )
+
+
+def _migrate_deprecated_kwargs(mesh_layout_kwargs, m2m_connectivity_kwargs):
+    """Migrate old-style kwargs to the new mesh_layout_kwargs structure.
+
+    In the old API, ``mesh_node_distance``, ``level_refinement_factor``, and
+    ``max_num_levels`` were passed via ``m2m_connectivity_kwargs``.  In the new
+    design these belong in ``mesh_layout_kwargs`` (as ``mesh_node_spacing``,
+    ``refinement_factor``, and ``max_num_refinement_levels`` respectively).
+
+    This helper emits ``DeprecationWarning`` for each migrated key and moves
+    the value into *mesh_layout_kwargs*.  It is intended to be removed once the
+    old API is no longer supported.
+
+    Parameters
+    ----------
+    mesh_layout_kwargs : dict
+        Mutable dict of mesh layout keyword arguments.
+    m2m_connectivity_kwargs : dict
+        Mutable dict of m2m connectivity keyword arguments.
+
+    Returns
+    -------
+    tuple[dict, dict]
+        Updated (mesh_layout_kwargs, m2m_connectivity_kwargs).
+    """
+    if "mesh_node_distance" in m2m_connectivity_kwargs and "mesh_node_spacing" not in mesh_layout_kwargs:
+        warnings.warn(
+            "Passing 'mesh_node_distance' in m2m_connectivity_kwargs is deprecated. "
+            "Use mesh_layout_kwargs=dict(mesh_node_spacing=...) instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        mesh_layout_kwargs["mesh_node_spacing"] = m2m_connectivity_kwargs.pop(
+            "mesh_node_distance"
+        )
+    if "level_refinement_factor" in m2m_connectivity_kwargs and "refinement_factor" not in mesh_layout_kwargs:
+        warnings.warn(
+            "Passing 'level_refinement_factor' in m2m_connectivity_kwargs is deprecated. "
+            "Use mesh_layout_kwargs=dict(refinement_factor=...) instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        mesh_layout_kwargs["refinement_factor"] = (
+            m2m_connectivity_kwargs.pop("level_refinement_factor")
+        )
+    if "max_num_levels" in m2m_connectivity_kwargs and "max_num_refinement_levels" not in mesh_layout_kwargs:
+        warnings.warn(
+            "Passing 'max_num_levels' in m2m_connectivity_kwargs is deprecated. "
+            "Use mesh_layout_kwargs=dict(max_num_refinement_levels=...) instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        mesh_layout_kwargs["max_num_refinement_levels"] = m2m_connectivity_kwargs.pop(
+            "max_num_levels"
+        )
+    return mesh_layout_kwargs, m2m_connectivity_kwargs
 
 
 def create_all_graph_components(
@@ -42,11 +99,11 @@ def create_all_graph_components(
     m2m_connectivity: str,
     m2g_connectivity: str,
     g2m_connectivity: str,
-    mesh_layout: str = "rectilinear",
+    mesh_layout: str,
     mesh_layout_kwargs: dict = None,
     m2m_connectivity_kwargs: dict = None,
-    m2g_connectivity_kwargs={},
-    g2m_connectivity_kwargs={},
+    m2g_connectivity_kwargs: dict = None,
+    g2m_connectivity_kwargs: dict = None,
     coords_crs: pyproj.crs.CRS | None = None,
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
@@ -79,20 +136,27 @@ def create_all_graph_components(
         of `max_dist` or relative distance of `rel_max_dist` from each node in mesh
 
     mesh_layout:
-    - "rectilinear": Regular rectilinear grid (default). Uses grid_spacing to
-        determine mesh node placement. Produces nodes with 4-star (cardinal) and
+    - "rectilinear": Uniform regular grid with ``mesh_node_spacing`` resolution.
+        Produces an undirected mesh primitive with 4-star (cardinal) and
         8-star (cardinal + diagonal) spatial adjacency edges.
 
     mesh_layout_kwargs (for mesh_layout="rectilinear"):
-    - grid_spacing: float, distance between mesh nodes in coordinate units
-    - refinement_factor: int, refinement factor between levels (for multi-level)
-    - max_num_refinement_levels: int, maximum number of mesh levels (for multi-level)
+    - mesh_node_spacing: float, distance between mesh nodes in coordinate units.
+    - refinement_factor: int, refinement factor between levels
+        (for multi-level and hierarchical mesh graphs, default: 3)
+    - max_num_refinement_levels: int, maximum number of mesh levels
+        (for multi-level and hierarchical mesh graphs)
+
+    Wherever the ``pattern`` argument appears below it defines the spatial
+    neighbourhood connectivity:
+    - ``"4-star"``: only cardinal directions (horizontal and vertical neighbours)
+    - ``"8-star"``: cardinal plus diagonal neighbours (all 8 surrounding nodes)
 
     m2m_connectivity:
     - "flat": Create a single-level directed mesh graph.
-        m2m_connectivity_kwargs: pattern="4-star" or "8-star" (default: "8-star")
+        m2m_connectivity_kwargs: pattern (default: "8-star")
     - "flat_multiscale": Create a flat multiscale mesh graph.
-        m2m_connectivity_kwargs: pattern="4-star" or "8-star" (default: "8-star")
+        m2m_connectivity_kwargs: pattern (default: "8-star")
     - "hierarchical": Create a hierarchical mesh graph with up/down connections.
         m2m_connectivity_kwargs: intra_level=dict(pattern=...), inter_level=dict(pattern=..., k=...)
 
@@ -130,40 +194,19 @@ def create_all_graph_components(
         m2m_connectivity_kwargs = {}
     else:
         m2m_connectivity_kwargs = dict(m2m_connectivity_kwargs)
+    if m2g_connectivity_kwargs is None:
+        m2g_connectivity_kwargs = {}
+    else:
+        m2g_connectivity_kwargs = dict(m2g_connectivity_kwargs)
+    if g2m_connectivity_kwargs is None:
+        g2m_connectivity_kwargs = {}
+    else:
+        g2m_connectivity_kwargs = dict(g2m_connectivity_kwargs)
 
-    # Backward compatibility: migrate old-style kwargs where mesh_node_distance,
-    # level_refinement_factor, and max_num_levels were passed via
-    # m2m_connectivity_kwargs. In the new design these belong in mesh_layout_kwargs.
-    if "mesh_node_distance" in m2m_connectivity_kwargs and "grid_spacing" not in mesh_layout_kwargs:
-        warnings.warn(
-            "Passing 'mesh_node_distance' in m2m_connectivity_kwargs is deprecated. "
-            "Use mesh_layout_kwargs=dict(grid_spacing=...) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        mesh_layout_kwargs["grid_spacing"] = m2m_connectivity_kwargs.pop(
-            "mesh_node_distance"
-        )
-    if "level_refinement_factor" in m2m_connectivity_kwargs and "refinement_factor" not in mesh_layout_kwargs:
-        warnings.warn(
-            "Passing 'level_refinement_factor' in m2m_connectivity_kwargs is deprecated. "
-            "Use mesh_layout_kwargs=dict(refinement_factor=...) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        mesh_layout_kwargs["refinement_factor"] = (
-            m2m_connectivity_kwargs.pop("level_refinement_factor")
-        )
-    if "max_num_levels" in m2m_connectivity_kwargs and "max_num_refinement_levels" not in mesh_layout_kwargs:
-        warnings.warn(
-            "Passing 'max_num_levels' in m2m_connectivity_kwargs is deprecated. "
-            "Use mesh_layout_kwargs=dict(max_num_refinement_levels=...) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        mesh_layout_kwargs["max_num_refinement_levels"] = m2m_connectivity_kwargs.pop(
-            "max_num_levels"
-        )
+    # Migrate deprecated kwargs (to be removed in a future version)
+    mesh_layout_kwargs, m2m_connectivity_kwargs = _migrate_deprecated_kwargs(
+        mesh_layout_kwargs, m2m_connectivity_kwargs
+    )
 
     assert (
         len(coords.shape) == 2 and coords.shape[1] == 2
@@ -196,26 +239,29 @@ def create_all_graph_components(
     if m2m_connectivity == "flat":
         # --- Step 1: Coordinate creation based on mesh_layout ---
         if mesh_layout == "rectilinear":
-            grid_spacing = mesh_layout_kwargs.get("grid_spacing")
-            if grid_spacing is None:
+            mesh_node_spacing = mesh_layout_kwargs.get("mesh_node_spacing")
+            # Backward compat: also check for old name "grid_spacing"
+            if mesh_node_spacing is None:
+                mesh_node_spacing = mesh_layout_kwargs.get("grid_spacing")
+            if mesh_node_spacing is None:
                 raise ValueError(
-                    "mesh_layout='rectilinear' requires 'grid_spacing' in "
+                    "mesh_layout='rectilinear' requires 'mesh_node_spacing' in "
                     "mesh_layout_kwargs (or 'mesh_node_distance' in "
                     "m2m_connectivity_kwargs for backward compatibility)."
                 )
-            # Compute number of mesh nodes from grid_spacing
+            # Compute number of mesh nodes from mesh_node_spacing
             range_x, range_y = np.ptp(xy, axis=0)
-            nx_mesh = int(range_x / grid_spacing)
-            ny_mesh = int(range_y / grid_spacing)
+            nx_mesh = int(range_x / mesh_node_spacing)
+            ny_mesh = int(range_y / mesh_node_spacing)
             if nx_mesh == 0 or ny_mesh == 0:
                 raise ValueError(
-                    "The given `grid_spacing` is too large for the provided "
-                    f"coordinates. Got grid_spacing={grid_spacing}, but the "
+                    "The given `mesh_node_spacing` is too large for the provided "
+                    f"coordinates. Got mesh_node_spacing={mesh_node_spacing}, but the "
                     f"x-range is {range_x} and y-range is {range_y}. Maybe you "
-                    "want to decrease the `grid_spacing` so that the mesh nodes "
+                    "want to decrease the `mesh_node_spacing` so that the mesh nodes "
                     "are spaced closer together?"
                 )
-            G_mesh_coords = create_single_level_2d_mesh_coordinates(
+            G_mesh_coords = create_single_level_2d_mesh_primitive(
                 xy, nx_mesh, ny_mesh
             )
         else:
@@ -234,20 +280,22 @@ def create_all_graph_components(
     elif m2m_connectivity == "hierarchical":
         # --- Step 1: Coordinate creation based on mesh_layout ---
         if mesh_layout == "rectilinear":
-            grid_spacing = mesh_layout_kwargs.get("grid_spacing")
-            refinement_factor = mesh_layout_kwargs.get("refinement_factor")
+            mesh_node_spacing = mesh_layout_kwargs.get("mesh_node_spacing")
+            if mesh_node_spacing is None:
+                mesh_node_spacing = mesh_layout_kwargs.get("grid_spacing")
+            refinement_factor = mesh_layout_kwargs.get("refinement_factor", 3)
             max_num_refinement_levels = mesh_layout_kwargs.get(
                 "max_num_refinement_levels"
             )
-            if grid_spacing is None:
+            if mesh_node_spacing is None:
                 raise ValueError(
                     "mesh_layout='rectilinear' with m2m_connectivity='hierarchical' "
-                    "requires 'grid_spacing' in mesh_layout_kwargs."
+                    "requires 'mesh_node_spacing' in mesh_layout_kwargs."
                 )
-            G_coords_list = create_multirange_2d_mesh_coordinates(
+            G_coords_list = create_multirange_2d_mesh_primitives(
                 max_num_levels=max_num_refinement_levels,
                 xy=xy,
-                grid_spacing=grid_spacing,
+                mesh_node_spacing=mesh_node_spacing,
                 interlevel_refinement_factor=refinement_factor,
             )
         else:
@@ -257,19 +305,13 @@ def create_all_graph_components(
             )
 
         # --- Step 2: Connectivity creation ---
-        intra_level = m2m_connectivity_kwargs.get(
-            "intra_level", {"pattern": "8-star"}
-        )
-        inter_level = m2m_connectivity_kwargs.get(
-            "inter_level", {"pattern": "nearest", "k": 1}
-        )
         # hierarchical mesh graph have three sub-graphs:
         # `m2m` (mesh-to-mesh), `mesh_up` (up edge connections) and
         # `mesh_down` (down edge connections)
         graph_components["m2m"] = create_hierarchical_from_coordinates(
             G_coords_list,
-            intra_level=intra_level,
-            inter_level=inter_level,
+            intra_level=m2m_connectivity_kwargs.get("intra_level"),
+            inter_level=m2m_connectivity_kwargs.get("inter_level"),
         )
         # Only connect grid to bottom level of hierarchy
         grid_connect_graph = split_graph_by_edge_attribute(
@@ -279,20 +321,22 @@ def create_all_graph_components(
     elif m2m_connectivity == "flat_multiscale":
         # --- Step 1: Coordinate creation based on mesh_layout ---
         if mesh_layout == "rectilinear":
-            grid_spacing = mesh_layout_kwargs.get("grid_spacing")
-            refinement_factor = mesh_layout_kwargs.get("refinement_factor")
+            mesh_node_spacing = mesh_layout_kwargs.get("mesh_node_spacing")
+            if mesh_node_spacing is None:
+                mesh_node_spacing = mesh_layout_kwargs.get("grid_spacing")
+            refinement_factor = mesh_layout_kwargs.get("refinement_factor", 3)
             max_num_refinement_levels = mesh_layout_kwargs.get(
                 "max_num_refinement_levels"
             )
-            if grid_spacing is None:
+            if mesh_node_spacing is None:
                 raise ValueError(
                     "mesh_layout='rectilinear' with m2m_connectivity='flat_multiscale' "
-                    "requires 'grid_spacing' in mesh_layout_kwargs."
+                    "requires 'mesh_node_spacing' in mesh_layout_kwargs."
                 )
-            G_coords_list = create_multirange_2d_mesh_coordinates(
+            G_coords_list = create_multirange_2d_mesh_primitives(
                 max_num_levels=max_num_refinement_levels,
                 xy=xy,
-                grid_spacing=grid_spacing,
+                mesh_node_spacing=mesh_node_spacing,
                 interlevel_refinement_factor=refinement_factor,
             )
         else:

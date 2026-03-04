@@ -57,20 +57,20 @@ def create_keisler_graph(
     """
     return create_all_graph_components(
         coords=coords,
-        m2m_connectivity="flat",
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
         mesh_layout="rectilinear",
-        mesh_layout_kwargs=dict(grid_spacing=mesh_node_distance),
-        m2m_connectivity_kwargs=dict(pattern="8-star"),
+        mesh_layout_kwargs=dict(mesh_node_spacing=mesh_node_distance),
         g2m_connectivity="within_radius",
-        m2g_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
             rel_max_dist=0.51,
         ),
+        m2m_connectivity="flat",
+        m2m_connectivity_kwargs=dict(pattern="8-star"),
+        m2g_connectivity="nearest_neighbours",
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
-        coords_crs=coords_crs,
-        graph_crs=graph_crs,
         decode_mask=decode_mask,
         return_components=return_components,
     )
@@ -134,26 +134,26 @@ def create_graphcast_graph(
     """
     return create_all_graph_components(
         coords=coords,
-        m2m_connectivity="flat_multiscale",
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
         mesh_layout="rectilinear",
         mesh_layout_kwargs=dict(
-            grid_spacing=mesh_node_distance,
+            mesh_node_spacing=mesh_node_distance,
             refinement_factor=level_refinement_factor,
             max_num_refinement_levels=max_num_levels,
         ),
-        m2m_connectivity_kwargs=dict(
-            pattern="8-star",
-        ),
         g2m_connectivity="within_radius",
-        m2g_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(
             rel_max_dist=0.51,
         ),
+        m2m_connectivity="flat_multiscale",
+        m2m_connectivity_kwargs=dict(
+            pattern="8-star",
+        ),
+        m2g_connectivity="nearest_neighbours",
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
-        coords_crs=coords_crs,
-        graph_crs=graph_crs,
         decode_mask=decode_mask,
         return_components=return_components,
     )
@@ -222,27 +222,27 @@ def create_oskarsson_hierarchical_graph(
     """
     return create_all_graph_components(
         coords=coords,
-        m2m_connectivity="hierarchical",
+        coords_crs=coords_crs,
+        graph_crs=graph_crs,
         mesh_layout="rectilinear",
         mesh_layout_kwargs=dict(
-            grid_spacing=mesh_node_distance,
+            mesh_node_spacing=mesh_node_distance,
             refinement_factor=level_refinement_factor,
             max_num_refinement_levels=max_num_levels,
         ),
+        g2m_connectivity="within_radius",
+        g2m_connectivity_kwargs=dict(
+            rel_max_dist=0.51,
+        ),
+        m2m_connectivity="hierarchical",
         m2m_connectivity_kwargs=dict(
             intra_level=dict(pattern="8-star"),
             inter_level=dict(pattern="nearest", k=1),
         ),
-        g2m_connectivity="within_radius",
         m2g_connectivity="nearest_neighbours",
-        g2m_connectivity_kwargs=dict(
-            rel_max_dist=0.51,
-        ),
         m2g_connectivity_kwargs=dict(
             max_num_neighbours=4,
         ),
-        coords_crs=coords_crs,
-        graph_crs=graph_crs,
         decode_mask=decode_mask,
         return_components=return_components,
     )

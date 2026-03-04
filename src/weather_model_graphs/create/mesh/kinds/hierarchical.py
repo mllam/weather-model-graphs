@@ -1,37 +1,49 @@
+from typing import Dict, List, Optional
+
 import networkx
 import numpy as np
 import scipy
 
 from ....networkx_utils import prepend_node_index
-from .. import mesh as mesh_graph
+from .. import coords as mesh_coords
 
 
 def create_hierarchical_from_coordinates(
-    G_coords_list,
-    intra_level=None,
-    inter_level=None,
+    G_coords_list: List[networkx.Graph],
+    intra_level: Optional[Dict[str, object]] = None,
+    inter_level: Optional[Dict[str, object]] = None,
 ):
     """
-    Create a hierarchical multiscale mesh graph from a list of coordinate graphs.
+    Create a hierarchical multiscale mesh graph from a list of mesh primitive
+    graphs.
 
     This is the connectivity creation step for hierarchical meshes.
-    It takes undirected coordinate graphs (one per level) and produces a
+    It takes undirected mesh primitive graphs (one per level) and produces a
     directed mesh graph with intra-level connectivity and inter-level
     up/down connections.
+
+    The ``intra_level["pattern"]`` defines the spatial neighbourhood connectivity
+    within each mesh level:
+    - ``"4-star"``: only cardinal directions (horizontal and vertical neighbours)
+    - ``"8-star"``: cardinal directions plus diagonals (all 8 surrounding neighbours)
 
     Parameters
     ----------
     G_coords_list : list of networkx.Graph
-        List of undirected coordinate graphs, one per level. Each should have
-        nodes with "pos" and "type" attributes, and edges with "adjacency_type"
-        attributes. Created by create_multirange_2d_mesh_coordinates.
-    intra_level : dict or None
-        Intra-level connectivity options. Supports:
-        - pattern: str, "4-star" or "8-star" (default: "8-star")
-    inter_level : dict or None
-        Inter-level connectivity options. Supports:
-        - pattern: str, "nearest" (default: "nearest")
-        - k: int, number of nearest neighbours (default: 1)
+        List of undirected mesh primitive graphs, one per level. Each graph
+        must have:
+        - Node attributes: ``"pos"`` (np.ndarray of shape [2,]), ``"type"`` (str)
+        - Edge attributes: ``"adjacency_type"`` (str, ``"cardinal"`` or ``"diagonal"``)
+        Created by ``create_multirange_2d_mesh_primitives``.
+    intra_level : dict, optional
+        Configuration for intra-level connectivity. Keys:
+        - ``"pattern"`` (str): ``"4-star"`` or ``"8-star"``.
+        Default: ``{"pattern": "8-star"}``
+    inter_level : dict, optional
+        Configuration for inter-level connectivity. Keys:
+        - ``"pattern"`` (str): Currently only ``"nearest"`` is supported.
+        - ``"k"`` (int): Number of nearest neighbours for inter-level connections.
+        Default: ``{"pattern": "nearest", "k": 1}``
 
     Returns
     -------
@@ -45,19 +57,21 @@ def create_hierarchical_from_coordinates(
     if inter_level is None:
         inter_level = {"pattern": "nearest", "k": 1}
 
-    intra_pattern = intra_level.get("pattern", "8-star")
-    inter_pattern = inter_level.get("pattern", "nearest")
-    inter_k = inter_level.get("k", 1)
+    intra_level_pattern = intra_level.get("pattern", "8-star")
+    inter_level_pattern = inter_level.get("pattern", "nearest")
+    inter_level_k = inter_level.get("k", 1)
 
-    if inter_pattern != "nearest":
+    if inter_level_pattern != "nearest":
         raise NotImplementedError(
-            f"Inter-level pattern '{inter_pattern}' is not yet supported "
+            f"Inter-level pattern '{inter_level_pattern}' is not yet supported "
             "for hierarchical graphs. Only 'nearest' is currently implemented."
         )
 
     # Convert each level's coordinate graph to directed graph with chosen pattern
     Gs_all_levels = [
-        mesh_graph.create_directed_mesh_graph(g_coords, pattern=intra_pattern)
+        mesh_coords.create_directed_mesh_graph(
+            g_coords, pattern=intra_level_pattern
+        )
         for g_coords in G_coords_list
     ]
 
@@ -111,8 +125,8 @@ def create_hierarchical_from_coordinates(
         # add edges from coarser to finer level
         for v in v_to_list:
             # find k nearest neighbours (index to vm_xy)
-            neigh_idx = kdt_m.query(G_down.nodes[v]["pos"], inter_k)[1]
-            if inter_k == 1:
+            neigh_idx = kdt_m.query(G_down.nodes[v]["pos"], inter_level_k)[1]
+            if inter_level_k == 1:
                 neigh_idx = [neigh_idx]
 
             for idx in neigh_idx:
@@ -157,10 +171,12 @@ def create_hierarchical_from_coordinates(
 
 
 def create_hierarchical_multiscale_mesh_graph(
-    xy,
+    xy: np.ndarray,
     mesh_node_distance: float,
     level_refinement_factor: float,
     max_num_levels: int,
+    intra_level: Optional[Dict[str, object]] = None,
+    inter_level: Optional[Dict[str, object]] = None,
 ):
     """
     Create a hierarchical multiscale mesh graph with nearest neighbour
@@ -169,22 +185,29 @@ def create_hierarchical_multiscale_mesh_graph(
     nearest neighbour connection.
 
     Internally uses the two-step process:
-    1. create_multirange_2d_mesh_coordinates (coordinate creation)
+    1. create_multirange_2d_mesh_primitives (coordinate creation)
     2. create_hierarchical_from_coordinates (connectivity creation)
 
     Parameters
     ----------
-    xy: np.ndarray
-        2D array of mesh point positions.
+    xy : np.ndarray
+        2D array of mesh point positions, shaped [N_points, 2].
+    mesh_node_distance : float
         Distance (in x- and y-direction) between created mesh nodes in bottom level,
         in coordinate system of xy
-    mesh_node_distance: float
-        Distance (in x- and y-direction) between created mesh nodes in bottom level,
-        in coordinate system of xy
-    level_refinement_factor: float
+    level_refinement_factor : float
         Refinement factor between grid points and bottom level of mesh hierarchy
-    max_num_levels: int
+    max_num_levels : int
         The number of levels in the hierarchical mesh graph.
+    intra_level : dict, optional
+        Configuration for intra-level connectivity. Keys:
+        - ``"pattern"`` (str): ``"4-star"`` or ``"8-star"``.
+        Default: ``{"pattern": "8-star"}``
+    inter_level : dict, optional
+        Configuration for inter-level connectivity. Keys:
+        - ``"pattern"`` (str): Currently only ``"nearest"`` is supported.
+        - ``"k"`` (int): Number of nearest neighbours.
+        Default: ``{"pattern": "nearest", "k": 1}``
 
     Returns
     -------
@@ -192,15 +215,15 @@ def create_hierarchical_multiscale_mesh_graph(
         A directed graph containing the hierarchical mesh with intra-level,
         up, and down edges.
     """
-    G_coords_list = mesh_graph.create_multirange_2d_mesh_coordinates(
+    G_coords_list = mesh_coords.create_multirange_2d_mesh_primitives(
         max_num_levels=max_num_levels,
         xy=xy,
-        grid_spacing=mesh_node_distance,
+        mesh_node_spacing=mesh_node_distance,
         interlevel_refinement_factor=level_refinement_factor,
     )
 
     return create_hierarchical_from_coordinates(
         G_coords_list,
-        intra_level={"pattern": "8-star"},
-        inter_level={"pattern": "nearest", "k": 1},
+        intra_level=intra_level,
+        inter_level=inter_level,
     )

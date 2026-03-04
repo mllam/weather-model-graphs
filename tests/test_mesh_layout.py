@@ -21,10 +21,10 @@ import pytest
 
 import tests.utils as test_utils
 import weather_model_graphs as wmg
-from weather_model_graphs.create.mesh.mesh import (
+from weather_model_graphs.create.mesh.coords import (
     create_directed_mesh_graph,
-    create_multirange_2d_mesh_coordinates,
-    create_single_level_2d_mesh_coordinates,
+    create_multirange_2d_mesh_primitives,
+    create_single_level_2d_mesh_primitive,
 )
 from weather_model_graphs.create.mesh.kinds.flat import (
     create_flat_multiscale_from_coordinates,
@@ -41,17 +41,17 @@ from weather_model_graphs.create.mesh.kinds.hierarchical import (
 
 
 class TestSingleLevelCoordinateCreation:
-    """Tests for create_single_level_2d_mesh_coordinates."""
+    """Tests for create_single_level_2d_mesh_primitive."""
 
     def test_returns_undirected_graph(self):
         xy = test_utils.create_fake_xy(N=10)
-        G = create_single_level_2d_mesh_coordinates(xy, nx=5, ny=5)
+        G = create_single_level_2d_mesh_primitive(xy, nx=5, ny=5)
         assert isinstance(G, nx.Graph)
         assert not isinstance(G, nx.DiGraph)
 
     def test_nodes_have_pos_and_type(self):
         xy = test_utils.create_fake_xy(N=10)
-        G = create_single_level_2d_mesh_coordinates(xy, nx=4, ny=4)
+        G = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
         for node in G.nodes:
             assert "pos" in G.nodes[node]
             assert "type" in G.nodes[node]
@@ -60,12 +60,12 @@ class TestSingleLevelCoordinateCreation:
 
     def test_correct_number_of_nodes(self):
         xy = test_utils.create_fake_xy(N=10)
-        G = create_single_level_2d_mesh_coordinates(xy, nx=5, ny=4)
+        G = create_single_level_2d_mesh_primitive(xy, nx=5, ny=4)
         assert len(G.nodes) == 5 * 4
 
     def test_edges_have_adjacency_type(self):
         xy = test_utils.create_fake_xy(N=10)
-        G = create_single_level_2d_mesh_coordinates(xy, nx=5, ny=5)
+        G = create_single_level_2d_mesh_primitive(xy, nx=5, ny=5)
         cardinal_count = 0
         diagonal_count = 0
         for u, v, d in G.edges(data=True):
@@ -81,7 +81,7 @@ class TestSingleLevelCoordinateCreation:
 
     def test_graph_has_dx_dy(self):
         xy = test_utils.create_fake_xy(N=10)
-        G = create_single_level_2d_mesh_coordinates(xy, nx=5, ny=5)
+        G = create_single_level_2d_mesh_primitive(xy, nx=5, ny=5)
         assert "dx" in G.graph
         assert "dy" in G.graph
         assert G.graph["dx"] > 0
@@ -89,12 +89,12 @@ class TestSingleLevelCoordinateCreation:
 
 
 class TestMultirangeCoordinateCreation:
-    """Tests for create_multirange_2d_mesh_coordinates."""
+    """Tests for create_multirange_2d_mesh_primitives."""
 
     def test_returns_list_of_undirected_graphs(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         assert isinstance(G_list, list)
         assert len(G_list) > 0
@@ -104,8 +104,8 @@ class TestMultirangeCoordinateCreation:
 
     def test_each_level_has_level_attribute(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         for i, G in enumerate(G_list):
             assert G.graph["level"] == i
@@ -114,16 +114,16 @@ class TestMultirangeCoordinateCreation:
 
     def test_interlevel_refinement_factor_stored(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         for G in G_list:
             assert G.graph["interlevel_refinement_factor"] == 3
 
     def test_edges_have_adjacency_type(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=2, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=2, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         for G in G_list:
             for u, v, d in G.edges(data=True):
@@ -131,8 +131,8 @@ class TestMultirangeCoordinateCreation:
 
     def test_coarser_levels_have_fewer_nodes(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         if len(G_list) >= 2:
             for i in range(len(G_list) - 1):
@@ -149,13 +149,13 @@ class TestDirectedMeshGraph:
 
     def test_returns_directed_graph(self):
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=4, ny=4)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
         G_directed = create_directed_mesh_graph(G_coords, pattern="8-star")
         assert isinstance(G_directed, nx.DiGraph)
 
     def test_4star_has_fewer_edges_than_8star(self):
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=5, ny=5)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=5, ny=5)
         G_4star = create_directed_mesh_graph(G_coords, pattern="4-star")
         G_8star = create_directed_mesh_graph(G_coords, pattern="8-star")
         assert len(G_4star.edges) < len(G_8star.edges)
@@ -163,7 +163,7 @@ class TestDirectedMeshGraph:
     def test_4star_only_cardinal_edges(self):
         """4-star should only include cardinal (horizontal/vertical) edges."""
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=4, ny=4)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
         G_4star = create_directed_mesh_graph(G_coords, pattern="4-star")
 
         # In a 4x4 grid, 4-star adjacency means each node connects only to
@@ -175,7 +175,7 @@ class TestDirectedMeshGraph:
     def test_8star_includes_diagonal_edges(self):
         """8-star should include both cardinal and diagonal edges."""
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=4, ny=4)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
         G_8star = create_directed_mesh_graph(G_coords, pattern="8-star")
 
         # Cardinal: 2 * (4*3 + 3*4) = 48
@@ -185,7 +185,7 @@ class TestDirectedMeshGraph:
 
     def test_edges_have_len_and_vdiff(self):
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=4, ny=4)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
         G_directed = create_directed_mesh_graph(G_coords, pattern="8-star")
         for u, v, d in G_directed.edges(data=True):
             assert "len" in d
@@ -194,13 +194,13 @@ class TestDirectedMeshGraph:
 
     def test_invalid_pattern_raises_error(self):
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=4, ny=4)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
         with pytest.raises(ValueError, match="Unknown connectivity pattern"):
             create_directed_mesh_graph(G_coords, pattern="6-star")
 
     def test_preserves_graph_attributes(self):
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=4, ny=4)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
         G_directed = create_directed_mesh_graph(G_coords, pattern="8-star")
         assert "dx" in G_directed.graph
         assert "dy" in G_directed.graph
@@ -208,7 +208,7 @@ class TestDirectedMeshGraph:
     def test_bidirectional_edges(self):
         """Each undirected edge should produce two directed edges."""
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=3, ny=3)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=3, ny=3)
         G_directed = create_directed_mesh_graph(G_coords, pattern="4-star")
         for u, v in G_directed.edges():
             assert G_directed.has_edge(v, u), f"Missing reverse edge ({v}, {u})"
@@ -219,13 +219,13 @@ class TestFlatSinglescaleFromCoordinates:
 
     def test_basic_creation(self):
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=5, ny=5)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=5, ny=5)
         G = create_flat_singlescale_from_coordinates(G_coords, pattern="8-star")
         assert isinstance(G, nx.DiGraph)
 
     def test_4star_pattern(self):
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=5, ny=5)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=5, ny=5)
         G = create_flat_singlescale_from_coordinates(G_coords, pattern="4-star")
         assert isinstance(G, nx.DiGraph)
         # Fewer edges than 8-star
@@ -238,16 +238,16 @@ class TestFlatMultiscaleFromCoordinates:
 
     def test_basic_creation(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         G = create_flat_multiscale_from_coordinates(G_coords_list)
         assert isinstance(G, nx.DiGraph)
 
     def test_pattern_argument(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         G_4star = create_flat_multiscale_from_coordinates(
             G_coords_list,
@@ -265,16 +265,16 @@ class TestHierarchicalFromCoordinates:
 
     def test_basic_creation(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         G = create_hierarchical_from_coordinates(G_coords_list)
         assert isinstance(G, nx.DiGraph)
 
     def test_has_up_down_same_edges(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         G = create_hierarchical_from_coordinates(G_coords_list)
         directions = set()
@@ -287,8 +287,8 @@ class TestHierarchicalFromCoordinates:
 
     def test_intra_level_pattern(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         G_4star = create_hierarchical_from_coordinates(
             G_coords_list,
@@ -302,8 +302,8 @@ class TestHierarchicalFromCoordinates:
 
     def test_inter_level_k_parameter(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         G_k1 = create_hierarchical_from_coordinates(
             G_coords_list,
@@ -318,8 +318,8 @@ class TestHierarchicalFromCoordinates:
 
     def test_invalid_inter_level_pattern_raises(self):
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         with pytest.raises(NotImplementedError, match="Inter-level pattern"):
             create_hierarchical_from_coordinates(
@@ -342,7 +342,7 @@ class TestNewAPIFlat:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             m2m_connectivity_kwargs=dict(pattern="8-star"),
             g2m_connectivity="within_radius",
             m2g_connectivity="nearest_neighbours",
@@ -357,7 +357,7 @@ class TestNewAPIFlat:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             m2m_connectivity_kwargs=dict(pattern="4-star"),
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
@@ -366,7 +366,7 @@ class TestNewAPIFlat:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             m2m_connectivity_kwargs=dict(pattern="8-star"),
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
@@ -375,9 +375,9 @@ class TestNewAPIFlat:
         assert isinstance(graph_8, nx.DiGraph)
         assert len(graph_4.edges) < len(graph_8.edges)
 
-    def test_missing_grid_spacing_raises(self):
+    def test_missing_mesh_node_spacing_raises(self):
         xy = test_utils.create_fake_xy(N=32)
-        with pytest.raises(ValueError, match="grid_spacing"):
+        with pytest.raises(ValueError, match="mesh_node_spacing"):
             wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="flat",
@@ -398,7 +398,7 @@ class TestNewAPIFlatMultiscale:
             m2m_connectivity="flat_multiscale",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -419,7 +419,7 @@ class TestNewAPIFlatMultiscale:
             m2m_connectivity="flat_multiscale",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -442,7 +442,7 @@ class TestNewAPIHierarchical:
             m2m_connectivity="hierarchical",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -464,7 +464,7 @@ class TestNewAPIHierarchical:
             m2m_connectivity="hierarchical",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -484,7 +484,7 @@ class TestNewAPIHierarchical:
             m2m_connectivity="hierarchical",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -513,6 +513,7 @@ class TestBackwardCompatibility:
             graph = wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="flat",
+                mesh_layout="rectilinear",
                 m2m_connectivity_kwargs=dict(mesh_node_distance=3),
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
@@ -532,6 +533,7 @@ class TestBackwardCompatibility:
             graph = wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="flat_multiscale",
+                mesh_layout="rectilinear",
                 m2m_connectivity_kwargs=dict(
                     mesh_node_distance=3,
                     level_refinement_factor=3,
@@ -553,6 +555,7 @@ class TestBackwardCompatibility:
             graph = wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="hierarchical",
+                mesh_layout="rectilinear",
                 m2m_connectivity_kwargs=dict(
                     mesh_node_distance=3,
                     level_refinement_factor=3,
@@ -582,6 +585,7 @@ class TestBackwardCompatibility:
             wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="hierarchical",
+                mesh_layout="rectilinear",
                 m2m_connectivity_kwargs=original_kwargs,
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
@@ -606,7 +610,7 @@ class TestErrorHandling:
                 coords=xy,
                 m2m_connectivity="flat",
                 mesh_layout="triangular",
-                mesh_layout_kwargs=dict(grid_spacing=3),
+                mesh_layout_kwargs=dict(mesh_node_spacing=3),
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
             )
@@ -618,19 +622,19 @@ class TestErrorHandling:
                 coords=xy,
                 m2m_connectivity="some_unknown",
                 mesh_layout="rectilinear",
-                mesh_layout_kwargs=dict(grid_spacing=3),
+                mesh_layout_kwargs=dict(mesh_node_spacing=3),
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
             )
 
-    def test_grid_spacing_too_large_raises(self):
+    def test_mesh_node_spacing_too_large_raises(self):
         xy = test_utils.create_fake_xy(N=10)
         with pytest.raises(ValueError, match="too large"):
             wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="flat",
                 mesh_layout="rectilinear",
-                mesh_layout_kwargs=dict(grid_spacing=100),
+                mesh_layout_kwargs=dict(mesh_node_spacing=100),
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
             )
@@ -657,7 +661,7 @@ class TestEquivalence:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             m2m_connectivity_kwargs=dict(pattern="8-star"),
             g2m_connectivity="within_radius",
             m2g_connectivity="nearest_neighbours",
@@ -683,7 +687,7 @@ class TestEquivalence:
             m2m_connectivity="flat_multiscale",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -714,7 +718,7 @@ class TestEquivalence:
             m2m_connectivity="hierarchical",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -743,7 +747,7 @@ class TestCoordinateCreationEdgeCases:
     def test_minimum_grid_2x2(self):
         """Smallest possible grid: 2x2 nodes."""
         xy = test_utils.create_fake_xy(N=10)
-        G = create_single_level_2d_mesh_coordinates(xy, nx=2, ny=2)
+        G = create_single_level_2d_mesh_primitive(xy, nx=2, ny=2)
         assert len(G.nodes) == 4
         # 2x2 grid: cardinal edges = 2*(2*1) = 4, diagonal edges = 2*(1*1) = 2
         cardinal = sum(
@@ -758,7 +762,7 @@ class TestCoordinateCreationEdgeCases:
     def test_single_row_grid(self):
         """Grid with only 1 row (nx=5, ny=1)."""
         xy = test_utils.create_fake_xy(N=10)
-        G = create_single_level_2d_mesh_coordinates(xy, nx=5, ny=1)
+        G = create_single_level_2d_mesh_primitive(xy, nx=5, ny=1)
         assert len(G.nodes) == 5
         # 5x1 grid: only horizontal cardinal edges, no diagonals
         cardinal = sum(
@@ -773,7 +777,7 @@ class TestCoordinateCreationEdgeCases:
     def test_single_column_grid(self):
         """Grid with only 1 column (nx=1, ny=5)."""
         xy = test_utils.create_fake_xy(N=10)
-        G = create_single_level_2d_mesh_coordinates(xy, nx=1, ny=5)
+        G = create_single_level_2d_mesh_primitive(xy, nx=1, ny=5)
         assert len(G.nodes) == 5
         cardinal = sum(
             1 for _, _, d in G.edges(data=True) if d["adjacency_type"] == "cardinal"
@@ -787,14 +791,14 @@ class TestCoordinateCreationEdgeCases:
     def test_1x1_grid_no_edges(self):
         """Grid with a single node (1x1): should have no edges."""
         xy = test_utils.create_fake_xy(N=10)
-        G = create_single_level_2d_mesh_coordinates(xy, nx=1, ny=1)
+        G = create_single_level_2d_mesh_primitive(xy, nx=1, ny=1)
         assert len(G.nodes) == 1
         assert len(G.edges) == 0
 
     def test_large_grid(self):
         """Larger grid should still work correctly."""
         xy = test_utils.create_fake_xy(N=50)
-        G = create_single_level_2d_mesh_coordinates(xy, nx=10, ny=10)
+        G = create_single_level_2d_mesh_primitive(xy, nx=10, ny=10)
         assert len(G.nodes) == 100
         expected_cardinal = 2 * (10 * 9)  # 180
         expected_diagonal = 2 * (9 * 9)  # 162
@@ -810,7 +814,7 @@ class TestCoordinateCreationEdgeCases:
     def test_node_positions_within_bounds(self):
         """Node positions should be within the xy bounds."""
         xy = test_utils.create_fake_xy(N=20)
-        G = create_single_level_2d_mesh_coordinates(xy, nx=5, ny=5)
+        G = create_single_level_2d_mesh_primitive(xy, nx=5, ny=5)
         x_min, y_min = np.amin(xy, axis=0)
         x_max, y_max = np.amax(xy, axis=0)
         for node in G.nodes:
@@ -821,8 +825,8 @@ class TestCoordinateCreationEdgeCases:
     def test_multirange_with_max_levels_1(self):
         """Multi-range with max_num_levels=1 should return single-level list."""
         xy = test_utils.create_fake_xy(N=30)
-        G_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=1, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=1, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         assert len(G_list) == 1
         assert G_list[0].graph["level"] == 0
@@ -830,8 +834,8 @@ class TestCoordinateCreationEdgeCases:
     def test_multirange_with_none_max_levels(self):
         """max_num_levels=None should auto-compute levels."""
         xy = test_utils.create_fake_xy(N=30)
-        G_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=None, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=None, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         assert isinstance(G_list, list)
         assert len(G_list) >= 1
@@ -839,8 +843,8 @@ class TestCoordinateCreationEdgeCases:
     def test_multirange_refinement_factor_5(self):
         """Test with a different refinement factor."""
         xy = test_utils.create_fake_xy(N=50)
-        G_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=5
+        G_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=5
         )
         if len(G_list) >= 2:
             for i in range(len(G_list) - 1):
@@ -853,7 +857,7 @@ class TestConnectivityCreationEdgeCases:
     def test_directed_graph_from_1x1(self):
         """Creating directed graph from a single-node coordinate graph."""
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=1, ny=1)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=1, ny=1)
         G_directed = create_directed_mesh_graph(G_coords, pattern="8-star")
         assert isinstance(G_directed, nx.DiGraph)
         assert len(G_directed.nodes) == 1
@@ -862,7 +866,7 @@ class TestConnectivityCreationEdgeCases:
     def test_directed_graph_from_2x1(self):
         """Creating directed graph from a 2x1 grid."""
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=2, ny=1)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=2, ny=1)
         G_4star = create_directed_mesh_graph(G_coords, pattern="4-star")
         G_8star = create_directed_mesh_graph(G_coords, pattern="8-star")
         # 2x1: 1 edge, both patterns should have same (no diagonals possible)
@@ -872,7 +876,7 @@ class TestConnectivityCreationEdgeCases:
     def test_4star_is_subset_of_8star(self):
         """All edges in 4-star should exist in 8-star."""
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=5, ny=5)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=5, ny=5)
         G_4star = create_directed_mesh_graph(G_coords, pattern="4-star")
         G_8star = create_directed_mesh_graph(G_coords, pattern="8-star")
         for u, v in G_4star.edges():
@@ -881,7 +885,7 @@ class TestConnectivityCreationEdgeCases:
     def test_edge_lengths_are_positive(self):
         """All edge lengths should be positive."""
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=4, ny=4)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
         G = create_directed_mesh_graph(G_coords, pattern="8-star")
         for u, v, d in G.edges(data=True):
             assert d["len"] > 0, f"Edge ({u},{v}) has non-positive length"
@@ -889,7 +893,7 @@ class TestConnectivityCreationEdgeCases:
     def test_vdiff_antisymmetric(self):
         """vdiff(u,v) should be -vdiff(v,u)."""
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=4, ny=4)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
         G = create_directed_mesh_graph(G_coords, pattern="8-star")
         for u, v in G.edges():
             if G.has_edge(v, u):
@@ -901,7 +905,7 @@ class TestConnectivityCreationEdgeCases:
     def test_edge_len_matches_vdiff_norm(self):
         """Edge length should equal the norm of vdiff."""
         xy = test_utils.create_fake_xy(N=10)
-        G_coords = create_single_level_2d_mesh_coordinates(xy, nx=4, ny=4)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
         G = create_directed_mesh_graph(G_coords, pattern="8-star")
         for u, v, d in G.edges(data=True):
             expected_len = np.sqrt(np.sum(d["vdiff"] ** 2))
@@ -913,8 +917,8 @@ class TestConnectivityCreationEdgeCases:
     def test_flat_multiscale_single_level_input(self):
         """Flat multiscale with a single-level list should work (degenerate case)."""
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=1, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=1, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         G = create_flat_multiscale_from_coordinates(G_coords_list, pattern="8-star")
         assert isinstance(G, nx.DiGraph)
@@ -923,8 +927,8 @@ class TestConnectivityCreationEdgeCases:
     def test_flat_multiscale_4star_vs_8star_edge_count(self):
         """4-star flat_multiscale should have fewer edges than 8-star."""
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         G_4 = create_flat_multiscale_from_coordinates(G_coords_list, pattern="4-star")
         G_8 = create_flat_multiscale_from_coordinates(G_coords_list, pattern="8-star")
@@ -933,8 +937,8 @@ class TestConnectivityCreationEdgeCases:
     def test_hierarchical_single_level_raises(self):
         """Hierarchical with only 1 level should raise ValueError."""
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=1, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=1, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         with pytest.raises(ValueError, match="At least two mesh levels"):
             create_hierarchical_from_coordinates(G_coords_list)
@@ -942,8 +946,8 @@ class TestConnectivityCreationEdgeCases:
     def test_hierarchical_edge_direction_attributes(self):
         """Every edge in hierarchical graph must have a 'direction' attribute."""
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         G = create_hierarchical_from_coordinates(G_coords_list)
         for u, v, d in G.edges(data=True):
@@ -953,8 +957,8 @@ class TestConnectivityCreationEdgeCases:
     def test_hierarchical_up_down_symmetry(self):
         """For each 'down' edge (u,v), there should be an 'up' edge (v,u)."""
         xy = test_utils.create_fake_xy(N=30)
-        G_coords_list = create_multirange_2d_mesh_coordinates(
-            max_num_levels=3, xy=xy, grid_spacing=3, interlevel_refinement_factor=3
+        G_coords_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=3, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
         )
         G = create_hierarchical_from_coordinates(G_coords_list)
         for u, v, d in G.edges(data=True):
@@ -973,7 +977,7 @@ class TestAPIEdgeCases:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
         )
@@ -981,7 +985,7 @@ class TestAPIEdgeCases:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             m2m_connectivity_kwargs=dict(pattern="8-star"),
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
@@ -996,7 +1000,7 @@ class TestAPIEdgeCases:
             m2m_connectivity="flat_multiscale",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -1008,7 +1012,7 @@ class TestAPIEdgeCases:
             m2m_connectivity="flat_multiscale",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -1026,7 +1030,7 @@ class TestAPIEdgeCases:
             m2m_connectivity="hierarchical",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -1038,7 +1042,7 @@ class TestAPIEdgeCases:
             m2m_connectivity="hierarchical",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -1051,17 +1055,17 @@ class TestAPIEdgeCases:
         )
         assert len(graph_default.edges) == len(graph_explicit.edges)
 
-    def test_mesh_layout_default_is_rectilinear(self):
-        """When mesh_layout not specified, it should default to rectilinear."""
+    def test_mesh_layout_is_required(self):
+        """When mesh_layout not specified, it should raise TypeError."""
         xy = test_utils.create_fake_xy(N=32)
-        graph = wmg.create.create_all_graph_components(
-            coords=xy,
-            m2m_connectivity="flat",
-            mesh_layout_kwargs=dict(grid_spacing=3),
-            g2m_connectivity="nearest_neighbour",
-            m2g_connectivity="nearest_neighbour",
-        )
-        assert isinstance(graph, nx.DiGraph)
+        with pytest.raises(TypeError, match="mesh_layout"):
+            wmg.create.create_all_graph_components(
+                coords=xy,
+                m2m_connectivity="flat",
+                mesh_layout_kwargs=dict(mesh_node_spacing=3),
+                g2m_connectivity="nearest_neighbour",
+                m2g_connectivity="nearest_neighbour",
+            )
 
     def test_return_components_flat(self):
         """return_components=True should return dict with g2m, m2m, m2g."""
@@ -1070,7 +1074,7 @@ class TestAPIEdgeCases:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             m2m_connectivity_kwargs=dict(pattern="8-star"),
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
@@ -1091,7 +1095,7 @@ class TestAPIEdgeCases:
             m2m_connectivity="hierarchical",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -1116,7 +1120,7 @@ class TestAPIEdgeCases:
             m2m_connectivity="flat_multiscale",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -1136,7 +1140,7 @@ class TestAPIEdgeCases:
             m2m_connectivity="flat_multiscale",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
@@ -1155,7 +1159,7 @@ class TestAPIEdgeCases:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             m2m_connectivity_kwargs=dict(pattern="8-star"),
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
@@ -1176,6 +1180,7 @@ class TestBackwardCompatEdgeCases:
             graph = wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="flat_multiscale",
+                mesh_layout="rectilinear",
                 m2m_connectivity_kwargs=dict(
                     mesh_node_distance=3,
                     level_refinement_factor=3,
@@ -1191,7 +1196,7 @@ class TestBackwardCompatEdgeCases:
             assert len(deprecation_warnings) >= 3
             # Check the new names appear in the messages
             msgs = " ".join(str(x.message) for x in deprecation_warnings)
-            assert "grid_spacing" in msgs
+            assert "mesh_node_spacing" in msgs
             assert "refinement_factor" in msgs
             assert "max_num_refinement_levels" in msgs
         assert isinstance(graph, nx.DiGraph)
@@ -1207,7 +1212,7 @@ class TestGraphStructuralProperties:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
         )
@@ -1221,7 +1226,7 @@ class TestGraphStructuralProperties:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
         )
@@ -1236,7 +1241,7 @@ class TestGraphStructuralProperties:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
         )
@@ -1252,7 +1257,7 @@ class TestGraphStructuralProperties:
                 coords=xy,
                 m2m_connectivity=connectivity,
                 mesh_layout="rectilinear",
-                mesh_layout_kwargs=dict(grid_spacing=3),
+                mesh_layout_kwargs=dict(mesh_node_spacing=3),
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
             )
@@ -1265,7 +1270,7 @@ class TestGraphStructuralProperties:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             m2m_connectivity_kwargs=dict(pattern="4-star"),
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
@@ -1275,7 +1280,7 @@ class TestGraphStructuralProperties:
             coords=xy,
             m2m_connectivity="flat",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(grid_spacing=3),
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
             m2m_connectivity_kwargs=dict(pattern="8-star"),
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
@@ -1295,7 +1300,7 @@ class TestGraphStructuralProperties:
             m2m_connectivity="hierarchical",
             mesh_layout="rectilinear",
             mesh_layout_kwargs=dict(
-                grid_spacing=3,
+                mesh_node_spacing=3,
                 refinement_factor=3,
                 max_num_refinement_levels=3,
             ),
