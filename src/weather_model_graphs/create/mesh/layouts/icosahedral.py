@@ -334,14 +334,22 @@ def cartesian_to_lat_lon(vertices):
     return np.column_stack([lat, lon])
 
 def compute_max_edge_length(vertices, faces):
-    """Compute longest edge in mesh."""
-    max_len = 0
-    for face in faces:
-        for i, j in [(0,1), (1,2), (2,0)]:
-            dist = np.linalg.norm(vertices[face[i]] - vertices[face[j]])
-            max_len = max(max_len, dist)
-    return max_len
-
+    """Compute longest edge in mesh using vectorized operations."""
+    edge_pairs = faces[:, [[0,1], [1,2], [2,0]]]  # Shape: (num_faces, 3, 2)
+    
+    # Reshape to get all edges as pairs of vertex indices
+    all_edges = edge_pairs.reshape(-1, 2)  # Shape: (num_faces*3, 2)
+    
+    # Remove duplicate edges (each edge appears twice, once per adjacent face)
+    all_edges = np.unique(np.sort(all_edges, axis=1), axis=0)
+    
+    v1 = vertices[all_edges[:, 0]]
+    v2 = vertices[all_edges[:, 1]]
+    
+    # Compute all edge lengths at once
+    edge_lengths = np.linalg.norm(v1 - v2, axis=1)
+    
+    return np.max(edge_lengths)
 
 def find_containing_triangle(
     point_cartesian: np.ndarray,
