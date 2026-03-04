@@ -40,6 +40,45 @@ def _make_xy(nx: int, ny: int, extent: float = 100.0) -> np.ndarray:
     return np.column_stack([xx.ravel(), yy.ravel()])
 
 
+def _cuda_hardware_summary() -> str:
+    """Best-effort CUDA device summary. Never raises; returns a human string."""
+    # Prefer CuPy if available (common in RAPIDS CUDA stacks)
+    try:
+        import cupy as cp  # type: ignore
+
+        if cp.cuda.runtime.getDeviceCount() <= 0:
+            return "CUDA       : not detected"
+        dev_id = int(cp.cuda.runtime.getDevice())
+        props = cp.cuda.runtime.getDeviceProperties(dev_id)
+        raw_name = props.get("name", b"")
+        name = (
+            raw_name.decode("utf-8", errors="ignore")
+            if isinstance(raw_name, (bytes, bytearray))
+            else str(raw_name)
+        )
+        major = props.get("major", "?")
+        minor = props.get("minor", "?")
+        mem_gb = float(props.get("totalGlobalMem", 0)) / (1024**3)
+        return f"CUDA       : device {dev_id} - {name} (cc {major}.{minor}, {mem_gb:.1f} GiB)"
+    except Exception:
+        pass
+
+    # Fallback to PyTorch if available
+    try:
+        import torch  # type: ignore
+
+        if not torch.cuda.is_available():
+            return "CUDA       : not detected"
+        dev_id = int(torch.cuda.current_device())
+        name = torch.cuda.get_device_name(dev_id)
+        cap = torch.cuda.get_device_capability(dev_id)
+        props = torch.cuda.get_device_properties(dev_id)
+        mem_gb = float(getattr(props, "total_memory", 0)) / (1024**3)
+        return f"CUDA       : device {dev_id} - {name} (cc {cap[0]}.{cap[1]}, {mem_gb:.1f} GiB)"
+    except Exception:
+        return "CUDA       : unknown (no cupy/torch or query failed)"
+
+
 def run_benchmark(nx: int, ny: int, label: str) -> float:
     xy = _make_xy(nx, ny)
     print(f"\n  Graph size : {nx} x {ny}  ({nx*ny:,} data points)")
@@ -64,6 +103,7 @@ if __name__ == "__main__":
     print("  weather-model-graphs  –  Graph Build Backend Benchmark")
     print("=" * 60)
     print(f"\nBackend : {label}")
+    print(_cuda_hardware_summary())
 
     if cugraph_active and not HAS_CUGRAPH:
         print(
@@ -72,7 +112,7 @@ if __name__ == "__main__":
             "Install via:  pip install nx-cugraph-cu12\n"
         )
 
-    for grid in [(50, 50), (100, 100)]:
+    for grid in [(50, 50), (100, 100), (250, 400)]:
         run_benchmark(*grid, label=label)
 
     print("\nDone.")
