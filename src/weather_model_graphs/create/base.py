@@ -17,6 +17,7 @@ import numpy as np
 import pyproj
 import scipy.spatial
 from loguru import logger
+from .connectivity_checks import check_g2m_connectivity
 
 from ..networkx_utils import (
     replace_node_labels_with_unique_ids,
@@ -174,6 +175,8 @@ def create_all_graph_components(
     graph_components["g2m"] = G_g2m
 
     graph_components["g2m"] = G_g2m
+
+    check_g2m_connectivity(G_g2m, num_grid_nodes=len(G_grid.nodes))
 
     if decode_mask is None:
         # decode to all grid nodes
