@@ -4,7 +4,7 @@ Tests for :class:`weather_model_graphs.spatial.SpatialCoordinateValuesSelector`.
 Covers:
 - Initialisation (valid / invalid metric)
 - Euclidean k-nearest-to and with_radius queries
-- Haversine k-nearest-to and with_radius queries (distances in metres)
+- Haversine k-nearest-to and with_radius queries (distances in radians)
 - Factory method SpatialCoordinateValuesSelector.for_crs()
 - Warning emitted for rectilinear mesh + geographic CRS in create_all_graph_components
 """
@@ -122,42 +122,37 @@ class TestHaversineKNearest:
         assert idxs[0] == 0
         assert dists[0] == pytest.approx(0.0, abs=1e-3)
 
-    def test_distances_in_metres(self, simple_geo_coords):
-        """10° longitude at equator ≈ 1,111,945 m (great-circle)."""
+    def test_distances_in_radians(self, simple_geo_coords):
+        """10° longitude at equator is 10° * pi/180 radians."""
         sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
         idxs, dists = sel.k_nearest_to([0.0, 0.0], k=2)
-        # nearest is self (0 m), second is [10, 0] ≈ 1,111,945 m
-        expected_m = np.deg2rad(10.0) * 6_371_000.0
-        assert dists[1] == pytest.approx(expected_m, rel=1e-4)
+        # nearest is self (0 rad), second is [10, 0] = deg2rad(10)
+        expected_rad = np.deg2rad(10.0)
+        assert dists[1] == pytest.approx(expected_rad, rel=1e-4)
 
-    def test_distances_larger_than_euclidean(self):
-        """For geographic coords, haversine distances are in metres and
-        therefore much larger than the raw degree-difference."""
+    def test_distances_are_native_haversine_radians(self):
+        """For geographic coords, haversine returns unit-sphere radians."""
         coords = np.array([[0.0, 0.0], [1.0, 0.0]])
-        sel_hav = SpatialCoordinateValuesSelector("haversine", coords)
-        sel_euc = SpatialCoordinateValuesSelector("euclidean", coords)
-        _, d_hav = sel_hav.k_nearest_to([0.0, 0.0], k=2)
-        _, d_euc = sel_euc.k_nearest_to([0.0, 0.0], k=2)
-        # Haversine dist ≈ 111_195 m >> euclidean dist = 1 (degree)
-        assert d_hav[1] > d_euc[1] * 100
+        sel = SpatialCoordinateValuesSelector("haversine", coords)
+        _, d_hav = sel.k_nearest_to([0.0, 0.0], k=2)
+        assert d_hav[1] == pytest.approx(np.deg2rad(1.0), rel=1e-4)
 
 
 # Haversine – with_radius
 class TestHaversineWithRadius:
-    def test_radius_in_metres_inclusive(self, simple_geo_coords):
-        """Points at 0° and 10° lon are ~1,111,945 m apart.
-        A radius of 1.2e6 m from the origin should include both."""
+    def test_radius_in_radians_inclusive(self, simple_geo_coords):
+        """A 0.2 rad radius from origin includes points at 0° and 10° lon."""
         sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
-        radius_m = 1.2e6
-        idxs, dists = sel.with_radius([0.0, 0.0], radius=radius_m)
+        radius_rad = 0.2
+        idxs, dists = sel.with_radius([0.0, 0.0], radius=radius_rad)
         assert 0 in idxs  # self
-        assert 1 in idxs  # 10° lon ≈ 1.11e6 m away
+        assert 1 in idxs  # 10° lon ≈ 0.1745 rad away
 
-    def test_radius_in_metres_exclusive(self, simple_geo_coords):
-        """A radius of 0.5e6 m from the origin should include only the origin."""
+    def test_radius_in_radians_exclusive(self, simple_geo_coords):
+        """A 0.1 rad radius from origin excludes the 10° point."""
         sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
-        radius_m = 0.5e6
-        idxs, _ = sel.with_radius([0.0, 0.0], radius=radius_m)
+        radius_rad = 0.1
+        idxs, _ = sel.with_radius([0.0, 0.0], radius=radius_rad)
         assert set(idxs) == {0}
 
 
@@ -268,7 +263,7 @@ class TestIntegrationGraphCreation:
     """
     Smoke-test that graph creation completes without error when a geographic
     CRS is supplied, and that the haversine-based edge lengths are physically
-    reasonable (order of ~10^5 – 10^6 m for a ~10° domain).
+    reasonable in radians for a ~10° domain.
     """
 
     def _make_lonlat_coords(self, n=8):
@@ -290,7 +285,7 @@ class TestIntegrationGraphCreation:
                 graph_crs=pyproj.CRS("EPSG:4326"),
                 return_components=False,
             )
-        # The g2m / m2g edges use haversine (distances in metres).
+        # The g2m / m2g edges use haversine (distances in radians).
         # The m2m internal mesh edges still use Euclidean (degrees) because
         # create_single_level_2d_mesh_graph does not receive the CRS.
         g2m_m2g_lens = [
@@ -299,9 +294,9 @@ class TestIntegrationGraphCreation:
             if d.get("component") in ("g2m", "m2g") and "len" in d
         ]
         assert len(g2m_m2g_lens) > 0, "Expected g2m/m2g edges with 'len' attribute"
-        # For a ~9 degree domain, haversine edge lengths should be >> 1 km
-        # (confirms the distances are in metres, not degrees)
-        assert all(1e3 < l < 2e6 for l in g2m_m2g_lens), (
+        # For a ~9 degree domain, haversine edge lengths should be below ~0.2 rad
+        # and clearly not degree-scale values.
+        assert all(1e-4 < l < 0.5 for l in g2m_m2g_lens), (
             f"g2m/m2g edge lengths out of expected haversine range: "
-            f"min={min(g2m_m2g_lens):.0f} m, max={max(g2m_m2g_lens):.0f} m"
+            f"min={min(g2m_m2g_lens):.6f} rad, max={max(g2m_m2g_lens):.6f} rad"
         )
