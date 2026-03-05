@@ -22,10 +22,6 @@ except ImportError:  # pragma: no cover
     _HAS_SKLEARN = False
 
 
-# Mean radius of the Earth used when converting haversine arc-distances to metres.
-_EARTH_RADIUS_M: float = 6_371_000.0
-
-
 class SpatialCoordinateValuesSelector:
     """
     Metric-aware spatial index for selecting coordinate values by proximity.
@@ -125,12 +121,12 @@ class SpatialCoordinateValuesSelector:
             of the *k* nearest neighbours, ordered by increasing distance.
         distances : np.ndarray, shape (k,)
             Corresponding distances.  For ``"euclidean"`` these are in the same
-            units as *coords*; for ``"haversine"`` these are in **metres**.
+            units as *coords*; for ``"haversine"`` these are in **radians**.
         """
         tree_point = self._prepare_query_point(point)
         raw_dists, raw_idxs = self._tree.query(tree_point, k=k)
         indices = raw_idxs.flatten()
-        distances = self._to_output_distances(raw_dists.flatten())
+        distances = raw_dists.flatten()
         return indices, distances
 
     def with_radius(
@@ -145,7 +141,7 @@ class SpatialCoordinateValuesSelector:
             Query point (same coordinate convention as for :meth:`k_nearest_to`).
         radius : float
             Search radius.  For ``"euclidean"`` this is in the same units as
-            *coords*; for ``"haversine"`` this is in **metres**.
+            *coords*; for ``"haversine"`` this is in **radians**.
 
         Returns
         -------
@@ -156,12 +152,11 @@ class SpatialCoordinateValuesSelector:
             Distances to each returned neighbour (same units as described above).
         """
         tree_point = self._prepare_query_point(point)
-        tree_radius = self._to_tree_radius(radius)
         raw_idxs, raw_dists = self._tree.query_radius(
-            tree_point, r=tree_radius, return_distance=True
+            tree_point, r=radius, return_distance=True
         )
         indices = raw_idxs[0]
-        distances = self._to_output_distances(raw_dists[0])
+        distances = raw_dists[0]
         return indices, distances
 
     
@@ -221,16 +216,3 @@ class SpatialCoordinateValuesSelector:
             # swap [lon, lat] → [lat, lon] and convert to radians
             return np.deg2rad(pt[:, ::-1])
         return pt
-
-    def _to_tree_radius(self, radius: float) -> float:
-        """Convert an output-space radius to the tree's internal units."""
-        if self.distance_metric == "haversine":
-            # BallTree haversine distances are in radians (unit-sphere arc length)
-            return radius / _EARTH_RADIUS_M
-        return radius
-
-    def _to_output_distances(self, raw_distances: np.ndarray) -> np.ndarray:
-        """Convert tree distances (radians for haversine) to output units (metres)."""
-        if self.distance_metric == "haversine":
-            return raw_distances * _EARTH_RADIUS_M
-        return raw_distances

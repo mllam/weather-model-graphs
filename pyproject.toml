@@ -11,16 +11,12 @@ dependencies = [
     "networkx>=3.3",
     "scipy>=1.13.0",
     "pyproj>=3.7.0",
+    "scikit-learn>=1.3.0",
 ]
-# scikit-learn is required only when using the haversine distance metric
-# (i.e. for geographic / global graphs).  Install with: pip install weather-model-graphs[global]
 requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
 [project.optional-dependencies]
-global = [
-    "scikit-learn>=1.3.0",
-]
 pytorch = [
     "torch>=2.3.0",
     "torch-geometric>=2.5.3",

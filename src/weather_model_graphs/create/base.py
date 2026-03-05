@@ -129,9 +129,11 @@ def create_all_graph_components(
     # Build a spatial index for the graph coordinates so that all downstream
     # neighbour queries use the correct distance metric for the CRS.
     if graph_crs is not None:
-        spatial_index = SpatialCoordinateValuesSelector.for_crs(graph_crs, xy)
+        spatial_coord_selector = SpatialCoordinateValuesSelector.for_crs(graph_crs, xy)
     else:
-        spatial_index = SpatialCoordinateValuesSelector("euclidean", xy)
+        # No graph_crs provided: assume projected (Cartesian) coordinates,
+        # so Euclidean distance is used as the default metric.
+        spatial_coord_selector = SpatialCoordinateValuesSelector("euclidean", xy)
 
     # Warn when a rectilinear mesh is being built on top of geographic (lat/lon)
     # coordinates.  Equally-spaced lon/lat values are *not* equally spaced on a
@@ -160,7 +162,7 @@ def create_all_graph_components(
         # `m2m` (mesh-to-mesh), `mesh_up` (up edge connections) and `mesh_down` (down edge connections)
         graph_components["m2m"] = create_hierarchical_multiscale_mesh_graph(
             xy=xy,
-            distance_metric=spatial_index.distance_metric,
+            distance_metric=spatial_coord_selector.distance_metric,
             **m2m_connectivity_kwargs,
         )
         # Only connect grid to bottom level of hierarchy
@@ -182,7 +184,7 @@ def create_all_graph_components(
         G_source=G_grid,
         G_target=grid_connect_graph,
         method=g2m_connectivity,
-        spatial_index=spatial_index,
+        distance_metric=spatial_coord_selector.distance_metric,
         **g2m_connectivity_kwargs,
     )
     graph_components["g2m"] = G_g2m
@@ -201,7 +203,7 @@ def create_all_graph_components(
         G_source=grid_connect_graph,
         G_target=decode_grid,
         method=m2g_connectivity,
-        spatial_index=spatial_index,
+        distance_metric=spatial_coord_selector.distance_metric,
         **m2g_connectivity_kwargs,
     )
     graph_components["m2g"] = G_m2g
@@ -243,7 +245,7 @@ def connect_nodes_across_graphs(
     max_dist=None,
     rel_max_dist=None,
     max_num_neighbours=None,
-    spatial_index: SpatialCoordinateValuesSelector | None = None,
+    distance_metric: str = "euclidean",
 ):
     """
     Create a new graph containing the nodes in `G_source` and `G_target` and add
@@ -277,6 +279,9 @@ def connect_nodes_across_graphs(
         relative to longest edge in (bottom level of) `G_source` and `G_target`.
     max_num_neighbours : int
         Maximum number of neighbours to search for in `G_target` for each node in `G_source`
+    distance_metric : str, optional
+        Distance metric used for neighbour search. Supported values are
+        ``"euclidean"`` and ``"haversine"``. Defaults to ``"euclidean"``.
 
     Returns
     -------
@@ -287,18 +292,14 @@ def connect_nodes_across_graphs(
     source_nodes_list = list(G_source.nodes)
     target_nodes_list = list(G_target.nodes)
 
-    # Build spatial index for source nodes (e.g. mesh nodes when constructing m2g).
-    # If no spatial_index is provided, default to euclidean (backward-compatible).
+    # Build spatial selector for source nodes (e.g. mesh nodes when constructing m2g).
     xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
-    if spatial_index is None:
-        spatial_index = SpatialCoordinateValuesSelector("euclidean", xy_source)
-    else:
-        # Re-build a new index scoped to the source nodes of this subgraph so
-        # that returned integer indices index into source_nodes_list correctly.
-        spatial_index = SpatialCoordinateValuesSelector(spatial_index.distance_metric, xy_source)
+    spatial_coord_selector = SpatialCoordinateValuesSelector(
+        distance_metric, xy_source
+    )
 
     # Determine method and perform checks once.
-    # Conditionally define _find_neighbours_in_source for use in loop later.
+    # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in loop later.
     # Each helper returns (indices_array, distances_array) so that edge lengths
     # can be taken directly from the tree without recomputing.
     if method == "containing_rectangle":
@@ -319,7 +320,7 @@ def connect_nodes_across_graphs(
         # to the diagonal of one rectangle.
         rad_graph = connect_nodes_across_graphs(
             G_source, G_target, method="within_radius", rel_max_dist=1.0,
-            spatial_index=spatial_index,
+            distance_metric=distance_metric,
         )
 
         # Filter edges to those that fit within a rectangle of measurements dx,dy
@@ -361,8 +362,8 @@ def connect_nodes_across_graphs(
                 "to use `nearest_neighbour` you should not set `max_dist`, `rel_max_dist`or `max_num_neighbours`"
             )
 
-        def _find_neighbours_in_source(xy_target):
-            idxs, dists = spatial_index.k_nearest_to(xy_target, k=1)
+        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
+            idxs, dists = spatial_coord_selector.k_nearest_to(xy_target, k=1)
             return idxs, dists
 
     elif method == "nearest_neighbours":
@@ -375,8 +376,10 @@ def connect_nodes_across_graphs(
                 "to use `nearest_neighbours` you should not set `max_dist` or `rel_max_dist`"
             )
 
-        def _find_neighbours_in_source(xy_target):
-            idxs, dists = spatial_index.k_nearest_to(xy_target, k=max_num_neighbours)
+        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
+            idxs, dists = spatial_coord_selector.k_nearest_to(
+                xy_target, k=max_num_neighbours
+            )
             return idxs, dists
 
     elif method == "within_radius":
@@ -426,8 +429,10 @@ def connect_nodes_across_graphs(
                 "to use `witin_radius` method you shold set `max_dist` or `rel_max_dist"
             )
 
-        def _find_neighbours_in_source(xy_target):
-            idxs, dists = spatial_index.with_radius(xy_target, radius=query_dist)
+        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
+            idxs, dists = spatial_coord_selector.with_radius(
+                xy_target, radius=query_dist
+            )
             return idxs, dists
 
     else:
@@ -443,7 +448,7 @@ def connect_nodes_across_graphs(
     # add edges
     for target_node in target_nodes_list:
         xy_target = G_target.nodes[target_node]["pos"]
-        neigh_idxs, neigh_dists = _find_neighbours_in_source(xy_target)
+        neigh_idxs, neigh_dists = _find_neighbour_node_idxs_in_source_mesh(xy_target)
         for i, d in zip(neigh_idxs, neigh_dists):
             source_node = source_nodes_list[i]
             # add edge from source to target

@@ -109,7 +109,6 @@ def create_hierarchical_multiscale_mesh_graph(
 
             # add edge from mesh to grid
             G_down.add_edge(u, v)
-            d_euclidean = np.sqrt(np.sum((G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]) ** 2))
             G_down.edges[u, v]["len"] = d
             G_down.edges[u, v]["vdiff"] = (
                 G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]
