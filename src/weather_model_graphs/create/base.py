@@ -342,7 +342,7 @@ def connect_nodes_across_graphs(
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
             neigh_idxs = kdt_s.query(xy_target, max_num_neighbours)[1]
             # KDTree.query returns a scalar when k=1 and a 1-D array when k>1.
-             # np.atleast_1d normalises both cases so the caller can always iterate.
+            # np.atleast_1d normalises both cases so the caller can always iterate.
             return np.atleast_1d(neigh_idxs)
 
     elif method == "within_radius":
