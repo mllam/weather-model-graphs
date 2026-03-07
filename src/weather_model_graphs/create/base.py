@@ -145,9 +145,7 @@ def create_all_graph_components(
             f"m2m_connectivity='{m2m_connectivity}' places mesh nodes on a "
             "rectilinear (equally-spaced lon/lat) grid, but the graph CRS is "
             "geographic.  Equally-spaced longitude/latitude values are NOT equally "
-            "spaced on a sphere — mesh node density will vary with latitude.  "
-            "Consider projecting to a suitable projected CRS (e.g. via graph_crs) "
-            "or use an icosahedral mesh layout for global graphs."
+            "spaced on a sphere — mesh node density will vary with latitude."
         )
 
     if m2m_connectivity == "flat":
