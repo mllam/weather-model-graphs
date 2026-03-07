@@ -116,12 +116,12 @@ def create_hierarchical_from_coordinates(
         v_to_list = list(G_to.nodes)
         v_from_list = list(G_from.nodes)
         v_from_xy = np.array([xy for _, xy in G_from.nodes.data("pos")])
-        spatial_idx = SpatialCoordinateValuesSelector(distance_metric, v_from_xy)
+        spatial_coord_selector = SpatialCoordinateValuesSelector(distance_metric, v_from_xy)
 
         # add edges from coarser to finer level
         for v in v_to_list:
             # find k nearest neighbours (index to vm_xy)
-            neigh_idxs, neigh_dists = spatial_idx.k_nearest_to(
+            neigh_idxs, neigh_dists = spatial_coord_selector.k_nearest_to(
                 G_down.nodes[v]["pos"], k=inter_level_k
             )
             if inter_level_k == 1:
