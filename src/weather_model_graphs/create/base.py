@@ -17,7 +17,6 @@ import numpy as np
 import pyproj
 import scipy.spatial
 from loguru import logger
-from .connectivity_checks import check_g2m_connectivity
 
 from ..networkx_utils import (
     replace_node_labels_with_unique_ids,
@@ -30,6 +29,7 @@ from .mesh.kinds.flat import (
     create_flat_singlescale_mesh_graph,
 )
 from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
+from .connectivity_checks import check_g2m_connectivity
 
 
 def create_all_graph_components(
@@ -160,23 +160,10 @@ def create_all_graph_components(
         method=g2m_connectivity,
         **g2m_connectivity_kwargs,
     )
-
-    # --- NEW SAFETY CHECK START ---
-    # Ensure every grid node successfully connected to at least one mesh node
-    isolated_grid_nodes = [n for n in G_grid.nodes if G_g2m.degree(n) == 0]
-    if isolated_grid_nodes:
-        raise ValueError(
-            f"{len(isolated_grid_nodes)} grid node(s) are not connected to any mesh nodes "
-            "in the g2m graph. This usually happens if the connection radius is too small "
-            "or the mesh resolution is too sparse."
-        )
-    # --- NEW SAFETY CHECK END ---
-
     graph_components["g2m"] = G_g2m
-
-    graph_components["g2m"] = G_g2m
-
-    check_g2m_connectivity(G_g2m, num_grid_nodes=len(G_grid.nodes))
+    
+    # Run safety assertion to catch isolated grid nodes
+    check_g2m_connectivity(G_g2m)
 
     if decode_mask is None:
         # decode to all grid nodes
