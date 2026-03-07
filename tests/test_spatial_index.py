@@ -15,6 +15,7 @@ import cartopy.crs as ccrs
 import numpy as np
 import pyproj
 import pytest
+from loguru import logger
 
 import weather_model_graphs as wmg
 from weather_model_graphs.spatial import SpatialCoordinateValuesSelector
@@ -231,8 +232,17 @@ class TestRectilinearGeographicWarning:
             kwargs["m2m_connectivity_kwargs"] = dict(
                 max_num_levels=2, mesh_node_distance=3, level_refinement_factor=3
             )
-        with pytest.warns(UserWarning, match="rectilinear"):
+        warning_messages = []
+        sink_id = logger.add(
+            lambda msg: warning_messages.append(msg.record["message"]),
+            level="WARNING",
+        )
+        try:
             wmg.create.create_all_graph_components(**kwargs)
+        finally:
+            logger.remove(sink_id)
+
+        assert any("rectilinear" in message for message in warning_messages)
 
     def test_no_warning_for_projected_crs(self):
         """No UserWarning for a projected CRS."""
@@ -274,8 +284,14 @@ class TestIntegrationGraphCreation:
 
     def test_graph_created_with_geographic_crs(self):
         coords = self._make_lonlat_coords()
-        # pyproj EPSG:4326 has is_geographic=True → haversine metric used, warning raised
-        with pytest.warns(UserWarning, match="rectilinear"):
+        # pyproj EPSG:4326 has is_geographic=True → haversine metric used,
+        # and the rectilinear/geographic warning is logged.
+        warning_messages = []
+        sink_id = logger.add(
+            lambda msg: warning_messages.append(msg.record["message"]),
+            level="WARNING",
+        )
+        try:
             G = wmg.create.create_all_graph_components(
                 coords=coords,
                 m2m_connectivity="flat",
@@ -285,6 +301,10 @@ class TestIntegrationGraphCreation:
                 graph_crs=pyproj.CRS("EPSG:4326"),
                 return_components=False,
             )
+        finally:
+            logger.remove(sink_id)
+
+        assert any("rectilinear" in message for message in warning_messages)
         # The g2m / m2g edges use haversine (distances in radians).
         # The m2m internal mesh edges still use Euclidean (degrees) because
         # create_single_level_2d_mesh_graph does not receive the CRS.
