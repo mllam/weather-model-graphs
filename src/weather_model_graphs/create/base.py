@@ -8,8 +8,6 @@ used to represent the encode-process-decode steps respectively. These are create
 function uses `connect_nodes_across_graphs` to connect nodes across the component graphs.
 """
 
-
-import warnings
 from typing import Iterable
 
 import networkx
@@ -143,15 +141,13 @@ def create_all_graph_components(
     # sphere, so the mesh node density will vary strongly with latitude.
     _is_geographic = getattr(graph_crs, "is_geographic", False)
     if _is_geographic and m2m_connectivity in ("flat", "flat_multiscale", "hierarchical"):
-        warnings.warn(
+        logger.warning(
             f"m2m_connectivity='{m2m_connectivity}' places mesh nodes on a "
             "rectilinear (equally-spaced lon/lat) grid, but the graph CRS is "
             "geographic.  Equally-spaced longitude/latitude values are NOT equally "
             "spaced on a sphere — mesh node density will vary with latitude.  "
             "Consider projecting to a suitable projected CRS (e.g. via graph_crs) "
-            "or use an icosahedral mesh layout for global graphs.",
-            UserWarning,
-            stacklevel=2,
+            "or use an icosahedral mesh layout for global graphs."
         )
 
     if m2m_connectivity == "flat":
