@@ -132,7 +132,7 @@ class TestHaversineKNearest:
         assert dists[1] == pytest.approx(expected_rad, rel=1e-4)
 
     def test_distances_are_native_haversine_radians(self):
-        """For geographic coords, haversine returns unit-sphere radians."""
+        """For geographic coords, haversine returns radians."""
         coords = np.array([[0.0, 0.0], [1.0, 0.0]])
         sel = SpatialCoordinateValuesSelector("haversine", coords)
         _, d_hav = sel.k_nearest_to([0.0, 0.0], k=2)
