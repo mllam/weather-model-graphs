@@ -90,17 +90,19 @@ def create_hierarchical_multiscale_mesh_graph(
         # Add nodes of to level
         G_down.add_nodes_from(G_to.nodes(data=True))
 
-        # build spatial index for source (coarser) mesh node positions
+        # build spatial coordinate selector for source (coarser) mesh node positions
         # order in vm should be same as in vm_xy
         v_to_list = list(G_to.nodes)
         v_from_list = list(G_from.nodes)
         v_from_xy = np.array([xy for _, xy in G_from.nodes.data("pos")])
-        spatial_idx = SpatialCoordinateValuesSelector(distance_metric, v_from_xy)
+        spatial_coord_selector = SpatialCoordinateValuesSelector(
+            distance_metric, v_from_xy
+        )
 
         # add edges from mesh to grid
         for v in v_to_list:
             # find nearest neighbour in coarser level
-            neigh_idxs, neigh_dists = spatial_idx.k_nearest_to(
+            neigh_idxs, neigh_dists = spatial_coord_selector.k_nearest_to(
                 G_down.nodes[v]["pos"], k=1
             )
             neigh_idx = int(neigh_idxs[0])
