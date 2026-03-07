@@ -1,40 +1,36 @@
+from unittest.mock import patch
+
 import numpy as np
-import networkx as nx
 import pytest
-import pyproj
-from unittest.mock import patch, MagicMock
 from scipy.spatial import KDTree
+
 import tests.utils as test_utils
-import weather_model_graphs as wmg
-from weather_model_graphs.create.mesh.layouts.icosahedral import (
-    generate_icosahedral_mesh,
-    create_hierarchy_of_icosahedral_meshes,
-    create_flat_icosahedral_mesh_graph,
-    create_hierarchical_icosahedral_mesh_graph,
-    connect_grid_to_mesh,
-    connect_mesh_to_grid,
-    lat_lon_to_cartesian,
+from weather_model_graphs.create import create_all_graph_components
+from weather_model_graphs.create.mesh.layouts.icosahedral import (  # refinement_level_from_grid_spacing,
     cartesian_to_lat_lon,
     compute_max_edge_length,
+    connect_grid_to_mesh,
+    connect_mesh_to_grid,
+    create_flat_icosahedral_mesh_graph,
+    create_hierarchical_icosahedral_mesh_graph,
+    create_hierarchy_of_icosahedral_meshes,
     find_containing_triangle,
-    refinement_level_from_grid_spacing,
+    generate_icosahedral_mesh,
+    lat_lon_to_cartesian,
 )
-from weather_model_graphs.create import create_all_graph_components
 
-
-try:
-    import trimesh
-    TRIMESH_AVAILABLE = True
-except ImportError:
-    TRIMESH_AVAILABLE = False
-    pytest.skip("trimesh not installed", allow_module_level=True)
+# try:
+#     import trimesh
+# except ImportError:
+#     pytest.skip("trimesh not installed", allow_module_level=True)
+pytest.importorskip("trimesh")
 
 
 @pytest.fixture
 def sample_grid_1deg():
     lats = np.arange(-90, 91, 1)
     lons = np.arange(-180, 181, 1)
-    grid_lat, grid_lon = np.meshgrid(lats, lons, indexing='ij')
+    grid_lat, grid_lon = np.meshgrid(lats, lons, indexing="ij")
     return np.column_stack([grid_lat.ravel(), grid_lon.ravel()])
 
 
@@ -42,7 +38,7 @@ def sample_grid_1deg():
 def sample_grid_5deg():
     lats = np.arange(-90, 91, 5)
     lons = np.arange(-180, 181, 5)
-    grid_lat, grid_lon = np.meshgrid(lats, lons, indexing='ij')
+    grid_lat, grid_lon = np.meshgrid(lats, lons, indexing="ij")
     return np.column_stack([grid_lat.ravel(), grid_lon.ravel()])
 
 
@@ -50,7 +46,7 @@ def sample_grid_5deg():
 def sample_grid_10deg():
     lats = np.arange(-90, 91, 10)
     lons = np.arange(-180, 181, 10)
-    grid_lat, grid_lon = np.meshgrid(lats, lons, indexing='ij')
+    grid_lat, grid_lon = np.meshgrid(lats, lons, indexing="ij")
     return np.column_stack([grid_lat.ravel(), grid_lon.ravel()])
 
 
@@ -65,7 +61,6 @@ def projected_crs():
 
 
 class TestIcosahedralMeshGeneration:
-
     def test_generate_base_icosahedron(self):
         vertices, faces = generate_icosahedral_mesh(refinement_level=0)
         assert len(vertices) == 12
@@ -96,7 +91,6 @@ class TestIcosahedralMeshGeneration:
 
 
 class TestIcosahedralMeshGraphs:
-
     def test_flat_icosahedral_graph(self):
         subdivisions = 2
         G = create_flat_icosahedral_mesh_graph(subdivisions=subdivisions)
@@ -118,7 +112,9 @@ class TestIcosahedralMeshGraphs:
 
     def test_hierarchical_icosahedral_graph(self):
         max_subdivisions = 2
-        G = create_hierarchical_icosahedral_mesh_graph(max_subdivisions=max_subdivisions)
+        G = create_hierarchical_icosahedral_mesh_graph(
+            max_subdivisions=max_subdivisions
+        )
         total_nodes = sum(2 + 10 * 4**level for level in range(max_subdivisions + 1))
         assert len(G.nodes) == total_nodes
         level_counts = {}
@@ -129,7 +125,8 @@ class TestIcosahedralMeshGraphs:
             expected_nodes = 2 + 10 * 4**level
             assert level_counts[level] == expected_nodes
         inter_level_edges = [
-            (u, v, data) for u, v, data in G.edges(data=True)
+            (u, v, data)
+            for u, v, data in G.edges(data=True)
             if isinstance(data.get("level"), str) and "_to_" in data["level"]
         ]
         assert len(inter_level_edges) > 0
@@ -153,9 +150,9 @@ class TestIcosahedralMeshGraphs:
             assert np.allclose(vdiff, expected, atol=1e-10)
 
     def test_vdiff_is_2d_for_rectilinear(self):
-        from weather_model_graphs.create.mesh import create_single_level_2d_mesh_graph
-        from weather_model_graphs.create.grid import create_grid_graph_nodes
         from weather_model_graphs.create.base import connect_nodes_across_graphs
+        from weather_model_graphs.create.grid import create_grid_graph_nodes
+        from weather_model_graphs.create.mesh import create_single_level_2d_mesh_graph
 
         xy = test_utils.create_fake_xy(N=16)
         G = create_single_level_2d_mesh_graph(xy=xy, nx=4, ny=4)
@@ -169,7 +166,6 @@ class TestIcosahedralMeshGraphs:
 
 
 class TestCoordinateConversions:
-
     def test_lat_lon_to_cartesian(self):
         points = [
             (0, 0, [1, 0, 0]),
@@ -199,12 +195,14 @@ class TestCoordinateConversions:
             assert np.allclose(result, expected, atol=1e-10)
 
     def test_cartesian_to_lat_lon_clipping(self):
-        vertices = np.array([
-            [1.0000001, 0, 0],
-            [0, 1.0, 0],
-            [0, 0, 1.0000001],
-            [0, 0, -1.0000001],
-        ])
+        vertices = np.array(
+            [
+                [1.0000001, 0, 0],
+                [0, 1.0, 0],
+                [0, 0, 1.0000001],
+                [0, 0, -1.0000001],
+            ]
+        )
         with pytest.warns(UserWarning, match="Clipped.*values outside"):
             lat_lon = cartesian_to_lat_lon(vertices)
         assert lat_lon.shape == (4, 2)
@@ -213,7 +211,6 @@ class TestCoordinateConversions:
 
 
 class TestGridToMeshConnectivity:
-
     def test_connect_mesh_to_grid_basic(self, sample_grid_10deg):
         vertices, faces = generate_icosahedral_mesh(refinement_level=2)
 
@@ -232,12 +229,18 @@ class TestGridToMeshConnectivity:
 
         # Weights are clamped to [0, 1] and non-negative
         assert np.all(weights >= 0.0), f"Negative weights found: {weights[weights < 0]}"
-        assert np.all(weights <= 1.0 + 1e-9), f"Weights > 1 found: {weights[weights > 1.0 + 1e-9]}"
+        assert np.all(
+            weights <= 1.0 + 1e-9
+        ), f"Weights > 1 found: {weights[weights > 1.0 + 1e-9]}"
 
     def test_connect_grid_to_mesh_radius_factor(self, sample_grid_5deg):
         vertices, faces = generate_icosahedral_mesh(refinement_level=2)
-        edges_small = connect_grid_to_mesh(sample_grid_5deg, vertices, faces, radius_factor=0.3)
-        edges_large = connect_grid_to_mesh(sample_grid_5deg, vertices, faces, radius_factor=0.9)
+        edges_small = connect_grid_to_mesh(
+            sample_grid_5deg, vertices, faces, radius_factor=0.3
+        )
+        edges_large = connect_grid_to_mesh(
+            sample_grid_5deg, vertices, faces, radius_factor=0.9
+        )
         assert edges_small.shape[1] <= edges_large.shape[1]
 
     def test_max_edge_length_computation(self):
@@ -248,7 +251,6 @@ class TestGridToMeshConnectivity:
 
 
 class TestMeshToGridConnectivity:
-
     def test_find_containing_triangle_basic(self):
         vertices, faces = generate_icosahedral_mesh(refinement_level=0)
         test_point = np.array([0.5, 0.5, 0.5])
@@ -256,8 +258,11 @@ class TestMeshToGridConnectivity:
         face_centroids = vertices[faces].mean(axis=1)
         centroid_tree = KDTree(face_centroids)
         face_idx, weights = find_containing_triangle(
-            test_point, vertices, faces,
-            face_centroids=face_centroids, centroid_tree=centroid_tree
+            test_point,
+            vertices,
+            faces,
+            face_centroids=face_centroids,
+            centroid_tree=centroid_tree,
         )
         if face_idx is not None:
             assert weights is not None
@@ -286,20 +291,29 @@ class TestMeshToGridConnectivity:
             # Triangle hit: 3 weights summing to 1; fallback: 1 weight == 1
             # Also allow 1 or 3 connections summing to 1 (normalised triangles or fallback)
             weight_sum = sum(weight_list)
-            assert np.isclose(weight_sum, 1.0, atol=1e-4), (
-                f"Grid point {grid_idx}: weights {weight_list} sum to {weight_sum}, expected 1.0"
-            )
+            assert np.isclose(
+                weight_sum, 1.0, atol=1e-4
+            ), f"Grid point {grid_idx}: weights {weight_list} sum to {weight_sum}, expected 1.0"
 
 
 class TestGridSpacing:
-
-    def refinement_level_from_grid_spacing(self, grid_spacing_deg: float, radius: float = 1.0) -> int:
+    def refinement_level_from_grid_spacing(
+        self, grid_spacing_deg: float, radius: float = 1.0
+    ) -> int:
         import warnings
+
         level_to_spacing = {
-            0: 63.4, 1: 31.7, 2: 15.8, 3: 7.9, 4: 3.95, 5: 1.98,
+            0: 63.4,
+            1: 31.7,
+            2: 15.8,
+            3: 7.9,
+            4: 3.95,
+            5: 1.98,
         }
-        closest_level = min(level_to_spacing.keys(),
-                            key=lambda l: abs(level_to_spacing[l] - grid_spacing_deg))
+        closest_level = min(
+            level_to_spacing.keys(),
+            key=lambda lvl: abs(level_to_spacing[lvl] - grid_spacing_deg),
+        )
         actual_spacing = level_to_spacing[closest_level]
         if abs(actual_spacing - grid_spacing_deg) / grid_spacing_deg > 0.3:
             warnings.warn(
@@ -310,7 +324,9 @@ class TestGridSpacing:
             )
         return closest_level
 
-    def test_grid_spacing_in_create_all_graph_components(self, sample_grid_5deg, geographic_crs):
+    def test_grid_spacing_in_create_all_graph_components(
+        self, sample_grid_5deg, geographic_crs
+    ):
         G = create_all_graph_components(
             coords=sample_grid_5deg,
             mesh_layout="icosahedral",
@@ -332,7 +348,9 @@ class TestGridSpacing:
         assert len(mesh_nodes) in [162, 642]
 
     def test_grid_spacing_conflict_error(self, sample_grid_5deg, geographic_crs):
-        with pytest.raises(ValueError, match="Cannot specify both grid_spacing and subdivisions"):
+        with pytest.raises(
+            ValueError, match="Cannot specify both grid_spacing and subdivisions"
+        ):
             create_all_graph_components(
                 coords=sample_grid_5deg,
                 mesh_layout="icosahedral",
@@ -351,8 +369,9 @@ class TestGridSpacing:
 
 
 class TestContainingTriangleDispatch:
-
-    def test_containing_triangle_with_icosahedral(self, sample_grid_10deg, geographic_crs):
+    def test_containing_triangle_with_icosahedral(
+        self, sample_grid_10deg, geographic_crs
+    ):
         G = create_all_graph_components(
             coords=sample_grid_10deg,
             mesh_layout="icosahedral",
@@ -366,15 +385,21 @@ class TestContainingTriangleDispatch:
             graph_crs=geographic_crs,
         )
         assert G is not None
-        m2g_edges = [(u, v, d) for u, v, d in G.edges(data=True)
-                     if d.get("component") == "m2g"]
+        m2g_edges = [
+            (u, v, d) for u, v, d in G.edges(data=True) if d.get("component") == "m2g"
+        ]
         assert len(m2g_edges) > 0
         for _, _, data in m2g_edges:
             assert "barycentric_weight" in data
             assert data["barycentric_weight"] > 0
 
-    def test_containing_triangle_with_rectilinear_error(self, sample_grid_10deg, geographic_crs):
-        with pytest.raises(ValueError, match="containing_triangle method is only valid for mesh_layout='icosahedral'"):
+    def test_containing_triangle_with_rectilinear_error(
+        self, sample_grid_10deg, geographic_crs
+    ):
+        with pytest.raises(
+            ValueError,
+            match="containing_triangle method is only valid for mesh_layout='icosahedral'",
+        ):
             create_all_graph_components(
                 coords=sample_grid_10deg,
                 mesh_layout="rectilinear",
@@ -389,12 +414,17 @@ class TestContainingTriangleDispatch:
 
 
 class TestIntegrationWithCreateAllGraphComponents:
-
-    def test_icosahedral_in_create_all_graph_components(self, sample_grid_5deg, geographic_crs):
+    def test_icosahedral_in_create_all_graph_components(
+        self, sample_grid_5deg, geographic_crs
+    ):
         G = create_all_graph_components(
             coords=sample_grid_5deg,
             mesh_layout="icosahedral",
-            mesh_layout_kwargs={"subdivisions": 2, "hierarchical": False, "radius": 1.0},
+            mesh_layout_kwargs={
+                "subdivisions": 2,
+                "hierarchical": False,
+                "radius": 1.0,
+            },
             m2m_connectivity="flat",
             m2g_connectivity="within_radius",
             m2g_connectivity_kwargs={"max_dist": 0.5},
@@ -414,7 +444,11 @@ class TestIntegrationWithCreateAllGraphComponents:
         G = create_all_graph_components(
             coords=sample_grid_5deg,
             mesh_layout="icosahedral",
-            mesh_layout_kwargs={"max_subdivisions": 2, "hierarchical": True, "radius": 1.0},
+            mesh_layout_kwargs={
+                "max_subdivisions": 2,
+                "hierarchical": True,
+                "radius": 1.0,
+            },
             m2m_connectivity="hierarchical",
             m2g_connectivity="within_radius",
             m2g_connectivity_kwargs={"max_dist": 0.5},
@@ -430,8 +464,12 @@ class TestIntegrationWithCreateAllGraphComponents:
                 levels.add(data.get("level", -1))
         assert len(levels) > 1
 
-    def test_icosahedral_with_projected_crs_warning(self, sample_grid_5deg, projected_crs):
-        with pytest.warns(UserWarning, match="Icosahedral mesh is designed for geographic coordinates"):
+    def test_icosahedral_with_projected_crs_warning(
+        self, sample_grid_5deg, projected_crs
+    ):
+        with pytest.warns(
+            UserWarning, match="Icosahedral mesh is designed for geographic coordinates"
+        ):
             create_all_graph_components(
                 coords=sample_grid_5deg,
                 mesh_layout="icosahedral",
@@ -447,24 +485,28 @@ class TestIntegrationWithCreateAllGraphComponents:
 
 
 class TestEdgeCases:
-
     def test_trimesh_import_error_direct(self):
-        with patch('trimesh.creation.icosphere') as mock_icosphere:
+        with patch("trimesh.creation.icosphere") as mock_icosphere:
             mock_icosphere.side_effect = ImportError("No module named 'trimesh'")
-            with pytest.raises(ImportError, match="trimesh is required for icosahedral mesh"):
+            with pytest.raises(
+                ImportError, match="trimesh is required for icosahedral mesh"
+            ):
                 generate_icosahedral_mesh(refinement_level=1)
 
     def test_trimesh_import_error_module_level(self):
         """Test graceful handling when trimesh is not available at module level."""
         import sys
+
         # Temporarily hide trimesh
-        trimesh_backup = sys.modules.get('trimesh')
-        sys.modules['trimesh'] = None  # Simulate missing module
+        trimesh_backup = sys.modules.get("trimesh")
+        sys.modules["trimesh"] = None  # Simulate missing module
 
         try:
             with pytest.raises((ImportError, TypeError)) as excinfo:
                 from importlib import reload
+
                 import weather_model_graphs.create.mesh.layouts.icosahedral as icosahedral_module
+
                 reload(icosahedral_module)
                 # Calling generate_icosahedral_mesh will hit the import inside the function
                 icosahedral_module.generate_icosahedral_mesh(refinement_level=1)
@@ -474,9 +516,9 @@ class TestEdgeCases:
         finally:
             # Restore trimesh
             if trimesh_backup is not None:
-                sys.modules['trimesh'] = trimesh_backup
-            elif 'trimesh' in sys.modules:
-                del sys.modules['trimesh']
+                sys.modules["trimesh"] = trimesh_backup
+            elif "trimesh" in sys.modules:
+                del sys.modules["trimesh"]
 
     def test_invalid_subdivisions(self):
         with pytest.raises(ValueError, match="subdivisions must be non-negative"):

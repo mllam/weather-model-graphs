@@ -138,7 +138,9 @@ def replace_node_labels_with_unique_ids(graph):
         Graph with node labels renamed
     """
     return networkx.relabel_nodes(
-        graph, {node: i for i, node in enumerate(sorted(graph.nodes, key=str))}, copy=True
+        graph,
+        {node: i for i, node in enumerate(sorted(graph.nodes, key=str))},
+        copy=True,
     )
 
 

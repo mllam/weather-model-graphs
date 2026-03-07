@@ -1,19 +1,20 @@
 """Icosahedral mesh layout for global graphs."""
 
-import numpy as np
-import networkx as nx
-from scipy.spatial import KDTree
 import warnings
+
+import networkx as nx
+import numpy as np
+from scipy.spatial import KDTree
 
 
 def create_hierarchy_of_icosahedral_meshes(max_subdivisions: int, radius: float = 1.0):
     """
     Create a list of icosahedral meshes at different refinement levels.
-    
+
     Args:
         max_subdivisions (int): Maximum number of subdivisions
         radius (float): Radius of the sphere
-        
+
     Returns:
         list of (vertices, faces) tuples for each level from coarsest to finest
     """
@@ -32,13 +33,13 @@ def create_flat_icosahedral_mesh_graph(
 ):
     """
     Create a flat (single-level) icosahedral mesh graph.
-    
+
     Args:
         subdivisions (int): Number of mesh subdivisions (0 = base icosahedron)
         radius (float): Sphere radius
         add_edge_length (bool): Add 'len' attribute to edges with Euclidean distance
         add_edge_vector (bool): Add 'vdiff' attribute with vector difference
-        
+
     Returns:
         networkx.DiGraph: Directed graph with mesh nodes and edges
     """
@@ -152,12 +153,20 @@ def create_hierarchical_icosahedral_mesh_graph(
                 fine_node = fine_offset + fine_idx
                 vec = coarse_pos - fine_vertices[fine_idx]
                 dist = np.linalg.norm(vec)
-                DG.add_edge(fine_node, coarse_node,
-                            len=dist, vdiff=vec,
-                            level=f"{fine_level}_to_{coarse_level}")
-                DG.add_edge(coarse_node, fine_node,
-                            len=dist, vdiff=-vec,
-                            level=f"{coarse_level}_to_{fine_level}")
+                DG.add_edge(
+                    fine_node,
+                    coarse_node,
+                    len=dist,
+                    vdiff=vec,
+                    level=f"{fine_level}_to_{coarse_level}",
+                )
+                DG.add_edge(
+                    coarse_node,
+                    fine_node,
+                    len=dist,
+                    vdiff=-vec,
+                    level=f"{coarse_level}_to_{fine_level}",
+                )
 
     DG.graph["mesh_layout"] = "icosahedral_hierarchical"
     DG.graph["max_subdivisions"] = max_subdivisions
@@ -173,13 +182,13 @@ def create_hierarchical_icosahedral_mesh_graph(
 def connect_grid_to_mesh(grid_lat_lon, mesh_vertices, mesh_faces, radius_factor=0.6):
     """
     Grid to Mesh connections (g2m) adapted from create_global_mesh.py lines 224-242.
-    
+
     Args:
         grid_lat_lon: (N_grid, 2) array of [lat, lon] in degrees
         mesh_vertices: (N_mesh, 3) cartesian coordinates
         mesh_faces: (M, 3) face indices
         radius_factor: multiplier for max edge distance
-    
+
     Returns:
         edge_index: (2, E) array of [grid_node, mesh_node] connections
     """
@@ -210,7 +219,9 @@ def connect_grid_to_mesh(grid_lat_lon, mesh_vertices, mesh_faces, radius_factor=
     return np.array([grid_indices, mesh_indices])
 
 
-def connect_mesh_to_grid(mesh_vertices, mesh_faces, grid_lat_lon, fallback_to_nearest=True):
+def connect_mesh_to_grid(
+    mesh_vertices, mesh_faces, grid_lat_lon, fallback_to_nearest=True
+):
     """
     Mesh to Grid connections (m2g).
     For each grid point, find containing mesh triangle and return
@@ -233,8 +244,12 @@ def connect_mesh_to_grid(mesh_vertices, mesh_faces, grid_lat_lon, fallback_to_ne
 
     for grid_idx, point in enumerate(grid_cartesian):
         face_idx, bary_weights = find_containing_triangle(
-            point, mesh_vertices, mesh_faces,
-            face_centroids, centroid_tree, k_candidates=10
+            point,
+            mesh_vertices,
+            mesh_faces,
+            face_centroids,
+            centroid_tree,
+            k_candidates=10,
         )
 
         # Clip negative weights (numerical noise near edges), renormalise to sum=1.
@@ -290,10 +305,10 @@ def lat_lon_to_cartesian(lat, lon):
 
 def cartesian_to_lat_lon(vertices):
     """Convert cartesian coordinates to lat/lon degrees.
-    
+
     Args:
         vertices: (N, 3) array of (x, y, z) coordinates on unit sphere
-        
+
     Returns:
         (N, 2) array of (latitude, longitude) in degrees
         Latitude range: [-90, 90]
@@ -337,7 +352,7 @@ def find_containing_triangle(
 ):
     """
     Optimized triangle containment using spatial indexing.
-    
+
     Args:
         point_cartesian: (3,) cartesian point on sphere
         mesh_vertices: (N_mesh, 3) mesh vertices
@@ -345,7 +360,7 @@ def find_containing_triangle(
         face_centroids: Precomputed centroids of faces
         centroid_tree: Precomputed KDTree on centroids
         k_candidates: Number of candidate faces to check
-        
+
     Returns:
         tuple: (face_index, barycentric_weights) or (None, None) if not found
     """
@@ -358,7 +373,7 @@ def find_containing_triangle(
 
     best_face = None
     best_weights = None
-    best_sum = float('inf')
+    best_sum = float("inf")
 
     for face_idx in candidate_indices:
         face = mesh_faces[face_idx]
@@ -407,15 +422,15 @@ def barycentric_coordinates(p, a, b, c):
 def generate_icosahedral_mesh(refinement_level: int, radius: float = 1.0):
     """
     Generates a spherical icosahedral mesh using Trimesh.
-    
+
     Args:
         refinement_level (int): Number of subdivisions. Must be non-negative.
         radius (float): Radius of the sphere (default 1.0 for unit sphere).
-        
+
     Returns:
         nodes (np.ndarray): Shape (N, 3) Cartesian coordinates (x, y, z).
         faces (np.ndarray): Shape (M, 3) Triangular faces connecting the nodes.
-        
+
     Raises:
         ValueError: If refinement_level is negative.
         ImportError: If trimesh is not available.
@@ -444,7 +459,9 @@ def generate_icosahedral_mesh(refinement_level: int, radius: float = 1.0):
     return nodes, faces
 
 
-def refinement_level_from_grid_spacing(grid_spacing_deg: float, radius: float = 1.0) -> int:
+def refinement_level_from_grid_spacing(
+    grid_spacing_deg: float, radius: float = 1.0
+) -> int:
     """Determine the appropriate refinement level for a desired grid spacing.
 
     Selects the finest icosahedral refinement level whose mesh spacing is still
@@ -453,16 +470,20 @@ def refinement_level_from_grid_spacing(grid_spacing_deg: float, radius: float = 
     """
     # Approximate angular spacing in degrees for each refinement level
     level_spacing_deg = {
-        0: 63.4, #level0
-        1: 31.7, #level1
-        2: 15.8, #level2
-        3: 7.9, #level3
-        4: 3.95, #level4
-        5: 1.98,   #level5
+        0: 63.4,  # level0
+        1: 31.7,  # level1
+        2: 15.8,  # level2
+        3: 7.9,  # level3
+        4: 3.95,  # level4
+        5: 1.98,  # level5
     }
 
     # Find all levels whose mesh spacing is >= requested grid spacing
-    coarse_enough = {l: s for l, s in level_spacing_deg.items() if s >= grid_spacing_deg}
+    coarse_enough = {
+        lvl: spacing
+        for lvl, spacing in level_spacing_deg.items()
+        if spacing >= grid_spacing_deg
+    }
 
     if coarse_enough:
         # Pick the finest (highest level) among valid candidates

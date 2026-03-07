@@ -8,10 +8,10 @@ used to represent the encode-process-decode steps respectively. These are create
 function uses `connect_nodes_across_graphs` to connect nodes across the component graphs.
 """
 
-from typing import Iterable
 import warnings
+from typing import Iterable
+
 import networkx
-import networkx as nx
 import numpy as np
 import pyproj
 import scipy.spatial
@@ -20,7 +20,6 @@ from loguru import logger
 from ..networkx_utils import (
     replace_node_labels_with_unique_ids,
     split_graph_by_edge_attribute,
-    split_on_edge_attribute_existance,
 )
 from .grid import create_grid_graph_nodes
 from .mesh.kinds.flat import (
@@ -183,8 +182,8 @@ def create_all_graph_components(
     elif mesh_layout == "icosahedral":
         from weather_model_graphs.create.mesh.layouts.icosahedral import (
             create_flat_icosahedral_mesh_graph,
-            generate_icosahedral_mesh,
             create_hierarchical_icosahedral_mesh_graph,
+            generate_icosahedral_mesh,
             refinement_level_from_grid_spacing,
         )
 
@@ -198,8 +197,9 @@ def create_all_graph_components(
                 parsed = pyproj.CRS.from_user_input(crs)
                 val = parsed.is_geographic
                 # Guard against unusual pyproj builds that return array-like values
-                if hasattr(val, '__iter__'):
+                if hasattr(val, "__iter__"):
                     import numpy as _np
+
                     return bool(int(_np.asarray(val).flat[0]))
                 return bool(int(val))
             except Exception:
@@ -208,7 +208,9 @@ def create_all_graph_components(
             # String heuristic fallback
             try:
                 crs_str = str(crs).upper()
-                if any(k in crs_str for k in ("4326", "WGS84", "GEOGRAPHIC", "LATLONG")):
+                if any(
+                    k in crs_str for k in ("4326", "WGS84", "GEOGRAPHIC", "LATLONG")
+                ):
                     return True
                 return False
             except Exception:
@@ -229,7 +231,10 @@ def create_all_graph_components(
         hierarchical = mesh_layout_kwargs.get("hierarchical", False)
 
         if grid_spacing is not None:
-            if "subdivisions" in mesh_layout_kwargs or "max_subdivisions" in mesh_layout_kwargs:
+            if (
+                "subdivisions" in mesh_layout_kwargs
+                or "max_subdivisions" in mesh_layout_kwargs
+            ):
                 raise ValueError(
                     "Cannot specify both grid_spacing and subdivisions/max_subdivisions. "
                     "Choose one method."
@@ -237,10 +242,14 @@ def create_all_graph_components(
             refinement_level = refinement_level_from_grid_spacing(grid_spacing, radius)
             if hierarchical:
                 mesh_layout_kwargs["max_subdivisions"] = refinement_level
-                logger.debug(f"grid_spacing={grid_spacing}° mapped to max_subdivisions={refinement_level}")
+                logger.debug(
+                    f"grid_spacing={grid_spacing}° mapped to max_subdivisions={refinement_level}"
+                )
             else:
                 mesh_layout_kwargs["subdivisions"] = refinement_level
-                logger.debug(f"grid_spacing={grid_spacing}° mapped to subdivisions={refinement_level}")
+                logger.debug(
+                    f"grid_spacing={grid_spacing}° mapped to subdivisions={refinement_level}"
+                )
 
         if hierarchical:
             max_subdivisions = mesh_layout_kwargs.get("max_subdivisions", 3)
@@ -358,15 +367,18 @@ def create_all_graph_components(
             return a is b
         try:
             import numpy as _np
+
             if isinstance(a, _np.ndarray) or isinstance(b, _np.ndarray):
                 a_arr, b_arr = _np.asarray(a), _np.asarray(b)
-                return a_arr.shape == b_arr.shape and bool(_np.array_equal(a_arr, b_arr))
+                return a_arr.shape == b_arr.shape and bool(
+                    _np.array_equal(a_arr, b_arr)
+                )
         except Exception:
             pass
         try:
             result = a == b
             # If result is array-like, use array_equal logic
-            if hasattr(result, '__len__'):
+            if hasattr(result, "__len__"):
                 return False  # Different array values → not equal
             return bool(result)
         except Exception:
@@ -395,7 +407,7 @@ def connect_nodes_across_graphs(
     max_num_neighbours=None,
     mesh_vertices=None,
     mesh_faces=None,
-    **kwargs
+    **kwargs,
 ):
     """
     Create a new graph containing the nodes in `G_source` and `G_target` and add
@@ -456,7 +468,10 @@ def connect_nodes_across_graphs(
         xy_source = np.array([G_source.nodes[n]["pos3d"] for n in source_nodes_list])
         use_3d = True
     elif target_has_3d:
-        from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
+        from weather_model_graphs.create.mesh.layouts.icosahedral import (
+            lat_lon_to_cartesian,
+        )
+
         source_lats = np.array([G_source.nodes[n]["pos"][0] for n in source_nodes_list])
         source_lons = np.array([G_source.nodes[n]["pos"][1] for n in source_nodes_list])
         xy_source = lat_lon_to_cartesian(source_lats, source_lons)
@@ -478,7 +493,11 @@ def connect_nodes_across_graphs(
     kdt_s = scipy.spatial.KDTree(xy_source)
 
     if method == "containing_rectangle":
-        if (max_dist is not None or rel_max_dist is not None or max_num_neighbours is not None):
+        if (
+            max_dist is not None
+            or rel_max_dist is not None
+            or max_num_neighbours is not None
+        ):
             raise Exception(
                 "to use `containing_rectangle` you should not set `max_dist`, `rel_max_dist` or `max_num_neighbours`"
             )
@@ -510,7 +529,11 @@ def connect_nodes_across_graphs(
         return filtered_graph
 
     elif method == "nearest_neighbour":
-        if (max_dist is not None or rel_max_dist is not None or max_num_neighbours is not None):
+        if (
+            max_dist is not None
+            or rel_max_dist is not None
+            or max_num_neighbours is not None
+        ):
             raise Exception(
                 "to use `nearest_neighbour` you should not set `max_dist`, `rel_max_dist` or `max_num_neighbours`"
             )
@@ -567,8 +590,8 @@ def connect_nodes_across_graphs(
                 if len(edge_check_graph.edges) > 0:
                     edge_lengths = []
                     for _, _, data in edge_check_graph.edges(data=True):
-                        if 'len' in data:
-                            edge_lengths.append(data['len'])
+                        if "len" in data:
+                            edge_lengths.append(data["len"])
                     if edge_lengths:
                         longest_graph_edge = max(edge_lengths)
                         longest_edge = max(longest_edge, longest_graph_edge)
@@ -577,16 +600,18 @@ def connect_nodes_across_graphs(
                 warnings.warn(
                     f"No edges with 'len' attribute found when computing rel_max_dist. "
                     f"Using default longest_edge={longest_edge}",
-                    UserWarning
+                    UserWarning,
                 )
             query_dist = longest_edge * rel_max_dist
-            print(f"query_dist = {query_dist:.4f}  (longest_edge={longest_edge:.4f}, rel={rel_max_dist})")
+            print(
+                f"query_dist = {query_dist:.4f}  (longest_edge={longest_edge:.4f}, rel={rel_max_dist})"
+            )
         else:
             query_dist = 0.5
             warnings.warn(
                 f"No max_dist or rel_max_dist provided for within_radius method. "
                 f"Using default query_dist={query_dist}",
-                UserWarning
+                UserWarning,
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(query_point):
@@ -606,8 +631,8 @@ def connect_nodes_across_graphs(
 
     elif method == "containing_triangle":
         from weather_model_graphs.create.mesh.layouts.icosahedral import (
-            lat_lon_to_cartesian,
             connect_mesh_to_grid,
+            lat_lon_to_cartesian,
         )
 
         if mesh_vertices is None or mesh_faces is None:
@@ -617,7 +642,7 @@ def connect_nodes_across_graphs(
             )
 
         grid_lat_lon = np.array([G_target.nodes[n]["pos"] for n in target_nodes_list])
-        fallback_to_nearest = kwargs.get('fallback_to_nearest', True)
+        fallback_to_nearest = kwargs.get("fallback_to_nearest", True)
 
         edge_index, weights = connect_mesh_to_grid(
             mesh_vertices=mesh_vertices,
@@ -629,7 +654,7 @@ def connect_nodes_across_graphs(
         if edge_index.shape[1] == 0:
             warnings.warn(
                 "No triangle containment connections found. Grid points may be outside mesh domain.",
-                UserWarning
+                UserWarning,
             )
             G_connect = networkx.DiGraph()
             G_connect.add_nodes_from(sorted(G_source.nodes(data=True)))
@@ -664,15 +689,13 @@ def connect_nodes_across_graphs(
             if "pos3d" in G_connect.nodes[source_node]:
                 source_pos_3d = G_connect.nodes[source_node]["pos3d"]
                 target_pos_3d = lat_lon_to_cartesian(
-                    np.array([target_pos_2d[0]]),
-                    np.array([target_pos_2d[1]])
+                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
                 )[0]
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
                 vdiff = source_pos_3d - target_pos_3d
             elif "pos3d" in G_connect.nodes[target_node]:
                 source_pos_3d = lat_lon_to_cartesian(
-                    np.array([source_pos_2d[0]]),
-                    np.array([source_pos_2d[1]])
+                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
                 )[0]
                 target_pos_3d = G_connect.nodes[target_node]["pos3d"]
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
@@ -687,15 +710,19 @@ def connect_nodes_across_graphs(
             if G_connect.has_edge(source_node, target_node):
                 # Duplicate edge (same mesh vertex connected to same grid point by
                 # two different triangles) — accumulate barycentric weight.
-                G_connect.edges[source_node, target_node]["barycentric_weight"] += weight
+                G_connect.edges[source_node, target_node][
+                    "barycentric_weight"
+                ] += weight
             else:
                 G_connect.add_edge(source_node, target_node)
-                G_connect.edges[source_node, target_node].update({
-                    "len": d,
-                    "vdiff": vdiff,
-                    "barycentric_weight": weight,
-                    "component": "m2g",
-                })
+                G_connect.edges[source_node, target_node].update(
+                    {
+                        "len": d,
+                        "vdiff": vdiff,
+                        "barycentric_weight": weight,
+                        "component": "m2g",
+                    }
+                )
 
         num_fallback_points = len(grid_points_with_fallback)
         if num_fallback_points > 0:
@@ -704,7 +731,7 @@ def connect_nodes_across_graphs(
                 f"Triangle containment failed for {num_fallback_points}/{total_grid_points} "
                 f"({num_fallback_points/total_grid_points*100:.1f}%) grid points. "
                 f"Used nearest neighbour fallback.",
-                UserWarning
+                UserWarning,
             )
 
         G_connect.graph["mesh_vertices"] = mesh_vertices
@@ -723,18 +750,22 @@ def connect_nodes_across_graphs(
         target_pos_2d = G_target.nodes[target_node]["pos"]
 
         if use_3d:
-            from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
+            from weather_model_graphs.create.mesh.layouts.icosahedral import (
+                lat_lon_to_cartesian,
+            )
+
             query_point = lat_lon_to_cartesian(
-                np.array([target_pos_2d[0]]),
-                np.array([target_pos_2d[1]])
+                np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
             )[0]
             query_points_for_kdt = query_point
         else:
-            query_points_for_kdt = np.array([
-                [target_pos_2d[0], target_pos_2d[1] - 360],
-                [target_pos_2d[0], target_pos_2d[1]],
-                [target_pos_2d[0], target_pos_2d[1] + 360]
-            ])
+            query_points_for_kdt = np.array(
+                [
+                    [target_pos_2d[0], target_pos_2d[1] - 360],
+                    [target_pos_2d[0], target_pos_2d[1]],
+                    [target_pos_2d[0], target_pos_2d[1] + 360],
+                ]
+            )
 
         neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(query_points_for_kdt)
 
@@ -745,15 +776,16 @@ def connect_nodes_across_graphs(
             if source_has_3d:
                 source_pos_3d = G_connect.nodes[source_node]["pos3d"]
                 target_pos_3d = lat_lon_to_cartesian(
-                    np.array([target_pos_2d[0]]),
-                    np.array([target_pos_2d[1]])
+                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
                 )[0]
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
             elif target_has_3d:
-                from weather_model_graphs.create.mesh.layouts.icosahedral import lat_lon_to_cartesian
+                from weather_model_graphs.create.mesh.layouts.icosahedral import (
+                    lat_lon_to_cartesian,
+                )
+
                 source_pos_3d = lat_lon_to_cartesian(
-                    np.array([source_pos_2d[0]]),
-                    np.array([source_pos_2d[1]])
+                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
                 )[0]
                 target_pos_3d = G_connect.nodes[target_node]["pos3d"]
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
