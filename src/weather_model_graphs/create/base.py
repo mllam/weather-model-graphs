@@ -131,6 +131,9 @@ def create_all_graph_components(
     if graph_crs is not None:
         spatial_coord_selector = SpatialCoordinateValuesSelector.for_crs(graph_crs, xy)
     else:
+        logger.warning(
+            "No `graph_crs` provided: using Euclidean distance metric for spatial neighbour queries."
+        )
         # No graph_crs provided: assume projected (Cartesian) coordinates,
         # so Euclidean distance is used as the default metric.
         spatial_coord_selector = SpatialCoordinateValuesSelector("euclidean", xy)
