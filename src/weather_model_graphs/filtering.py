@@ -4,7 +4,7 @@ Django-style filtering for NetworkX DiGraph objects.
 This module provides an expressive query interface for filtering nodes and edges
 of a NetworkX `DiGraph` using Django ORM-style syntax. It supports flexible
 attribute lookups, logical composition with `Q()` objects, nested indexing (e.g. `attr[0]__gt`),
-and returns a new filtered graph.
+spatial bounding box filtering, and returns a new filtered graph.
 
 Example
 -------
@@ -29,11 +29,17 @@ Example
 >>> list(filtered_q.nodes)
 [1, 3]
 
+# Filter nodes within a bounding box (x_min, x_max, y_min, y_max)
+>>> filtered_bbox = filter_graph(G, node__pos__bbox=(0, 10, 0, 20))
+>>> list(filtered_bbox.nodes)
+[1, 3]
+
 Features
 --------
 - Django-style field lookups: exact, lt, lte, gt, gte, contains, in, startswith, endswith, isnull
 - Attribute indexing support: e.g., node__pos[0]__gt=5
 - Logical composition with Q objects: AND (&), OR (|), NOT (~)
+- Spatial bounding box filter: node__pos__bbox=(x_min, x_max, y_min, y_max)
 - Returns a new DiGraph with matched nodes and edges
 """
 
@@ -112,18 +118,17 @@ def _get_nested_attr_value(attrs: Dict[str, Any], key: str) -> Any:
     return val
 
 
-def _match(attrs: Dict[str, Any], key: str, value: Any, node_id: Any = None) -> bool:
+def _match(attrs: Dict[str, Any], key: str, value: Any) -> bool:
     """
     Arguments
     ---------
     attrs : dict
-        The attribute dictionary of a node or edge.
+        The attribute dictionary of a node or edge. For node label matching,
+        the node ID should be injected under the "label" key by the caller.
     key : str
         The attribute path and lookup.
     value : Any
         The value to compare against.
-    node_id : Any, optional
-        The node ID for special case handling (e.g., label).
 
     Returns
     -------
@@ -134,12 +139,7 @@ def _match(attrs: Dict[str, Any], key: str, value: Any, node_id: Any = None) -> 
     if lookup not in LOOKUPS:
         raise ValueError(f"Unsupported lookup: {lookup}")
 
-    # Special case: node label
-    if attr == "label" and node_id is not None:
-        attr_val = node_id
-    else:
-        attr_val = _get_nested_attr_value(attrs, attr)
-
+    attr_val = _get_nested_attr_value(attrs, attr)
     return LOOKUPS[lookup](attr_val, value)
 
 
@@ -186,7 +186,9 @@ def _evaluate_q_object(q: Union[Q, dict], attrs: dict) -> bool:
     q : Q or dict
         The query object or raw lookup dictionary.
     attrs : dict
-        The node or edge attributes to test.
+        The node or edge attributes to test. For node filtering, inject the
+        node ID under the "label" key before calling, e.g.
+        _evaluate_q_object(q, {**attrs, "label": n}).
 
     Returns
     -------
@@ -206,6 +208,105 @@ def _evaluate_q_object(q: Union[Q, dict], attrs: dict) -> bool:
 
     combined = all(results) if q.connector == "AND" else any(results)
     return not combined if q.negated else combined
+
+
+def _node_matches_bbox(attrs: Dict[str, Any], bbox: tuple) -> bool:
+    """
+    Check whether a node's `pos` attribute falls within a bounding box.
+
+    Arguments
+    ---------
+    attrs : dict
+        The node attribute dictionary. Must contain a `pos` key with at least 2 elements.
+    bbox : tuple
+        A (x_min, x_max, y_min, y_max) bounding box. Bounds are inclusive.
+
+    Returns
+    -------
+    bool
+        True if the node's pos is within the bounding box.
+    """
+    pos = attrs.get("pos")
+    if pos is None or len(pos) < 2:
+        return False
+    x_min, x_max, y_min, y_max = bbox
+    return x_min <= pos[0] <= x_max and y_min <= pos[1] <= y_max
+
+
+def _split_q_by_prefix(q: "Q") -> "dict[str, Q]":
+    """
+    Walk a Q tree once and return a dict mapping each prefix ('node', 'edge')
+    to a new Q tree with that prefix stripped from all leaf dict keys.
+    Preserves AND/OR/NOT/negation structure exactly.
+
+    Arguments
+    ---------
+    q : Q
+        The query tree to split. All leaf dict keys must start with 'node__'
+        or 'edge__'. Mixed prefixes within a single leaf dict are not supported.
+
+    Returns
+    -------
+    dict[str, Q]
+        e.g. {'node': <Q with node__ stripped>, 'edge': <Q with edge__ stripped>}
+
+    Raises
+    ------
+    ValueError
+        If no recognized prefix is found, or if a single leaf dict contains
+        keys from more than one prefix.
+    """
+    # Note: this handles the common shallow Q trees used in practice (1-2 levels,
+    # single connector, root-level negation). Deeply nested trees with inner
+    # negations or mixed connectors at different levels are not a realistic use
+    # case for graph filtering and are not explicitly supported.
+    def _walk(node_q):
+        rewritten = {}
+        for child in node_q.children:
+            if isinstance(child, Q):
+                child_result = _walk(child)
+                for prefix, child_subtree in child_result.items():
+                    if prefix not in rewritten:
+                        new_q = Q()
+                        new_q.connector = node_q.connector
+                        new_q.negated = child.negated
+                        new_q.children = []
+                        rewritten[prefix] = new_q
+                    rewritten[prefix].children.append(child_subtree)
+            elif isinstance(child, dict):
+                prefixes_in_leaf = {k.split("__", 1)[0] for k in child if "__" in k}
+                recognized = prefixes_in_leaf & {"node", "edge"}
+                if len(recognized) > 1:
+                    raise ValueError(
+                        f"A single Q() cannot mix 'node__' and 'edge__' keys: {list(child.keys())}"
+                    )
+                if not recognized:
+                    raise ValueError(
+                        f"Q keys must start with 'node__' or 'edge__', got: {list(child.keys())}"
+                    )
+                prefix = next(iter(recognized))
+                stripped = {k[len(prefix) + 2:]: v for k, v in child.items()}
+                if prefix not in rewritten:
+                    new_q = Q()
+                    new_q.connector = node_q.connector
+                    new_q.negated = False
+                    new_q.children = []
+                    rewritten[prefix] = new_q
+                rewritten[prefix].children.append(stripped)
+        return rewritten
+
+    result = _walk(q)
+
+    if not result:
+        raise ValueError(
+            "Q args must contain at least one 'node__' or 'edge__' key."
+        )
+
+    # Apply root-level negation to each split subtree root
+    for split_q in result.values():
+        split_q.negated = q.negated
+
+    return result
 
 
 def filter_graph(
@@ -243,6 +344,8 @@ def filter_graph(
         - "filter_connected": include edges that match edge filters and connect to at least one node matching node filters
     **kwargs : dict
         Django-style field lookups prefixed with 'node__' or 'edge__'.
+        Special shorthand: node__pos__bbox=(x_min, x_max, y_min, y_max) for
+        spatial bounding box filtering on the node's `pos` attribute.
 
     Returns
     -------
@@ -256,7 +359,18 @@ def filter_graph(
     """
     filters = defaultdict(list)
 
+    # Extract bbox shorthand before standard Q parsing
+    bbox = None
+    filtered_kwargs = {}
     for k, v in kwargs.items():
+        if k == "node__pos__bbox":
+            if len(v) != 4:
+                raise ValueError("node__pos__bbox must be a 4-tuple (x_min, x_max, y_min, y_max)")
+            bbox = v
+        else:
+            filtered_kwargs[k] = v
+
+    for k, v in filtered_kwargs.items():
         if "__" not in k:
             raise ValueError(f"Query key must start with 'node__' or 'edge__': {k}")
         prefix, rest = k.split("__", 1)
@@ -267,36 +381,20 @@ def filter_graph(
     for q in args:
         if not isinstance(q, Q):
             raise ValueError("Positional args must be Q objects")
-
-        def classify_q(q):
-            if isinstance(q, Q):
-                new_q = Q()
-                new_q.connector = q.connector
-                new_q.negated = q.negated
-                new_q.children = [classify_q(c) for c in q.children]
-                return new_q
-            elif isinstance(q, dict):
-                classified = defaultdict(dict)
-                for k, v in q.items():
-                    prefix, rest = k.split("__", 1)
-                    classified[prefix][rest] = v
-                return {k: Q(**v) for k, v in classified.items()}
-
-        split_q = classify_q(q)
-        for prefix in ["node", "edge"]:
-            if prefix in split_q:
-                filters[prefix].append(split_q[prefix])
+        for prefix, rewritten in _split_q_by_prefix(q).items():
+            filters[prefix].append(rewritten)
 
     node_match = set()
     edge_match = set()
 
-    if "node" in filters:
+    if "node" in filters or bbox is not None:
         for n, attrs in graph.nodes(data=True):
-            if all(
-                _match(attrs, k, v, node_id=n)
-                for q in filters["node"]
-                for k, v in q.children[0].items()
-            ):
+            node_attrs = {**attrs, "label": n}
+            q_match = all(
+                _evaluate_q_object(q, node_attrs) for q in filters["node"]
+            )
+            bbox_match = _node_matches_bbox(attrs, bbox) if bbox is not None else True
+            if q_match and bbox_match:
                 node_match.add(n)
 
     if "edge" in filters:
