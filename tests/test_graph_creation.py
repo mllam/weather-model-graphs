@@ -263,6 +263,10 @@ def test_edgeless_nodes_preservation_in_different_graphs(
     )
     graph_target = wmg.create.grid.create_grid_graph_nodes(coordinates_grid)
     graph = wmg.create.base.connect_nodes_across_graphs(
-        G_source=graph_source, G_target=graph_target, method=method, **method_kwargs
+        G_source=graph_source,
+        G_target=graph_target,
+        method=method,
+        distance_metric="euclidean",
+        **method_kwargs,
     )
     assert set(graph.nodes) == set(graph_source.nodes) | set(graph_target.nodes)

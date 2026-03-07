@@ -238,11 +238,12 @@ def create_all_graph_components(
 def connect_nodes_across_graphs(
     G_source,
     G_target,
+    *,
     method="nearest_neighbour",
     max_dist=None,
     rel_max_dist=None,
     max_num_neighbours=None,
-    distance_metric: str = "euclidean",
+    distance_metric: str,
 ):
     """
     Create a new graph containing the nodes in `G_source` and `G_target` and add
@@ -276,9 +277,9 @@ def connect_nodes_across_graphs(
         relative to longest edge in (bottom level of) `G_source` and `G_target`.
     max_num_neighbours : int
         Maximum number of neighbours to search for in `G_target` for each node in `G_source`
-    distance_metric : str, optional
+    distance_metric : str
         Distance metric used for neighbour search. Supported values are
-        ``"euclidean"`` and ``"haversine"``. Defaults to ``"euclidean"``.
+        ``"euclidean"`` and ``"haversine"``.
 
     Returns
     -------
