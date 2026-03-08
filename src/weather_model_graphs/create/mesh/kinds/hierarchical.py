@@ -10,8 +10,8 @@ from .. import coords as mesh_coords
 
 def create_hierarchical_from_coordinates(
     G_coords_list: List[networkx.Graph],
-    intra_level: Optional[Dict[str, object]] = None,
-    inter_level: Optional[Dict[str, object]] = None,
+    intra_level: Dict[str, object] = {"pattern": "8-star"},
+    inter_level: Dict[str, object] = {"pattern": "nearest", "k": 1},
 ):
     """
     Create a hierarchical multiscale mesh graph from a list of mesh primitive
@@ -35,11 +35,11 @@ def create_hierarchical_from_coordinates(
         - Node attributes: ``"pos"`` (np.ndarray of shape [2,]), ``"type"`` (str)
         - Edge attributes: ``"adjacency_type"`` (str, ``"cardinal"`` or ``"diagonal"``)
         Created by ``create_multirange_2d_mesh_primitives``.
-    intra_level : dict, optional
+    intra_level : dict
         Configuration for intra-level connectivity. Keys:
         - ``"pattern"`` (str): ``"4-star"`` or ``"8-star"``.
         Default: ``{"pattern": "8-star"}``
-    inter_level : dict, optional
+    inter_level : dict
         Configuration for inter-level connectivity. Keys:
         - ``"pattern"`` (str): Currently only ``"nearest"`` is supported.
         - ``"k"`` (int): Number of nearest neighbours for inter-level connections.
@@ -52,11 +52,6 @@ def create_hierarchical_from_coordinates(
         edges (direction="same"), inter-level down edges (direction="down"),
         and inter-level up edges (direction="up").
     """
-    if intra_level is None:
-        intra_level = {"pattern": "8-star"}
-    if inter_level is None:
-        inter_level = {"pattern": "nearest", "k": 1}
-
     intra_level_pattern = intra_level.get("pattern", "8-star")
     inter_level_pattern = inter_level.get("pattern", "nearest")
     inter_level_k = inter_level.get("k", 1)
@@ -222,8 +217,13 @@ def create_hierarchical_multiscale_mesh_graph(
         interlevel_refinement_factor=level_refinement_factor,
     )
 
+    kwargs = {}
+    if intra_level is not None:
+        kwargs["intra_level"] = intra_level
+    if inter_level is not None:
+        kwargs["inter_level"] = inter_level
+
     return create_hierarchical_from_coordinates(
         G_coords_list,
-        intra_level=intra_level,
-        inter_level=inter_level,
+        **kwargs,
     )
