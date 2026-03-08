@@ -159,7 +159,7 @@ def create_directed_mesh_graph(
     return dg
 
 
-def create_single_level_2d_mesh_graph(xy, nx, ny):
+def create_single_level_2d_mesh_graph(xy: np.ndarray, nx: int, ny: int):
     """
     Create directed graph with nx * ny nodes representing a 2D grid with
     positions spanning the range of xy coordinate values (first dimension
@@ -201,7 +201,10 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
 
 
 def create_multirange_2d_mesh_primitives(
-    max_num_levels, xy, mesh_node_spacing=3, interlevel_refinement_factor=3
+    max_num_levels: int,
+    xy: np.ndarray,
+    mesh_node_spacing: float = 3,
+    interlevel_refinement_factor: float = 3,
 ):
     """
     Create a list of undirected mesh primitive graphs (nx.Graph) representing
@@ -285,7 +288,11 @@ def create_multirange_2d_mesh_primitives(
 
 
 def create_multirange_2d_mesh_graphs(
-    max_num_levels, xy, mesh_node_distance=3, level_refinement_factor=3
+    max_num_levels: int,
+    xy: np.ndarray,
+    mesh_node_distance: float = 3,
+    level_refinement_factor: float = 3,
+    pattern: str = "8-star",
 ):
     """
     Create a list of 2D grid mesh graphs representing different levels of edge-length
@@ -297,7 +304,7 @@ def create_multirange_2d_mesh_graphs(
 
     Internally uses the two-step process:
     1. create_multirange_2d_mesh_primitives (coordinate creation)
-    2. create_directed_mesh_graph (connectivity creation, pattern="8-star")
+    2. create_directed_mesh_graph (connectivity creation)
 
     Parameters
     ----------
@@ -305,15 +312,18 @@ def create_multirange_2d_mesh_graphs(
         Number of edge-distance levels in mesh graph
     xy : np.ndarray
         Grid point coordinates, shaped [N_grid_points, 2]
-    mesh_node_distance: float
+    mesh_node_distance : float
         Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of xy
-    level_refinement_factor: float
+    level_refinement_factor : float
         Refinement factor between grid points and bottom level of mesh hierarchy
+    pattern : str
+        Connectivity pattern for directed graph creation: ``"4-star"`` or
+        ``"8-star"`` (default: ``"8-star"``)
 
     Returns
     -------
-    G_all_levels : list of networkx.Graph
+    G_all_levels : list of networkx.DiGraph
         List of networkx graphs for each level representing the connectivity
         of the mesh within each level
     """
@@ -326,7 +336,7 @@ def create_multirange_2d_mesh_graphs(
 
     G_all_levels = []
     for g_coords in G_coords_list:
-        g_directed = create_directed_mesh_graph(g_coords, pattern="8-star")
+        g_directed = create_directed_mesh_graph(g_coords, pattern=pattern)
         G_all_levels.append(g_directed)
 
     return G_all_levels
