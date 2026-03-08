@@ -5,9 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.2.0...HEAD)
+## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
 
 ### Added
+
+- Add a decoding mask option to only include subset of grid nodes in m2g
+  [\#34](https://github.com/mllam/weather-model-graphs/pull/34) @joeloskarsson
+
+- Add test to check python codeblocks in README keep working as code changes
+  [\#38](https://github.com/mllam/weather-model-graphs/pull/38) @leifdenby
 
 - Add coords_crs and graph_crs arguments to allow for using lat-lons coordinates
   or other CRSs as input. These are then converted to the specific CRS used when
@@ -22,8 +28,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix the bug with edgeless nodes being dropped
+  [\#51](https://github.com/mllam/weather-model-graphs/pull/51), @pkhalaj, @wi-spang, @krikru
+
 - Fix crash when trying to create flat multiscale graphs with >= 3 levels
   [\#41](https://github.com/mllam/weather-model-graphs/pull/41), @joeloskarsson
+
+- Fix example in README
+  [\#38](https://github.com/mllam/weather-model-graphs/pull/38) @leifdenby
+
+### Maintenance
+
+- Update github CI actions, including pre-commit action to fix caching issue
+  that lead to tests failing
+  [\#48](https://github.com/mllam/weather-model-graphs/pull/48), @leifdenby
+
+- Update github CI actions to fix failing build and deploy of jupyterbook
+  [\#49](https://github.com/mllam/weather-model-graphs/pull/49),
+  [\#54](https://github.com/mllam/weather-model-graphs/pull/54), @leifdenby
 
 ## [v0.2.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.2.0)
 
