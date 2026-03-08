@@ -285,7 +285,7 @@ def _split_q_by_prefix(q: "Q") -> "dict[str, Q]":
                         f"Q keys must start with 'node__' or 'edge__', got: {list(child.keys())}"
                     )
                 prefix = next(iter(recognized))
-                stripped = {k[len(prefix) + 2:]: v for k, v in child.items()}
+                stripped = {k[len(prefix) + 2 :]: v for k, v in child.items()}
                 if prefix not in rewritten:
                     new_q = Q()
                     new_q.connector = node_q.connector
@@ -298,9 +298,7 @@ def _split_q_by_prefix(q: "Q") -> "dict[str, Q]":
     result = _walk(q)
 
     if not result:
-        raise ValueError(
-            "Q args must contain at least one 'node__' or 'edge__' key."
-        )
+        raise ValueError("Q args must contain at least one 'node__' or 'edge__' key.")
 
     # Apply root-level negation to each split subtree root
     for split_q in result.values():
@@ -365,7 +363,9 @@ def filter_graph(
     for k, v in kwargs.items():
         if k == "node__pos__bbox":
             if len(v) != 4:
-                raise ValueError("node__pos__bbox must be a 4-tuple (x_min, x_max, y_min, y_max)")
+                raise ValueError(
+                    "node__pos__bbox must be a 4-tuple (x_min, x_max, y_min, y_max)"
+                )
             bbox = v
         else:
             filtered_kwargs[k] = v
@@ -390,9 +390,7 @@ def filter_graph(
     if "node" in filters or bbox is not None:
         for n, attrs in graph.nodes(data=True):
             node_attrs = {**attrs, "label": n}
-            q_match = all(
-                _evaluate_q_object(q, node_attrs) for q in filters["node"]
-            )
+            q_match = all(_evaluate_q_object(q, node_attrs) for q in filters["node"])
             bbox_match = _node_matches_bbox(attrs, bbox) if bbox is not None else True
             if q_match and bbox_match:
                 node_match.add(n)

@@ -28,6 +28,7 @@ def simple_graph():
 
 # --- Basic filtering ---
 
+
 def test_simple_node_filter(simple_graph):
     result = filter_graph(simple_graph, **{"node__type": "mesh"}, retain="none")
     assert set(result.nodes) == {1, 3}
@@ -39,6 +40,7 @@ def test_simple_edge_filter(simple_graph):
 
 
 # --- OR logic on nodes (previously broken) ---
+
 
 def test_node_or_q_logic(simple_graph):
     """Q with OR should correctly match either condition."""
@@ -73,6 +75,7 @@ def test_node_nested_or_not_q_logic(simple_graph):
 
 # --- Bounding box filtering ---
 
+
 def test_bbox_basic(simple_graph):
     """Nodes within bbox should be returned."""
     result = filter_graph(simple_graph, node__pos__bbox=(0, 10, 0, 15), retain="none")
@@ -89,7 +92,9 @@ def test_bbox_boundary_inclusive(simple_graph):
 
 def test_bbox_no_matches(simple_graph):
     """Bbox that contains no nodes returns empty graph."""
-    result = filter_graph(simple_graph, node__pos__bbox=(100, 200, 100, 200), retain="none")
+    result = filter_graph(
+        simple_graph, node__pos__bbox=(100, 200, 100, 200), retain="none"
+    )
     assert len(result.nodes) == 0
 
 
@@ -125,6 +130,7 @@ def test_bbox_missing_pos_attribute():
 
 # --- _split_q_by_prefix guards ---
 
+
 def test_mixed_prefix_q_raises(simple_graph):
     """A Q with both node__ and edge__ keys in the same dict should raise."""
     with pytest.raises(ValueError, match="cannot mix"):
@@ -140,6 +146,7 @@ def test_unrecognized_prefix_q_raises(simple_graph):
 
 
 # --- Documented behaviour for edge cases not common in practice ---
+
 
 def test_inner_negation_is_preserved(simple_graph):
     """Inner negation on a child Q should be preserved after splitting."""
