@@ -13,11 +13,13 @@ These tests verify:
 6. Error handling for invalid inputs
 """
 
+import io
 import warnings
 
 import networkx as nx
 import numpy as np
 import pytest
+from loguru import logger
 
 import tests.utils as test_utils
 import weather_model_graphs as wmg
@@ -508,8 +510,9 @@ class TestBackwardCompatibility:
 
     def test_old_style_flat_with_mesh_node_distance(self):
         xy = test_utils.create_fake_xy(N=32)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        log_output = io.StringIO()
+        handler_id = logger.add(log_output, format="{message}", level="WARNING")
+        try:
             graph = wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="flat",
@@ -518,18 +521,16 @@ class TestBackwardCompatibility:
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
             )
-            # Should have deprecation warning
-            deprecation_warnings = [
-                x for x in w if issubclass(x.category, DeprecationWarning)
-            ]
-            assert len(deprecation_warnings) >= 1
-            assert "mesh_node_distance" in str(deprecation_warnings[0].message)
+        finally:
+            logger.remove(handler_id)
+        assert "mesh_node_distance" in log_output.getvalue()
         assert isinstance(graph, nx.DiGraph)
 
     def test_old_style_flat_multiscale(self):
         xy = test_utils.create_fake_xy(N=32)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        log_output = io.StringIO()
+        handler_id = logger.add(log_output, format="{message}", level="WARNING")
+        try:
             graph = wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="flat_multiscale",
@@ -542,16 +543,19 @@ class TestBackwardCompatibility:
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
             )
-            deprecation_warnings = [
-                x for x in w if issubclass(x.category, DeprecationWarning)
-            ]
-            assert len(deprecation_warnings) >= 3  # 3 migrated kwargs
+        finally:
+            logger.remove(handler_id)
+        log_text = log_output.getvalue()
+        assert "mesh_node_distance" in log_text
+        assert "level_refinement_factor" in log_text
+        assert "max_num_levels" in log_text
         assert isinstance(graph, nx.DiGraph)
 
     def test_old_style_hierarchical(self):
         xy = test_utils.create_fake_xy(N=32)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        log_output = io.StringIO()
+        handler_id = logger.add(log_output, format="{message}", level="WARNING")
+        try:
             graph = wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="hierarchical",
@@ -564,10 +568,12 @@ class TestBackwardCompatibility:
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
             )
-            deprecation_warnings = [
-                x for x in w if issubclass(x.category, DeprecationWarning)
-            ]
-            assert len(deprecation_warnings) >= 3
+        finally:
+            logger.remove(handler_id)
+        log_text = log_output.getvalue()
+        assert "mesh_node_distance" in log_text
+        assert "level_refinement_factor" in log_text
+        assert "max_num_levels" in log_text
         assert isinstance(graph, nx.DiGraph)
 
     def test_kwargs_dict_not_mutated(self):
@@ -1173,10 +1179,11 @@ class TestBackwardCompatEdgeCases:
 
     def test_old_kwargs_with_flat_multiscale_compat(self):
         """Old-style flat_multiscale kwargs should trigger deprecation warnings
-        and be migrated to the new names."""
+        (via loguru) and be migrated to the new names."""
         xy = test_utils.create_fake_xy(N=32)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        log_output = io.StringIO()
+        handler_id = logger.add(log_output, format="{message}", level="WARNING")
+        try:
             graph = wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="flat_multiscale",
@@ -1189,16 +1196,12 @@ class TestBackwardCompatEdgeCases:
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
             )
-            deprecation_warnings = [
-                x for x in w if issubclass(x.category, DeprecationWarning)
-            ]
-            # Should have 3 deprecation warnings
-            assert len(deprecation_warnings) >= 3
-            # Check the new names appear in the messages
-            msgs = " ".join(str(x.message) for x in deprecation_warnings)
-            assert "mesh_node_spacing" in msgs
-            assert "refinement_factor" in msgs
-            assert "max_num_refinement_levels" in msgs
+        finally:
+            logger.remove(handler_id)
+        log_text = log_output.getvalue()
+        assert "mesh_node_spacing" in log_text
+        assert "refinement_factor" in log_text
+        assert "max_num_refinement_levels" in log_text
         assert isinstance(graph, nx.DiGraph)
 
 
