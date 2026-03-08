@@ -8,7 +8,6 @@ used to represent the encode-process-decode steps respectively. These are create
 function uses `connect_nodes_across_graphs` to connect nodes across the component graphs.
 """
 
-import warnings
 from typing import Iterable
 
 import networkx
@@ -41,12 +40,12 @@ def _migrate_deprecated_kwargs(mesh_layout_kwargs, m2m_connectivity_kwargs):
     """Migrate old-style kwargs to the new mesh_layout_kwargs structure.
 
     In the old API, ``mesh_node_distance``, ``level_refinement_factor``, and
-    ``max_num_levels`` were passed via ``m2m_connectivity_kwargs``.  In the new
+    ``max_num_levels`` were passed via ``m2m_connectivity_kwargs``. In the new
     design these belong in ``mesh_layout_kwargs`` (as ``mesh_node_spacing``,
     ``refinement_factor``, and ``max_num_refinement_levels`` respectively).
 
-    This helper emits ``DeprecationWarning`` for each migrated key and moves
-    the value into *mesh_layout_kwargs*.  It is intended to be removed once the
+    This helper emits deprecation warnings for each migrated key and moves
+    the value into *mesh_layout_kwargs*. It is intended to be removed once the
     old API is no longer supported.
 
     Parameters
@@ -62,31 +61,25 @@ def _migrate_deprecated_kwargs(mesh_layout_kwargs, m2m_connectivity_kwargs):
         Updated (mesh_layout_kwargs, m2m_connectivity_kwargs).
     """
     if "mesh_node_distance" in m2m_connectivity_kwargs and "mesh_node_spacing" not in mesh_layout_kwargs:
-        warnings.warn(
+        logger.warning(
             "Passing 'mesh_node_distance' in m2m_connectivity_kwargs is deprecated. "
-            "Use mesh_layout_kwargs=dict(mesh_node_spacing=...) instead.",
-            DeprecationWarning,
-            stacklevel=3,
+            "Use mesh_layout_kwargs=dict(mesh_node_spacing=...) instead."
         )
         mesh_layout_kwargs["mesh_node_spacing"] = m2m_connectivity_kwargs.pop(
             "mesh_node_distance"
         )
     if "level_refinement_factor" in m2m_connectivity_kwargs and "refinement_factor" not in mesh_layout_kwargs:
-        warnings.warn(
+        logger.warning(
             "Passing 'level_refinement_factor' in m2m_connectivity_kwargs is deprecated. "
-            "Use mesh_layout_kwargs=dict(refinement_factor=...) instead.",
-            DeprecationWarning,
-            stacklevel=3,
+            "Use mesh_layout_kwargs=dict(refinement_factor=...) instead."
         )
         mesh_layout_kwargs["refinement_factor"] = (
             m2m_connectivity_kwargs.pop("level_refinement_factor")
         )
     if "max_num_levels" in m2m_connectivity_kwargs and "max_num_refinement_levels" not in mesh_layout_kwargs:
-        warnings.warn(
+        logger.warning(
             "Passing 'max_num_levels' in m2m_connectivity_kwargs is deprecated. "
-            "Use mesh_layout_kwargs=dict(max_num_refinement_levels=...) instead.",
-            DeprecationWarning,
-            stacklevel=3,
+            "Use mesh_layout_kwargs=dict(max_num_refinement_levels=...) instead."
         )
         mesh_layout_kwargs["max_num_refinement_levels"] = m2m_connectivity_kwargs.pop(
             "max_num_levels"
@@ -137,15 +130,15 @@ def create_all_graph_components(
 
     mesh_layout:
     - "rectilinear": Uniform regular grid with ``mesh_node_spacing`` resolution.
-        Produces an undirected mesh primitive with 4-star (cardinal) and
-        8-star (cardinal + diagonal) spatial adjacency edges.
+      Produces an undirected mesh primitive with 4-star (cardinal) and
+      8-star (cardinal + diagonal) spatial adjacency edges.
 
     mesh_layout_kwargs (for mesh_layout="rectilinear"):
     - mesh_node_spacing: float, distance between mesh nodes in coordinate units.
     - refinement_factor: int, refinement factor between levels
-        (for multi-level and hierarchical mesh graphs, default: 3)
+      (for multi-level and hierarchical mesh graphs, default: 3)
     - max_num_refinement_levels: int, maximum number of mesh levels
-        (for multi-level and hierarchical mesh graphs)
+      (for multi-level and hierarchical mesh graphs)
 
     Wherever the ``pattern`` argument appears below it defines the spatial
     neighbourhood connectivity:
@@ -154,11 +147,11 @@ def create_all_graph_components(
 
     m2m_connectivity:
     - "flat": Create a single-level directed mesh graph.
-        m2m_connectivity_kwargs: pattern (default: "8-star")
+      m2m_connectivity_kwargs: pattern (default: "8-star")
     - "flat_multiscale": Create a flat multiscale mesh graph.
-        m2m_connectivity_kwargs: pattern (default: "8-star")
+      m2m_connectivity_kwargs: pattern (default: "8-star")
     - "hierarchical": Create a hierarchical mesh graph with up/down connections.
-        m2m_connectivity_kwargs: intra_level=dict(pattern=...), inter_level=dict(pattern=..., k=...)
+      m2m_connectivity_kwargs: intra_level=dict(pattern=...), inter_level=dict(pattern=..., k=...)
 
     m2g_connectivity:
     - "nearest_neighbour": Find the nearest neighbour in mesh for each node in grid
@@ -308,10 +301,16 @@ def create_all_graph_components(
         # hierarchical mesh graph have three sub-graphs:
         # `m2m` (mesh-to-mesh), `mesh_up` (up edge connections) and
         # `mesh_down` (down edge connections)
+        hier_kwargs = {}
+        intra = m2m_connectivity_kwargs.get("intra_level")
+        inter = m2m_connectivity_kwargs.get("inter_level")
+        if intra is not None:
+            hier_kwargs["intra_level"] = intra
+        if inter is not None:
+            hier_kwargs["inter_level"] = inter
         graph_components["m2m"] = create_hierarchical_from_coordinates(
             G_coords_list,
-            intra_level=m2m_connectivity_kwargs.get("intra_level"),
-            inter_level=m2m_connectivity_kwargs.get("inter_level"),
+            **hier_kwargs,
         )
         # Only connect grid to bottom level of hierarchy
         grid_connect_graph = split_graph_by_edge_attribute(
