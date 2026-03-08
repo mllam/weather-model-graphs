@@ -272,4 +272,4 @@ def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
             " so that the mesh nodes are spaced closer together?"
         )
 
-    return mesh_coords.create_single_level_2d_mesh_graph(xy, nx, ny)
+    return mesh_coords.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
