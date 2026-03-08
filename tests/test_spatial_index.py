@@ -156,6 +156,36 @@ class TestHaversineWithRadius:
         idxs, _ = sel.with_radius([0.0, 0.0], radius=radius_rad)
         assert set(idxs) == {0}
 
+class TestHaversineLongitudeWrapAround:
+    """Regression tests for periodic longitude behaviour around +/-180 deg."""
+
+    @pytest.fixture()
+    def equator_periodic_coords(self):
+        # Equally spaced points on the equator, matching the periodic-domain notebook.
+        lons = np.linspace(0.0, 360.0, 40, endpoint=False)
+        lats = np.zeros_like(lons)
+        return np.column_stack([lons, lats])
+
+    def test_nearest_neighbour_wraps_across_dateline(self, equator_periodic_coords):
+        """A query near 360 deg should see 0 deg as nearest via spherical wrap-around."""
+        sel = SpatialCoordinateValuesSelector("haversine", equator_periodic_coords)
+        idxs, dists = sel.k_nearest_to([359.0, 0.0], k=2)
+        nearest_lons = equator_periodic_coords[idxs, 0]
+
+        # 0 deg is 1 degree away on the sphere, while 351 deg is 8 degrees away.
+        assert 0.0 in nearest_lons
+        assert dists.min() == pytest.approx(np.deg2rad(1.0), rel=1e-4)
+
+    def test_radius_query_crosses_longitude_seam(self, equator_periodic_coords):
+        """Radius query near 360 deg should include 0 deg neighbour across seam."""
+        sel = SpatialCoordinateValuesSelector("haversine", equator_periodic_coords)
+        idxs, _ = sel.with_radius([359.0, 0.0], radius=np.deg2rad(5.0))
+        lons_in_radius = set(equator_periodic_coords[idxs, 0])
+
+        # 0 deg is within 1 degree across seam; 351 deg is 8 degrees away and excluded.
+        assert 0.0 in lons_in_radius
+        assert 351.0 not in lons_in_radius
+
 
 
 # Factory: for_crs
