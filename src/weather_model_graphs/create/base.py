@@ -29,7 +29,7 @@ from .mesh.kinds.flat import (
     create_flat_singlescale_mesh_graph,
 )
 from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
-from .connectivity_checks import check_g2m_connectivity
+from .connectivity_checks import check_for_unconnected_grid_nodes
 
 
 def create_all_graph_components(
@@ -44,6 +44,7 @@ def create_all_graph_components(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
+    allow_unconnected_grid_nodes: bool = False,
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -162,8 +163,8 @@ def create_all_graph_components(
     )
     graph_components["g2m"] = G_g2m
     
-    # Run safety assertion to catch isolated grid nodes
-    check_g2m_connectivity(G_g2m)
+    if not allow_unconnected_grid_nodes:
+        check_for_unconnected_grid_nodes(G_g2m)
 
     if decode_mask is None:
         # decode to all grid nodes
