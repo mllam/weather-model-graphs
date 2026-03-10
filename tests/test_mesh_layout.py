@@ -36,7 +36,6 @@ from weather_model_graphs.create.mesh.kinds.hierarchical import (
     create_hierarchical_from_coordinates,
 )
 
-
 # ====================
 # Step 1: Coordinate creation tests
 # ====================
@@ -841,7 +840,10 @@ class TestCoordinateCreationEdgeCases:
         """max_num_levels=None should auto-compute levels."""
         xy = test_utils.create_fake_xy(N=30)
         G_list = create_multirange_2d_mesh_primitives(
-            max_num_levels=None, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
+            max_num_levels=None,
+            xy=xy,
+            mesh_node_spacing=3,
+            interlevel_refinement_factor=3,
         )
         assert isinstance(G_list, list)
         assert len(G_list) >= 1
@@ -904,8 +906,9 @@ class TestConnectivityCreationEdgeCases:
         for u, v in G.edges():
             if G.has_edge(v, u):
                 np.testing.assert_allclose(
-                    G.edges[u, v]["vdiff"], -G.edges[v, u]["vdiff"],
-                    err_msg=f"vdiff not antisymmetric for ({u},{v})"
+                    G.edges[u, v]["vdiff"],
+                    -G.edges[v, u]["vdiff"],
+                    err_msg=f"vdiff not antisymmetric for ({u},{v})",
                 )
 
     def test_edge_len_matches_vdiff_norm(self):
@@ -916,8 +919,9 @@ class TestConnectivityCreationEdgeCases:
         for u, v, d in G.edges(data=True):
             expected_len = np.sqrt(np.sum(d["vdiff"] ** 2))
             np.testing.assert_allclose(
-                d["len"], expected_len,
-                err_msg=f"Edge ({u},{v}) len doesn't match vdiff norm"
+                d["len"],
+                expected_len,
+                err_msg=f"Edge ({u},{v}) len doesn't match vdiff norm",
             )
 
     def test_flat_multiscale_single_level_input(self):
@@ -1322,7 +1326,7 @@ class TestGraphStructuralProperties:
         down_count = sum(
             1 for _, _, d in m2m.edges(data=True) if d.get("direction") == "down"
         )
-        assert up_count == down_count, (
-            f"Up edges ({up_count}) != Down edges ({down_count})"
-        )
+        assert (
+            up_count == down_count
+        ), f"Up edges ({up_count}) != Down edges ({down_count})"
         assert up_count > 0, "Should have at least some up/down edges"

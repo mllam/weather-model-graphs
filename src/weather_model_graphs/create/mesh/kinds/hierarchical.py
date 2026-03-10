@@ -64,9 +64,7 @@ def create_hierarchical_from_coordinates(
 
     # Convert each level's coordinate graph to directed graph with chosen pattern
     Gs_all_levels = [
-        mesh_coords.create_directed_mesh_graph(
-            g_coords, pattern=intra_level_pattern
-        )
+        mesh_coords.create_directed_mesh_graph(g_coords, pattern=intra_level_pattern)
         for g_coords in G_coords_list
     ]
 
@@ -76,8 +74,8 @@ def create_hierarchical_from_coordinates(
         raise ValueError(
             "At least two mesh levels are required for hierarchical mesh graph. "
             "You may need to reduce the level refinement factor "
-            f"or increase the max number of levels "
-            f"or number of grid points."
+            "or increase the max number of levels "
+            "or number of grid points."
         )
 
     # Relabel nodes of each level with level index first
@@ -130,9 +128,7 @@ def create_hierarchical_from_coordinates(
                 # add edge from coarser to finer
                 G_down.add_edge(u, v)
                 d = np.sqrt(
-                    np.sum(
-                        (G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]) ** 2
-                    )
+                    np.sum((G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]) ** 2)
                 )
                 G_down.edges[u, v]["len"] = d
                 G_down.edges[u, v]["vdiff"] = (

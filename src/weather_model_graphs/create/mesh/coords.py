@@ -78,9 +78,7 @@ def create_single_level_2d_mesh_primitive(xy: np.ndarray, nx: int, ny: int):
     return g
 
 
-def create_directed_mesh_graph(
-    G_undirected: networkx.Graph, pattern: str = "8-star"
-):
+def create_directed_mesh_graph(G_undirected: networkx.Graph, pattern: str = "8-star"):
     """
     Convert an undirected mesh primitive graph with spatial adjacency edges to a
     directed mesh graph (nx.DiGraph) based on the specified connectivity pattern.
@@ -139,9 +137,7 @@ def create_directed_mesh_graph(
     dg = networkx.DiGraph(g_filtered)
     for u, v in g_filtered.edges():
         d = np.sqrt(
-            np.sum(
-                (G_undirected.nodes[u]["pos"] - G_undirected.nodes[v]["pos"]) ** 2
-            )
+            np.sum((G_undirected.nodes[u]["pos"] - G_undirected.nodes[v]["pos"]) ** 2)
         )
         dg.edges[u, v]["len"] = d
         dg.edges[u, v]["vdiff"] = (
@@ -270,9 +266,7 @@ def create_multirange_2d_mesh_primitives(
     G_all_levels = []
     for lev in range(mesh_levels_to_create):  # 0-index mesh levels
         # Compute number of nodes on level separate for each direction
-        nodes_x, nodes_y = (
-            nleaf / (interlevel_refinement_factor**lev)
-        ).astype(int)
+        nodes_x, nodes_y = (nleaf / (interlevel_refinement_factor**lev)).astype(int)
         g = create_single_level_2d_mesh_primitive(xy, nodes_x, nodes_y)
         # Add level information to nodes, edges and full graph
         for node in g.nodes:

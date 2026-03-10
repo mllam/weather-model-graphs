@@ -23,16 +23,16 @@ from ..networkx_utils import (
     split_on_edge_attribute_existance,
 )
 from .grid import create_grid_graph_nodes
+from .mesh.coords import (
+    create_multirange_2d_mesh_primitives,
+    create_single_level_2d_mesh_primitive,
+)
 from .mesh.kinds.flat import (
     create_flat_multiscale_from_coordinates,
     create_flat_singlescale_from_coordinates,
 )
 from .mesh.kinds.hierarchical import (
     create_hierarchical_from_coordinates,
-)
-from .mesh.coords import (
-    create_multirange_2d_mesh_primitives,
-    create_single_level_2d_mesh_primitive,
 )
 
 
@@ -60,7 +60,10 @@ def _migrate_deprecated_kwargs(mesh_layout_kwargs, m2m_connectivity_kwargs):
     tuple[dict, dict]
         Updated (mesh_layout_kwargs, m2m_connectivity_kwargs).
     """
-    if "mesh_node_distance" in m2m_connectivity_kwargs and "mesh_node_spacing" not in mesh_layout_kwargs:
+    if (
+        "mesh_node_distance" in m2m_connectivity_kwargs
+        and "mesh_node_spacing" not in mesh_layout_kwargs
+    ):
         logger.warning(
             "Passing 'mesh_node_distance' in m2m_connectivity_kwargs is deprecated. "
             "Use mesh_layout_kwargs=dict(mesh_node_spacing=...) instead."
@@ -68,15 +71,21 @@ def _migrate_deprecated_kwargs(mesh_layout_kwargs, m2m_connectivity_kwargs):
         mesh_layout_kwargs["mesh_node_spacing"] = m2m_connectivity_kwargs.pop(
             "mesh_node_distance"
         )
-    if "level_refinement_factor" in m2m_connectivity_kwargs and "refinement_factor" not in mesh_layout_kwargs:
+    if (
+        "level_refinement_factor" in m2m_connectivity_kwargs
+        and "refinement_factor" not in mesh_layout_kwargs
+    ):
         logger.warning(
             "Passing 'level_refinement_factor' in m2m_connectivity_kwargs is deprecated. "
             "Use mesh_layout_kwargs=dict(refinement_factor=...) instead."
         )
-        mesh_layout_kwargs["refinement_factor"] = (
-            m2m_connectivity_kwargs.pop("level_refinement_factor")
+        mesh_layout_kwargs["refinement_factor"] = m2m_connectivity_kwargs.pop(
+            "level_refinement_factor"
         )
-    if "max_num_levels" in m2m_connectivity_kwargs and "max_num_refinement_levels" not in mesh_layout_kwargs:
+    if (
+        "max_num_levels" in m2m_connectivity_kwargs
+        and "max_num_refinement_levels" not in mesh_layout_kwargs
+    ):
         logger.warning(
             "Passing 'max_num_levels' in m2m_connectivity_kwargs is deprecated. "
             "Use mesh_layout_kwargs=dict(max_num_refinement_levels=...) instead."
@@ -254,9 +263,7 @@ def create_all_graph_components(
                     "want to decrease the `mesh_node_spacing` so that the mesh nodes "
                     "are spaced closer together?"
                 )
-            G_mesh_coords = create_single_level_2d_mesh_primitive(
-                xy, nx_mesh, ny_mesh
-            )
+            G_mesh_coords = create_single_level_2d_mesh_primitive(xy, nx_mesh, ny_mesh)
         else:
             raise NotImplementedError(
                 f"mesh_layout='{mesh_layout}' is not yet supported. "

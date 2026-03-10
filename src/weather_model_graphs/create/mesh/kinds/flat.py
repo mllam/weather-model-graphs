@@ -131,11 +131,7 @@ def create_flat_multiscale_from_coordinates(
                 :,
             ]
             .reshape(
-                int(
-                    num_nodes_x
-                    * num_nodes_y
-                    / (interlevel_refinement_factor**2)
-                ),
+                int(num_nodes_x * num_nodes_y / (interlevel_refinement_factor**2)),
                 2,
             )
         )
