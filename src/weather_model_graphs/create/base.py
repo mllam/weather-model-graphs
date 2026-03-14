@@ -260,7 +260,12 @@ def connect_nodes_across_graphs(
     target_nodes_list = list(G_target.nodes)
 
     # build kd tree for source nodes (e.g. the mesh nodes when constructing m2g)
-    xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
+    source_nodes_list = list(G_source.nodes)
+
+    xy_source = np.array(
+        [G_source.nodes[node]["pos"] for node in source_nodes_list]
+    )
+
     kdt_s = scipy.spatial.KDTree(xy_source)
 
     # Determine method and perform checks once
@@ -402,7 +407,7 @@ def connect_nodes_across_graphs(
     G_connect.add_nodes_from(sorted(G_target.nodes(data=True)))
 
     # sort nodes by index
-    source_nodes_list = sorted(G_source.nodes)
+    
 
     # add edges
     for target_node in target_nodes_list:
