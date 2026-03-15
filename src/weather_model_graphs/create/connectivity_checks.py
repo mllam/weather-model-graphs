@@ -4,7 +4,9 @@ Diagnostics and safety checks for graph connectivity during mesh generation.
 import networkx as nx
 
 
-def check_g2m_connectivity(g2m_graph: nx.DiGraph, num_grid_nodes: int) -> None:
+def check_for_unconnected_grid_nodes(
+    g2m_graph: nx.DiGraph, num_grid_nodes: int
+) -> None:
     """
     Asserts that all grid nodes in the Grid-to-Mesh (g2m) graph are connected
     to at least one mesh node.

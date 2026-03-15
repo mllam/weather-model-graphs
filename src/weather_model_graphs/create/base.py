@@ -23,13 +23,13 @@ from ..networkx_utils import (
     split_graph_by_edge_attribute,
     split_on_edge_attribute_existance,
 )
+from .connectivity_checks import check_for_unconnected_grid_nodes
 from .grid import create_grid_graph_nodes
 from .mesh.kinds.flat import (
     create_flat_multiscale_mesh_graph,
     create_flat_singlescale_mesh_graph,
 )
 from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
-from .connectivity_checks import check_for_unconnected_grid_nodes
 
 
 def create_all_graph_components(
@@ -162,10 +162,10 @@ def create_all_graph_components(
         **g2m_connectivity_kwargs,
     )
     graph_components["g2m"] = G_g2m
-    
-    if not allow_unconnected_grid_nodes:
-        check_for_unconnected_grid_nodes(G_g2m)
 
+    if not allow_unconnected_grid_nodes:
+        # THE FIX: Pass len(G_grid.nodes) as the second argument
+        check_for_unconnected_grid_nodes(G_g2m, len(G_grid.nodes))
     if decode_mask is None:
         # decode to all grid nodes
         decode_grid = G_grid

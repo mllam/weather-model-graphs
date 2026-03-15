@@ -1,7 +1,9 @@
 import networkx as nx
 import pytest
 
-from weather_model_graphs.create.connectivity_checks import check_g2m_connectivity
+from weather_model_graphs.create.connectivity_checks import (
+    check_for_unconnected_grid_nodes,
+)
 
 
 def test_g2m_connectivity_raises_value_error_on_isolated_nodes():
@@ -16,4 +18,4 @@ def test_g2m_connectivity_raises_value_error_on_isolated_nodes():
     # Node 2 is left isolated (out-degree = 0)
 
     with pytest.raises(ValueError, match=r"1 grid node\(s\) are not connected"):
-        check_g2m_connectivity(G, num_grid_nodes=3)
+        check_for_unconnected_grid_nodes(G, num_grid_nodes=3)
