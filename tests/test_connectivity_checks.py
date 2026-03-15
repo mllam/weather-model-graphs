@@ -18,4 +18,4 @@ def test_g2m_connectivity_raises_value_error_on_isolated_nodes():
     # Node 2 is left isolated (out-degree = 0)
 
     with pytest.raises(ValueError, match=r"1 grid node\(s\) are not connected"):
-        check_for_unconnected_grid_nodes(G, num_grid_nodes=3)
+        check_for_unconnected_grid_nodes(G, grid_nodes=[0, 1, 2])

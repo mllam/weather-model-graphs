@@ -164,8 +164,8 @@ def create_all_graph_components(
     graph_components["g2m"] = G_g2m
 
     if not allow_unconnected_grid_nodes:
-        # THE FIX: Pass len(G_grid.nodes) as the second argument
-        check_for_unconnected_grid_nodes(G_g2m, len(G_grid.nodes))
+        # Pass the actual grid nodes to check their out-degree
+        check_for_unconnected_grid_nodes(G_g2m, list(G_grid.nodes))
     if decode_mask is None:
         # decode to all grid nodes
         decode_grid = G_grid
