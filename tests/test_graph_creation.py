@@ -80,6 +80,7 @@ def test_create_graph_generic(m2g_connectivity, g2m_connectivity, m2m_connectivi
                     g2m_connectivity_kwargs=g2m_kwargs,
                     m2g_connectivity=m2g_connectivity,
                     m2g_connectivity_kwargs=m2g_kwargs,
+                    allow_unconnected_grid_nodes=True,
                 )
 
                 assert isinstance(graph, nx.DiGraph)
