@@ -10,8 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added a safety assertion in g2m graph creation to ensure all grid nodes connect to the mesh (#42).
+- Add `__version__` attribute to the package init
+  [\#56](https://github.com/mllam/weather-model-graphs/pull/56) @AdMub
 
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
+
 
 ### Added
 
