@@ -221,8 +221,6 @@ def test_create_decode_mask(kind):
     filtered_m2g_edges = [
         e for e in filtered_graph.edges(data=True) if e[2].get("component") == "m2g"
     ]
-    print(len(unfiltered_m2g_edges))
-    print(len(filtered_m2g_edges))
     assert len(filtered_m2g_edges) < len(unfiltered_m2g_edges)
 
 
