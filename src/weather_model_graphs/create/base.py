@@ -31,6 +31,20 @@ from .mesh.kinds.flat import (
 from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
 
 
+def detect_grid_structure(coords):
+    """
+    Detect whether coordinates form a structured grid or irregular grid.
+    """
+
+    xs = np.unique(coords[:, 0])
+    ys = np.unique(coords[:, 1])
+
+    if len(xs) * len(ys) == len(coords):
+        return "structured"
+    else:
+        return "irregular"
+
+
 def create_all_graph_components(
     coords: np.ndarray,
     m2m_connectivity: str,
@@ -100,7 +114,8 @@ def create_all_graph_components(
     assert (
         len(coords.shape) == 2 and coords.shape[1] == 2
     ), "Grid node coordinates should be given as an array of shape [num_grid_nodes, 2]."
-
+    grid_type = detect_grid_structure(coords)
+    logger.debug(f"Detected grid structure: {grid_type}")
     # Translate between coordinate crs and crs to use for graph creation
     if coords_crs is None and coords_crs is None:
         logger.debug(
