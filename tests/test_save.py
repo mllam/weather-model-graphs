@@ -1,4 +1,8 @@
+import pickle
 import tempfile
+from pathlib import Path
+
+import networkx as nx
 
 import pytest
 from loguru import logger
@@ -40,3 +44,26 @@ def test_save_to_pyg(list_from_attribute):
                 name=name,
                 list_from_attribute=list_from_attribute,
             )
+
+
+def test_save_to_pickle():
+    """
+    Test that to_pickle safely exports a graph to disk and allows
+    reloading without structural loss.
+    """
+    xy = test_utils.create_fake_xy(N=64)
+    graph = wmg.create.archetype.create_oskarsson_hierarchical_graph(coords=xy)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        name = "test_pickle_graph"
+        wmg.save.to_pickle(graph=graph, output_directory=tmpdir, name=name)
+
+        expected_path = Path(tmpdir) / f"{name}.pickle"
+        assert expected_path.exists()
+
+        with open(expected_path, "rb") as f:
+            loaded_graph = pickle.load(f)
+
+        assert isinstance(loaded_graph, nx.DiGraph)
+        assert len(loaded_graph.nodes) == len(graph.nodes)
+        assert len(loaded_graph.edges) == len(graph.edges)
