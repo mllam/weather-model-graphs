@@ -729,7 +729,7 @@ def connect_nodes_across_graphs(
             total_grid_points = len(target_nodes_list)
             warnings.warn(
                 f"Triangle containment failed for {num_fallback_points}/{total_grid_points} "
-                f"({num_fallback_points/total_grid_points*100:.1f}%) grid points. "
+                f"({num_fallback_points / total_grid_points * 100:.1f}%) grid points. "
                 f"Used nearest neighbour fallback.",
                 UserWarning,
             )

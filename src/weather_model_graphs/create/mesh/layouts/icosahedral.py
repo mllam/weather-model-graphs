@@ -282,7 +282,7 @@ def connect_mesh_to_grid(
         total_points = len(grid_cartesian)
         warnings.warn(
             f"Triangle containment failed for {failed_points}/{total_points} "
-            f"({failed_points/total_points*100:.1f}%) grid points. "
+            f"({failed_points / total_points * 100:.1f}%) grid points. "
             f"{'Used nearest neighbour fallback.' if fallback_to_nearest else 'Points were skipped.'}",
             UserWarning,
         )
