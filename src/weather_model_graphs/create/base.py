@@ -185,6 +185,7 @@ def create_all_graph_components(
             create_hierarchical_icosahedral_mesh_graph,
             generate_icosahedral_mesh,
             refinement_level_from_grid_spacing,
+            tangential_plane_vdiff,
         )
 
         def _is_geographic_crs(crs):
@@ -464,14 +465,16 @@ def connect_nodes_across_graphs(
     source_has_3d = "pos3d" in G_source.nodes[sample_source]
     target_has_3d = "pos3d" in G_target.nodes[sample_target]
 
+    if source_has_3d or target_has_3d:
+        from weather_model_graphs.create.mesh.layouts.icosahedral import (
+            lat_lon_to_cartesian,
+            tangential_plane_vdiff,
+        )
+
     if source_has_3d:
         xy_source = np.array([G_source.nodes[n]["pos3d"] for n in source_nodes_list])
         use_3d = True
     elif target_has_3d:
-        from weather_model_graphs.create.mesh.layouts.icosahedral import (
-            lat_lon_to_cartesian,
-        )
-
         source_lats = np.array([G_source.nodes[n]["pos"][0] for n in source_nodes_list])
         source_lons = np.array([G_source.nodes[n]["pos"][1] for n in source_nodes_list])
         xy_source = lat_lon_to_cartesian(source_lats, source_lons)
@@ -634,23 +637,23 @@ def connect_nodes_across_graphs(
             connect_mesh_to_grid,
             lat_lon_to_cartesian,
         )
-
+ 
         if mesh_vertices is None or mesh_faces is None:
             raise ValueError(
                 "containing_triangle method requires mesh_vertices and mesh_faces "
                 "to be passed to connect_nodes_across_graphs."
             )
-
+ 
         grid_lat_lon = np.array([G_target.nodes[n]["pos"] for n in target_nodes_list])
         fallback_to_nearest = kwargs.get("fallback_to_nearest", True)
-
+ 
         edge_index, weights = connect_mesh_to_grid(
             mesh_vertices=mesh_vertices,
             mesh_faces=mesh_faces,
             grid_lat_lon=grid_lat_lon,
             fallback_to_nearest=fallback_to_nearest,
         )
-
+ 
         if edge_index.shape[1] == 0:
             warnings.warn(
                 "No triangle containment connections found. Grid points may be outside mesh domain.",
@@ -660,53 +663,52 @@ def connect_nodes_across_graphs(
             G_connect.add_nodes_from(sorted(G_source.nodes(data=True)))
             G_connect.add_nodes_from(sorted(G_target.nodes(data=True)))
             return G_connect
-
+ 
         G_connect = networkx.DiGraph()
         G_connect.add_nodes_from(sorted(G_source.nodes(data=True)))
         G_connect.add_nodes_from(sorted(G_target.nodes(data=True)))
-
+ 
         grid_points_with_fallback = set()
-
+ 
         for col in range(edge_index.shape[1]):
             mesh_idx = edge_index[0, col]
             grid_idx = edge_index[1, col]
             weight = weights[col]
-
+ 
             # Skip zero-weight edges: a triangle vertex with w=0 contributes nothing
             # to interpolation and would fail the barycentric_weight > 0 invariant.
             if weight <= 0.0:
                 continue
-
+ 
             source_node = source_nodes_list[mesh_idx]
             target_node = target_nodes_list[grid_idx]
-
+ 
             if abs(weight - 1.0) < 1e-10:
                 grid_points_with_fallback.add(grid_idx)
-
+ 
             source_pos_2d = G_connect.nodes[source_node]["pos"]
             target_pos_2d = G_connect.nodes[target_node]["pos"]
-
-            if "pos3d" in G_connect.nodes[source_node]:
+ 
+            if source_has_3d:
                 source_pos_3d = G_connect.nodes[source_node]["pos3d"]
                 target_pos_3d = lat_lon_to_cartesian(
                     np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
                 )[0]
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
-                vdiff = source_pos_3d - target_pos_3d
-            elif "pos3d" in G_connect.nodes[target_node]:
+                vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
+            elif target_has_3d:
                 source_pos_3d = lat_lon_to_cartesian(
                     np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
                 )[0]
                 target_pos_3d = G_connect.nodes[target_node]["pos3d"]
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
-                vdiff = source_pos_3d - target_pos_3d
+                vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
             else:
                 dlat = source_pos_2d[0] - target_pos_2d[0]
-                dlon = source_pos_2d[1] - target_pos_2d[1]
-                dlon = (dlon + 180) % 360 - 180
+                dlon = (source_pos_2d[1] - target_pos_2d[1] + 180) % 360 - 180
                 d = np.sqrt(dlat**2 + dlon**2)
                 vdiff = np.array([dlat, dlon])
-
+ 
             if G_connect.has_edge(source_node, target_node):
                 # Duplicate edge (same mesh vertex connected to same grid point by
                 # two different triangles) — accumulate barycentric weight.
@@ -723,7 +725,7 @@ def connect_nodes_across_graphs(
                         "component": "m2g",
                     }
                 )
-
+ 
         num_fallback_points = len(grid_points_with_fallback)
         if num_fallback_points > 0:
             total_grid_points = len(target_nodes_list)
@@ -733,11 +735,11 @@ def connect_nodes_across_graphs(
                 f"Used nearest neighbour fallback.",
                 UserWarning,
             )
-
+ 
         G_connect.graph["mesh_vertices"] = mesh_vertices
         G_connect.graph["mesh_faces"] = mesh_faces
         return G_connect
-
+ 
     else:
         raise NotImplementedError(method)
 
@@ -750,10 +752,6 @@ def connect_nodes_across_graphs(
         target_pos_2d = G_target.nodes[target_node]["pos"]
 
         if use_3d:
-            from weather_model_graphs.create.mesh.layouts.icosahedral import (
-                lat_lon_to_cartesian,
-            )
-
             query_point = lat_lon_to_cartesian(
                 np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
             )[0]
@@ -780,10 +778,6 @@ def connect_nodes_across_graphs(
                 )[0]
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
             elif target_has_3d:
-                from weather_model_graphs.create.mesh.layouts.icosahedral import (
-                    lat_lon_to_cartesian,
-                )
-
                 source_pos_3d = lat_lon_to_cartesian(
                     np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
                 )[0]
@@ -803,13 +797,13 @@ def connect_nodes_across_graphs(
                 target_pos_3d = lat_lon_to_cartesian(
                     np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
                 )[0]
-                vdiff = source_pos_3d - target_pos_3d
+                vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
             elif target_has_3d:
                 source_pos_3d = lat_lon_to_cartesian(
                     np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
                 )[0]
                 target_pos_3d = G_connect.nodes[target_node]["pos3d"]
-                vdiff = source_pos_3d - target_pos_3d
+                vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
             else:
                 dlat = source_pos_2d[0] - target_pos_2d[0]
                 dlon = (source_pos_2d[1] - target_pos_2d[1] + 180) % 360 - 180

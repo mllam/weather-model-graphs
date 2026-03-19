@@ -141,13 +141,20 @@ class TestIcosahedralMeshGraphs:
         for u, v in list(edges):
             assert (v, u) in edges
 
-    def test_vdiff_is_3d_for_icosahedral(self):
+    def test_vdiff_is_tangential_2d_for_icosahedral(self):
         G = create_flat_icosahedral_mesh_graph(subdivisions=1)
         for u, v, data in G.edges(data=True):
             vdiff = data["vdiff"]
-            assert vdiff.shape == (3,), f"Expected vdiff shape (3,), got {vdiff.shape}"
-            expected = G.nodes[u]["pos3d"] - G.nodes[v]["pos3d"]
-            assert np.allclose(vdiff, expected, atol=1e-10)
+            assert vdiff.shape == (2,), f"Expected vdiff shape (2,), got {vdiff.shape}"
+            src_pos3d = G.nodes[u]["pos3d"]
+            dst_pos3d = G.nodes[v]["pos3d"]
+            outward_normal = src_pos3d / np.linalg.norm(src_pos3d)
+            raw_displacement = src_pos3d - dst_pos3d
+            normal_component = np.dot(raw_displacement, outward_normal)
+            tangential_displacement = raw_displacement - normal_component * outward_normal
+            tangential_magnitude = np.linalg.norm(tangential_displacement)
+            recovered_magnitude = np.linalg.norm(vdiff)
+            assert np.isclose(tangential_magnitude, recovered_magnitude, atol=1e-8)
 
     def test_vdiff_is_2d_for_rectilinear(self):
         from weather_model_graphs.create.base import connect_nodes_across_graphs
