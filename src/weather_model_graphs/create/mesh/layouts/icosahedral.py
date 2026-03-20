@@ -85,8 +85,12 @@ def create_flat_icosahedral_mesh_graph(
         src3d = dg.nodes[u]["pos3d"]
         dst3d = dg.nodes[v]["pos3d"]
         dist = np.linalg.norm(src3d - dst3d)
-        dg.add_edge(u, v, len=dist, vdiff=tangential_plane_vdiff(src3d, dst3d), level=None)
-        dg.add_edge(v, u, len=dist, vdiff=tangential_plane_vdiff(dst3d, src3d), level=None)
+        dg.add_edge(
+            u, v, len=dist, vdiff=tangential_plane_vdiff(src3d, dst3d), level=None
+        )
+        dg.add_edge(
+            v, u, len=dist, vdiff=tangential_plane_vdiff(dst3d, src3d), level=None
+        )
 
     dg.graph["mesh_layout"] = "icosahedral"
     dg.graph["subdivisions"] = subdivisions
@@ -165,10 +169,20 @@ def create_hierarchical_icosahedral_mesh_graph(
                         src3d = dg.nodes[u]["pos3d"]
                         dst3d = dg.nodes[v]["pos3d"]
                         dist = np.linalg.norm(src3d - dst3d)
-                        dg.add_edge(u, v, len=dist,
-                                    vdiff=tangential_plane_vdiff(src3d, dst3d), level=level)
-                        dg.add_edge(v, u, len=dist,
-                                    vdiff=tangential_plane_vdiff(dst3d, src3d), level=level)
+                        dg.add_edge(
+                            u,
+                            v,
+                            len=dist,
+                            vdiff=tangential_plane_vdiff(src3d, dst3d),
+                            level=level,
+                        )
+                        dg.add_edge(
+                            v,
+                            u,
+                            len=dist,
+                            vdiff=tangential_plane_vdiff(dst3d, src3d),
+                            level=level,
+                        )
 
     for coarse_level in range(max_subdivisions):
         fine_level = coarse_level + 1
@@ -189,12 +203,20 @@ def create_hierarchical_icosahedral_mesh_graph(
                 fine_pos3d = fine_vertices[fine_idx]
                 coarse_pos3d = coarse_pos
                 dist = np.linalg.norm(fine_pos3d - coarse_pos3d)
-                dg.add_edge(fine_node, coarse_node, len=dist,
-                            vdiff=tangential_plane_vdiff(fine_pos3d, coarse_pos3d),
-                            level=f"{fine_level}_to_{coarse_level}")
-                dg.add_edge(coarse_node, fine_node, len=dist,
-                            vdiff=tangential_plane_vdiff(coarse_pos3d, fine_pos3d),
-                            level=f"{coarse_level}_to_{fine_level}")
+                dg.add_edge(
+                    fine_node,
+                    coarse_node,
+                    len=dist,
+                    vdiff=tangential_plane_vdiff(fine_pos3d, coarse_pos3d),
+                    level=f"{fine_level}_to_{coarse_level}",
+                )
+                dg.add_edge(
+                    coarse_node,
+                    fine_node,
+                    len=dist,
+                    vdiff=tangential_plane_vdiff(coarse_pos3d, fine_pos3d),
+                    level=f"{coarse_level}_to_{fine_level}",
+                )
     dg.graph["mesh_layout"] = "icosahedral_hierarchical"
     dg.graph["max_subdivisions"] = max_subdivisions
     dg.graph["radius"] = radius
@@ -645,6 +667,7 @@ def refinement_level_from_grid_spacing(
 
     return chosen_level
 
+
 def tangential_plane_vdiff(src_pos3d: np.ndarray, dst_pos3d: np.ndarray) -> np.ndarray:
     """
     Compute edge displacement in the local tangent plane at the source node.
@@ -666,7 +689,9 @@ def tangential_plane_vdiff(src_pos3d: np.ndarray, dst_pos3d: np.ndarray) -> np.n
     """
     outward_normal = src_pos3d / np.linalg.norm(src_pos3d)
     raw_displacement = src_pos3d - dst_pos3d
-    tangential_displacement = raw_displacement - np.dot(raw_displacement, outward_normal) * outward_normal
+    tangential_displacement = (
+        raw_displacement - np.dot(raw_displacement, outward_normal) * outward_normal
+    )
 
     north_pole = np.array([0.0, 0.0, 1.0])
     east_direction = np.cross(north_pole, outward_normal)
@@ -674,7 +699,9 @@ def tangential_plane_vdiff(src_pos3d: np.ndarray, dst_pos3d: np.ndarray) -> np.n
 
     if east_magnitude < 1e-10:
         east_direction = np.array([1.0, 0.0, 0.0])
-        east_direction = east_direction - np.dot(east_direction, outward_normal) * outward_normal
+        east_direction = (
+            east_direction - np.dot(east_direction, outward_normal) * outward_normal
+        )
         east_magnitude = np.linalg.norm(east_direction)
 
     east_direction = east_direction / east_magnitude

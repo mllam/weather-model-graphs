@@ -151,7 +151,9 @@ class TestIcosahedralMeshGraphs:
             outward_normal = src_pos3d / np.linalg.norm(src_pos3d)
             raw_displacement = src_pos3d - dst_pos3d
             normal_component = np.dot(raw_displacement, outward_normal)
-            tangential_displacement = raw_displacement - normal_component * outward_normal
+            tangential_displacement = (
+                raw_displacement - normal_component * outward_normal
+            )
             tangential_magnitude = np.linalg.norm(tangential_displacement)
             recovered_magnitude = np.linalg.norm(vdiff)
             assert np.isclose(tangential_magnitude, recovered_magnitude, atol=1e-8)
