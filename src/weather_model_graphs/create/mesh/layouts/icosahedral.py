@@ -8,6 +8,45 @@ import numpy as np
 from scipy.spatial import KDTree
 
 
+def get_mesh_feature_dimension(mesh_features: np.ndarray) -> int:
+    """
+    Detect the feature dimension of mesh node features.
+
+    For backward compatibility:
+    - If shape[1] == 2: assumes 2D lat/lon coordinates
+    - If shape[1] == 3: assumes 3D Cartesian coordinates
+    - Otherwise: raises warning and assumes 2D for backward compatibility
+
+    Parameters
+    ----------
+    mesh_features : numpy.ndarray
+        (N_mesh, D) array of mesh node features.
+
+    Returns
+    -------
+    int
+        Detected feature dimension (2 or 3).
+    """
+    if mesh_features.ndim != 2:
+        raise ValueError(f"Expected 2D array, got shape {mesh_features.shape}")
+
+    dim = mesh_features.shape[1]
+
+    if dim == 2:
+        return 2
+    elif dim == 3:
+        return 3
+    else:
+        warnings.warn(
+            f"Unexpected mesh feature dimension {dim}. "
+            f"Expected 2 (lat/lon) or 3 (Cartesian). "
+            f"Assuming 2 for backward compatibility.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return 2
+
+
 def create_hierarchy_of_icosahedral_meshes(
     max_subdivisions: int, radius: float = 1.0
 ) -> list[tuple[np.ndarray, np.ndarray]]:
@@ -99,6 +138,11 @@ def create_flat_icosahedral_mesh_graph(
     dg.graph["faces"] = faces
     dg.graph["is_hierarchical"] = False
 
+    # Store both representations for future flexibility
+    dg.graph["mesh_features_2d"] = lat_lon  # shape (N, 2)
+    dg.graph["mesh_features_3d"] = vertices  # shape (N, 3)
+    dg.graph["mesh_feature_dim"] = 2  # default for now (validator-compliant)
+
     return dg
 
 
@@ -139,12 +183,16 @@ def create_hierarchical_icosahedral_mesh_graph(
     dg = nx.DiGraph()
     vertices_by_level = []
     faces_by_level = []
+    level_2d_features = []
+    level_3d_features = []
 
     for level in range(max_subdivisions + 1):
         vertices, faces = mesh_list[level]
         vertices_by_level.append(vertices)
         faces_by_level.append(faces)
         lat_lon = cartesian_to_lat_lon(vertices)
+        level_2d_features.append(lat_lon)
+        level_3d_features.append(vertices)
         offset = level_offsets[level]
 
         for i, (x, y, z) in enumerate(vertices):
@@ -217,6 +265,7 @@ def create_hierarchical_icosahedral_mesh_graph(
                     vdiff=tangential_plane_vdiff(coarse_pos3d, fine_pos3d),
                     level=f"{coarse_level}_to_{fine_level}",
                 )
+
     dg.graph["mesh_layout"] = "icosahedral_hierarchical"
     dg.graph["max_subdivisions"] = max_subdivisions
     dg.graph["radius"] = radius
@@ -224,6 +273,11 @@ def create_hierarchical_icosahedral_mesh_graph(
     dg.graph["mesh_vertices_by_level"] = vertices_by_level
     dg.graph["mesh_faces_by_level"] = faces_by_level
     dg.graph["is_hierarchical"] = True
+
+    # Store both representations for future flexibility
+    dg.graph["mesh_features_2d_by_level"] = level_2d_features
+    dg.graph["mesh_features_3d_by_level"] = level_3d_features
+    dg.graph["mesh_feature_dim"] = 2  # default for now (validator-compliant)
 
     return dg
 
@@ -312,6 +366,14 @@ def connect_mesh_to_grid(
     weights : numpy.ndarray
         (E,) barycentric weights for each edge.
     """
+    if len(mesh_vertices) > 0:
+        feat_dim = get_mesh_feature_dimension(mesh_vertices)
+        if feat_dim == 3:
+            # 3D Cartesian, ideal for spherical geometry
+            pass
+        else:
+            # 2D lat/lon, validator-compliant for now
+            pass
     grid_cartesian = lat_lon_to_cartesian(grid_lat_lon[:, 0], grid_lat_lon[:, 1])
     face_centroids = mesh_vertices[mesh_faces].mean(axis=1)
     centroid_tree = KDTree(face_centroids)
