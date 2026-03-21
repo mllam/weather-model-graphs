@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- Fix `TypeError` when using the `nx-cugraph` backend by ensuring array-based position math [\#164](https://github.com/mllam/neural-lam/issues/164).
+- Support for `nx-cugraph` backend by ensuring array-based position math during graph construction
+  [\#62](https://github.com/mllam/weather-model-graphs/pull/62) @AdMub
+
+- Added a safety assertion in g2m graph creation to ensure all grid nodes connect to the mesh (#42).
+- Add `__version__` attribute to the package init
+  [\#56](https://github.com/mllam/weather-model-graphs/pull/56) @AdMub
 
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
 
