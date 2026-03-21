@@ -1,6 +1,7 @@
 from typing import Iterable
 
 import pyproj
+
 from .base import create_all_graph_components
 
 
