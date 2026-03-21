@@ -197,8 +197,8 @@ def test_create_lat_lon(kind):
 @pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
 def test_create_decode_mask(kind):
     """
-    Tests that the decode mask for m2g works, resulting in less m2g edges than
-    without decode mask.
+    Tests that the decode mask for m2g works, resulting in fewer m2g edges than
+    without a decode mask.
     """
     xy = test_utils.create_fake_irregular_coords(100)
     fn_name = f"create_{kind}_graph"
