@@ -67,7 +67,7 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
     for u, v in g.edges():
         pos_u = np.array(g.nodes[u]["pos"])
         pos_v = np.array(g.nodes[v]["pos"])
-        
+
         d = np.sqrt(np.sum((pos_u - pos_v) ** 2))
         dg.edges[u, v]["len"] = d
         dg.edges[u, v]["vdiff"] = pos_u - pos_v

@@ -19,8 +19,8 @@ References
 """
 import os
 import time
-import networkx
 
+import networkx
 import numpy as np
 
 try:
@@ -82,13 +82,13 @@ def _cuda_hardware_summary() -> str:
 
 def run_benchmark(nx: int, ny: int, label: str) -> float:
     xy = _make_xy(nx, ny)
-    print(f"\n  Graph size : {nx} x {ny}  ({nx*ny:,} data points)")
-    
+    print(f"\n  Graph size : {nx} x {ny}  ({nx * ny:,} data points)")
+
     # 1. Benchmark Graph Construction
     t0 = time.perf_counter()
     g = create_single_level_2d_mesh_graph(xy, nx=nx, ny=ny)
     build_time = time.perf_counter() - t0
-    
+
     # 2. Benchmark heavy algorithm (PageRank) to show cuGraph acceleration
     t_algo_0 = time.perf_counter()
     _ = networkx.pagerank(g)
@@ -98,7 +98,7 @@ def run_benchmark(nx: int, ny: int, label: str) -> float:
     print(f"  Edges      : {len(g.edges):,}")
     print(f"  Build Time : {build_time:.4f} s  [{label}]")
     print(f"  Algo Time  : {algo_time:.4f} s  (PageRank)")
-    
+
     return build_time
 
 

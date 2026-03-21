@@ -102,7 +102,7 @@ def create_hierarchical_multiscale_mesh_graph(
             G_down.add_edge(u, v)
             pos_u = np.array(G_down.nodes[u]["pos"])
             pos_v = np.array(G_down.nodes[v]["pos"])
-            
+
             d = np.sqrt(np.sum((pos_u - pos_v) ** 2))
             G_down.edges[u, v]["len"] = d
             G_down.edges[u, v]["vdiff"] = pos_u - pos_v
