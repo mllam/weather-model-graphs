@@ -58,7 +58,9 @@ def create_keisler_graph(
     return create_all_graph_components(
         coords=coords,
         m2m_connectivity="flat",
-        m2m_connectivity_kwargs=dict(mesh_node_distance=mesh_node_distance),
+        m2m_connectivity_kwargs=dict(
+            mesh_node_distance=mesh_node_distance,
+        ),
         g2m_connectivity="within_radius",
         m2g_connectivity="nearest_neighbours",
         g2m_connectivity_kwargs=dict(

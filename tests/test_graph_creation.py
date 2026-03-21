@@ -266,3 +266,27 @@ def test_edgeless_nodes_preservation_in_different_graphs(
         G_source=graph_source, G_target=graph_target, method=method, **method_kwargs
     )
     assert set(graph.nodes) == set(graph_source.nodes) | set(graph_target.nodes)
+
+
+def test_mesh_node_distance_validation():
+    from weather_model_graphs.create.mesh.kinds.flat import (
+        create_flat_multiscale_mesh_graph,
+        create_flat_singlescale_mesh_graph,
+    )
+
+    # Create a tiny 1x1 bounding box
+    xy = np.array([[0.0, 0.0], [1.0, 1.0]])
+    massive_distance = 100.0
+
+    # 1. Test single scale validation catches the error
+    with pytest.raises(ValueError, match="is too large for the total extent"):
+        create_flat_singlescale_mesh_graph(xy, mesh_node_distance=massive_distance)
+
+    # 2. Test multiscale validation catches the error
+    with pytest.raises(ValueError, match="is too large for the total extent"):
+        create_flat_multiscale_mesh_graph(
+            xy,
+            mesh_node_distance=massive_distance,
+            level_refinement_factor=3,
+            max_num_levels=2,
+        )

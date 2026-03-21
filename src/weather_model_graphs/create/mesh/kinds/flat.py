@@ -41,6 +41,21 @@ def create_flat_multiscale_mesh_graph(
             f"Given value: {level_refinement_factor}."
         )
 
+    # Validate that the coordinate extent is large enough to support the mesh_node_distance.
+    # For multiscale, the base nodes must be at least the size of the refinement factor.
+    range_x, range_y = np.ptp(xy, axis=0)
+    nx = int(range_x / mesh_node_distance)
+    ny = int(range_y / mesh_node_distance)
+
+    if nx < level_refinement_factor or ny < level_refinement_factor:
+        raise ValueError(
+            f"The given `mesh_node_distance` ({mesh_node_distance}) is too large "
+            f"for the total extent of the provided coordinates given a `level_refinement_factor` of {level_refinement_factor}. "
+            f"The bounding box has an x-extent of {range_x} and a y-extent of {range_y}. "
+            "You must decrease the `mesh_node_distance` so that the base mesh fits at least "
+            "`level_refinement_factor` nodes within the coordinate boundaries."
+        )
+
     G_all_levels: list[networkx.DiGraph] = mesh_graph.create_multirange_2d_mesh_graphs(
         max_num_levels=max_num_levels,
         xy=xy,
@@ -79,7 +94,7 @@ def create_flat_multiscale_mesh_graph(
         num_nodes_x //= level_refinement_factor
         num_nodes_y //= level_refinement_factor
 
-    # Relabel mesh nodes to start with 0
+        # Relabel mesh nodes to start with 0
     G_tot = prepend_node_index(G_tot, 0)
 
     # add dx and dy to graph
@@ -114,10 +129,11 @@ def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
 
     if nx == 0 or ny == 0:
         raise ValueError(
-            "The given `mesh_node_distance` is too large for the provided coordinates. "
-            f"Got mesh_node_distance={mesh_node_distance}, but the x-range is {range_x} "
-            f"and y-range is {range_y}. Maybe you want to decrease the `mesh_node_distance`"
-            " so that the mesh nodes are spaced closer together?"
+            f"The given `mesh_node_distance` ({mesh_node_distance}) is too large "
+            f"for the total extent of the provided coordinates. "
+            f"The bounding box has an x-extent of {range_x} and a y-extent of {range_y}. "
+            "You must decrease the `mesh_node_distance` so that at least one mesh node "
+            "fits within the coordinate boundaries."
         )
 
     return mesh_graph.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)

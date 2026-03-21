@@ -9,9 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support for `nx-cugraph` backend by ensuring array-based position math during graph construction
+  [\#62](https://github.com/mllam/weather-model-graphs/pull/62) @AdMub
+
+- Added a safety assertion in g2m graph creation to ensure all grid nodes connect to the mesh (#42).
+
 - Add `__version__` attribute to the package init
   [\#56](https://github.com/mllam/weather-model-graphs/pull/56) @AdMub
 
+### Fixed
+
+- Add validation to safely catch when `mesh_node_distance` is too large for the coordinate extent
+  [\#57](https://github.com/mllam/weather-model-graphs/pull/57) @AdMub
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
 
 
