@@ -13,10 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [\#62](https://github.com/mllam/weather-model-graphs/pull/62) @AdMub
 
 - Added a safety assertion in g2m graph creation to ensure all grid nodes connect to the mesh (#42).
+
 - Add `__version__` attribute to the package init
   [\#56](https://github.com/mllam/weather-model-graphs/pull/56) @AdMub
 
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
+
 
 ### Added
 
@@ -57,6 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update github CI actions to fix failing build and deploy of jupyterbook
   [\#49](https://github.com/mllam/weather-model-graphs/pull/49),
   [\#54](https://github.com/mllam/weather-model-graphs/pull/54), @leifdenby
+
+- Improve isolation of README example tests by executing each code block in an isolated namespace.
+  [#65](https://github.com/mllam/weather-model-graphs/pull/64) @Shristi-Goel
 
 ## [v0.2.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.2.0)
 
