@@ -12,9 +12,9 @@ from .general import create_directed_mesh_graph
 
 def create_hierarchical_from_coordinates(
     G_coords_list: List[networkx.Graph],
+    distance_metric: str,
     intra_level: Dict[str, object] = {"pattern": "8-star"},
     inter_level: Dict[str, object] = {"pattern": "nearest", "k": 1},
-    distance_metric: str = "euclidean",
 ) -> networkx.DiGraph:
     """
     Create a hierarchical multiscale mesh graph from a list of mesh primitive
@@ -169,9 +169,9 @@ def create_hierarchical_multiscale_mesh_graph(
     mesh_node_distance: float,
     level_refinement_factor: float,
     max_num_levels: int,
+    distance_metric: str,
     intra_level: Optional[Dict[str, object]] = None,
     inter_level: Optional[Dict[str, object]] = None,
-    distance_metric: str = "euclidean",
 ) -> networkx.DiGraph:
     """
     Create a hierarchical multiscale mesh graph with nearest neighbour
