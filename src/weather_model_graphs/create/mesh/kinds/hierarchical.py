@@ -11,7 +11,7 @@ def create_hierarchical_multiscale_mesh_graph(
     mesh_node_distance: float,
     level_refinement_factor: float,
     max_num_levels: int,
-    distance_metric: str = "euclidean",
+    distance_metric: str,
 ):
     """
     Create a hierarchical multiscale mesh graph with nearest neighbour
@@ -32,7 +32,7 @@ def create_hierarchical_multiscale_mesh_graph(
         Refinement factor between grid points and bottom level of mesh hierarchy
     max_num_levels: int
         The number of levels in the hierarchical mesh graph.
-    distance_metric : {'euclidean', 'haversine'}, default 'euclidean'
+    distance_metric : {'euclidean', 'haversine'}
         Distance metric used when computing inter-level nearest-neighbour edges
         and storing edge ``"len"`` attributes.  Pass ``'haversine'`` when *xy*
         contains longitude/latitude coordinates (geographic CRS).
