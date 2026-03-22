@@ -428,7 +428,7 @@ def connect_nodes_across_graphs(
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            idxs, dists = spatial_coord_selector.with_radius(
+            idxs, dists = spatial_coord_selector.within_radius(
                 xy_target, radius=query_dist
             )
             return idxs, dists
