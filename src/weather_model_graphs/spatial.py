@@ -129,7 +129,7 @@ class SpatialCoordinateValuesSelector:
         distances = raw_dists.flatten()
         return indices, distances
 
-    def with_radius(
+    def within_radius(
         self, point: np.ndarray, radius: float
     ) -> Tuple[np.ndarray, np.ndarray]:
         """

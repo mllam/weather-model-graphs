@@ -3,8 +3,8 @@ Tests for :class:`weather_model_graphs.spatial.SpatialCoordinateValuesSelector`.
 
 Covers:
 - Initialisation (valid / invalid metric)
-- Euclidean k-nearest-to and with_radius queries
-- Haversine k-nearest-to and with_radius queries (distances in radians)
+- Euclidean k-nearest-to and within_radius queries
+- Haversine k-nearest-to and within_radius queries (distances in radians)
 - Factory method SpatialCoordinateValuesSelector.for_crs()
 - Warning emitted for rectilinear mesh + geographic CRS in create_all_graph_components
 """
@@ -88,28 +88,28 @@ class TestEuclideanKNearest:
         assert dists[1] == pytest.approx(5.0)
 
 
-# Euclidean – with_radius
+# Euclidean – within_radius
 class TestEuclideanWithRadius:
     def test_returns_points_within_radius(self, simple_euclidean_coords):
         sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
-        idxs, dists = sel.with_radius([2.0, 0.0], radius=1.5)
+        idxs, dists = sel.within_radius([2.0, 0.0], radius=1.5)
         # should include indices 1, 2, 3  (x=1, 2, 3)
         assert set(idxs) == {1, 2, 3}
 
     def test_excludes_points_beyond_radius(self, simple_euclidean_coords):
         sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
-        idxs, _ = sel.with_radius([2.0, 0.0], radius=0.5)
+        idxs, _ = sel.within_radius([2.0, 0.0], radius=0.5)
         assert set(idxs) == {2}
 
     def test_distances_within_radius(self, simple_euclidean_coords):
         sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
-        idxs, dists = sel.with_radius([2.0, 0.0], radius=1.5)
+        idxs, dists = sel.within_radius([2.0, 0.0], radius=1.5)
         # All returned distances must be ≤ radius
         assert all(d <= 1.5 + 1e-9 for d in dists)
 
     def test_zero_radius_returns_only_self(self, simple_euclidean_coords):
         sel = SpatialCoordinateValuesSelector("euclidean", simple_euclidean_coords)
-        idxs, dists = sel.with_radius([1.0, 0.0], radius=0.0)
+        idxs, dists = sel.within_radius([1.0, 0.0], radius=0.0)
         assert set(idxs) == {1}
         assert dists[0] == pytest.approx(0.0)
 
@@ -139,13 +139,13 @@ class TestHaversineKNearest:
         assert d_hav[1] == pytest.approx(np.deg2rad(1.0), rel=1e-4)
 
 
-# Haversine – with_radius
+# Haversine – within_radius
 class TestHaversineWithRadius:
     def test_radius_in_radians_inclusive(self, simple_geo_coords):
         """A 0.2 rad radius from origin includes points at 0° and 10° lon."""
         sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
         radius_rad = 0.2
-        idxs, dists = sel.with_radius([0.0, 0.0], radius=radius_rad)
+        idxs, dists = sel.within_radius([0.0, 0.0], radius=radius_rad)
         assert 0 in idxs  # self
         assert 1 in idxs  # 10° lon ≈ 0.1745 rad away
 
@@ -153,7 +153,7 @@ class TestHaversineWithRadius:
         """A 0.1 rad radius from origin excludes the 10° point."""
         sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
         radius_rad = 0.1
-        idxs, _ = sel.with_radius([0.0, 0.0], radius=radius_rad)
+        idxs, _ = sel.within_radius([0.0, 0.0], radius=radius_rad)
         assert set(idxs) == {0}
 
 class TestHaversineLongitudeWrapAround:
@@ -179,7 +179,7 @@ class TestHaversineLongitudeWrapAround:
     def test_radius_query_crosses_longitude_seam(self, equator_periodic_coords):
         """Radius query near 360 deg should include 0 deg neighbour across seam."""
         sel = SpatialCoordinateValuesSelector("haversine", equator_periodic_coords)
-        idxs, _ = sel.with_radius([359.0, 0.0], radius=np.deg2rad(5.0))
+        idxs, _ = sel.within_radius([359.0, 0.0], radius=np.deg2rad(5.0))
         lons_in_radius = set(equator_periodic_coords[idxs, 0])
 
         # 0 deg is within 1 degree across seam; 351 deg is 8 degrees away and excluded.
