@@ -5,6 +5,10 @@ description = "Tools for creating and visualising data-driven weather model grap
 authors = [
     {name = "Leif Denby", email = "lcd@dmi.dk"},
 ]
+
+[tool.setuptools]
+packages = ["weather_model_graphs"]
+
 dependencies = [
     "numpy>=1.26.4",
     "loguru>=0.7.2",
