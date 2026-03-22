@@ -458,11 +458,12 @@ def connect_nodes_across_graphs(
     source_nodes_list = sorted(G_source.nodes)
     target_nodes_list = sorted(G_target.nodes)
 
-    sample_source = source_nodes_list[0]
-    sample_target = target_nodes_list[0]
-
-    source_is_icosahedral = G_source.graph.get("mesh_layout", "").startswith("icosahedral")
-    target_is_icosahedral = G_target.graph.get("mesh_layout", "").startswith("icosahedral")
+    source_is_icosahedral = G_source.graph.get("mesh_layout", "").startswith(
+        "icosahedral"
+    )
+    target_is_icosahedral = G_target.graph.get("mesh_layout", "").startswith(
+        "icosahedral"
+    )
     use_spherical = source_is_icosahedral or target_is_icosahedral
 
     if use_spherical:
