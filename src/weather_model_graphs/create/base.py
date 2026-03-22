@@ -179,7 +179,6 @@ def create_all_graph_components(
     from ..networkx_utils import (
         replace_node_labels_with_unique_ids,
         split_graph_by_edge_attribute,
-        split_on_edge_attribute_existance,
     )
 
     assert (
@@ -381,6 +380,10 @@ def connect_nodes_across_graphs(
         Graph containing the nodes in `G_source` and `G_target` and directed edges
         from nodes in `G_source` to nodes in `G_target`
     """
+    from ..networkx_utils import (
+        split_graph_by_edge_attribute,
+        split_on_edge_attribute_existance,
+    )
     source_nodes_list = list(G_source.nodes)
     target_nodes_list = list(G_target.nodes)
 
