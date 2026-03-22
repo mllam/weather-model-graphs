@@ -141,7 +141,7 @@ class SpatialCoordinateValuesSelector:
             Query point (same coordinate convention as for :meth:`k_nearest_to`).
         radius : float
             Search radius.  For ``"euclidean"`` this is in the same units as
-            *coords*; for ``"haversine"`` this is in **radians**.
+            *coords*; for ``"haversine"`` this is in **degrees**.
 
         Returns
         -------
@@ -149,11 +149,15 @@ class SpatialCoordinateValuesSelector:
             Indices into the original *coords* array of all neighbours within
             *radius*, **unsorted**.
         distances : np.ndarray
-            Distances to each returned neighbour (same units as described above).
+            Distances to each returned neighbour.  For ``"euclidean"`` these
+            are in the same units as *coords*; for ``"haversine"`` these are
+            in **radians**.
         """
         tree_point = self._prepare_query_point(point)
         raw_idxs, raw_dists = self._tree.query_radius(
-            tree_point, r=radius, return_distance=True
+            tree_point,
+            r=np.deg2rad(radius) if self.distance_metric == "haversine" else radius,
+            return_distance=True,
         )
         indices = raw_idxs[0]
         distances = raw_dists[0]
