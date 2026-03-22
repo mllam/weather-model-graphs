@@ -148,6 +148,7 @@ class TestHaversineWithRadius:
         idxs, dists = sel.within_radius([0.0, 0.0], radius=radius_deg)
         assert 0 in idxs  # self
         assert 1 in idxs  # 10° lon away
+        assert any(d == pytest.approx(10.0, rel=1e-4) for d in dists)
 
     def test_radius_in_degrees_exclusive(self, simple_geo_coords):
         """A 5° radius from origin excludes the 10° point."""

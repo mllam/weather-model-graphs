@@ -151,7 +151,7 @@ class SpatialCoordinateValuesSelector:
         distances : np.ndarray
             Distances to each returned neighbour.  For ``"euclidean"`` these
             are in the same units as *coords*; for ``"haversine"`` these are
-            in **radians**.
+            in **degrees**.
         """
         tree_point = self._prepare_query_point(point)
         raw_idxs, raw_dists = self._tree.query_radius(
@@ -160,7 +160,11 @@ class SpatialCoordinateValuesSelector:
             return_distance=True,
         )
         indices = raw_idxs[0]
-        distances = raw_dists[0]
+        distances = (
+            np.rad2deg(raw_dists[0])
+            if self.distance_metric == "haversine"
+            else raw_dists[0]
+        )
         return indices, distances
 
     
