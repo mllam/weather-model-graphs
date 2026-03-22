@@ -461,19 +461,22 @@ def connect_nodes_across_graphs(
     sample_source = source_nodes_list[0]
     sample_target = target_nodes_list[0]
 
-    source_has_3d = "pos3d" in G_source.nodes[sample_source]
-    target_has_3d = "pos3d" in G_target.nodes[sample_target]
+    source_is_icosahedral = G_source.graph.get("mesh_layout", "").startswith("icosahedral")
+    target_is_icosahedral = G_target.graph.get("mesh_layout", "").startswith("icosahedral")
+    use_spherical = source_is_icosahedral or target_is_icosahedral
 
-    if source_has_3d or target_has_3d:
+    if use_spherical:
         from weather_model_graphs.create.mesh.layouts.icosahedral import (
             lat_lon_to_cartesian,
             tangential_plane_vdiff,
         )
 
-    if source_has_3d:
-        xy_source = np.array([G_source.nodes[n]["pos3d"] for n in source_nodes_list])
+    if source_is_icosahedral:
+        source_lats = np.array([G_source.nodes[n]["pos"][0] for n in source_nodes_list])
+        source_lons = np.array([G_source.nodes[n]["pos"][1] for n in source_nodes_list])
+        xy_source = lat_lon_to_cartesian(source_lats, source_lons)
         use_3d = True
-    elif target_has_3d:
+    elif target_is_icosahedral:
         source_lats = np.array([G_source.nodes[n]["pos"][0] for n in source_nodes_list])
         source_lons = np.array([G_source.nodes[n]["pos"][1] for n in source_nodes_list])
         xy_source = lat_lon_to_cartesian(source_lats, source_lons)
@@ -688,18 +691,22 @@ def connect_nodes_across_graphs(
             source_pos_2d = G_connect.nodes[source_node]["pos"]
             target_pos_2d = G_connect.nodes[target_node]["pos"]
 
-            if source_has_3d:
-                source_pos_3d = G_connect.nodes[source_node]["pos3d"]
+            if source_is_icosahedral:
+                source_pos_3d = lat_lon_to_cartesian(
+                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
+                )[0]
                 target_pos_3d = lat_lon_to_cartesian(
                     np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
                 )[0]
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
                 vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
-            elif target_has_3d:
+            elif target_is_icosahedral:
                 source_pos_3d = lat_lon_to_cartesian(
                     np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
                 )[0]
-                target_pos_3d = G_connect.nodes[target_node]["pos3d"]
+                target_pos_3d = lat_lon_to_cartesian(
+                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
+                )[0]
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
                 vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
             else:
@@ -770,17 +777,21 @@ def connect_nodes_across_graphs(
             source_node = source_nodes_list[i]
             source_pos_2d = G_connect.nodes[source_node]["pos"]
 
-            if source_has_3d:
-                source_pos_3d = G_connect.nodes[source_node]["pos3d"]
+            if source_is_icosahedral:
+                source_pos_3d = lat_lon_to_cartesian(
+                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
+                )[0]
                 target_pos_3d = lat_lon_to_cartesian(
                     np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
                 )[0]
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
-            elif target_has_3d:
+            elif target_is_icosahedral:
                 source_pos_3d = lat_lon_to_cartesian(
                     np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
                 )[0]
-                target_pos_3d = G_connect.nodes[target_node]["pos3d"]
+                target_pos_3d = lat_lon_to_cartesian(
+                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
+                )[0]
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
             else:
                 dlat = source_pos_2d[0] - target_pos_2d[0]
@@ -791,17 +802,21 @@ def connect_nodes_across_graphs(
             G_connect.add_edge(source_node, target_node)
             G_connect.edges[source_node, target_node]["len"] = d
 
-            if source_has_3d:
-                source_pos_3d = G_connect.nodes[source_node]["pos3d"]
+            if source_is_icosahedral:
+                source_pos_3d = lat_lon_to_cartesian(
+                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
+                )[0]
                 target_pos_3d = lat_lon_to_cartesian(
                     np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
                 )[0]
                 vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
-            elif target_has_3d:
+            elif target_is_icosahedral:
                 source_pos_3d = lat_lon_to_cartesian(
                     np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
                 )[0]
-                target_pos_3d = G_connect.nodes[target_node]["pos3d"]
+                target_pos_3d = lat_lon_to_cartesian(
+                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
+                )[0]
                 vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
             else:
                 dlat = source_pos_2d[0] - target_pos_2d[0]

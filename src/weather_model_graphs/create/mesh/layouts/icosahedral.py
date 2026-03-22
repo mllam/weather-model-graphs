@@ -101,11 +101,10 @@ def create_flat_icosahedral_mesh_graph(
     lat_lon = cartesian_to_lat_lon(vertices)
 
     g = nx.Graph()
-    for i, (x, y, z) in enumerate(vertices):
+    for i in range(len(vertices)):
         g.add_node(
             i,
             pos=lat_lon[i],
-            pos3d=np.array([x, y, z]),
             type="mesh",
             level=None,
         )
@@ -121,8 +120,8 @@ def create_flat_icosahedral_mesh_graph(
     dg.add_nodes_from(g.nodes(data=True))
 
     for u, v in g.edges():
-        src3d = dg.nodes[u]["pos3d"]
-        dst3d = dg.nodes[v]["pos3d"]
+        src3d = vertices[u]
+        dst3d = vertices[v]
         dist = np.linalg.norm(src3d - dst3d)
         dg.add_edge(
             u, v, len=dist, vdiff=tangential_plane_vdiff(src3d, dst3d), level=None
@@ -137,11 +136,6 @@ def create_flat_icosahedral_mesh_graph(
     dg.graph["vertices"] = vertices
     dg.graph["faces"] = faces
     dg.graph["is_hierarchical"] = False
-
-    # Store both representations for future flexibility
-    dg.graph["mesh_features_2d"] = lat_lon  # shape (N, 2)
-    dg.graph["mesh_features_3d"] = vertices  # shape (N, 3)
-    dg.graph["mesh_feature_dim"] = 2  # default for now (validator-compliant)
 
     return dg
 
@@ -183,24 +177,19 @@ def create_hierarchical_icosahedral_mesh_graph(
     dg = nx.DiGraph()
     vertices_by_level = []
     faces_by_level = []
-    level_2d_features = []
-    level_3d_features = []
 
     for level in range(max_subdivisions + 1):
         vertices, faces = mesh_list[level]
         vertices_by_level.append(vertices)
         faces_by_level.append(faces)
         lat_lon = cartesian_to_lat_lon(vertices)
-        level_2d_features.append(lat_lon)
-        level_3d_features.append(vertices)
         offset = level_offsets[level]
 
-        for i, (x, y, z) in enumerate(vertices):
+        for i in range(len(vertices)):
             node_id = offset + i
             dg.add_node(
                 node_id,
                 pos=lat_lon[i],
-                pos3d=np.array([x, y, z]),
                 type="mesh",
                 level=level,
             )
@@ -214,8 +203,8 @@ def create_hierarchical_icosahedral_mesh_graph(
                     u = offset + face[i]
                     v = offset + face[j]
                     if not dg.has_edge(u, v):
-                        src3d = dg.nodes[u]["pos3d"]
-                        dst3d = dg.nodes[v]["pos3d"]
+                        src3d = vertices[face[i]]
+                        dst3d = vertices[face[j]]
                         dist = np.linalg.norm(src3d - dst3d)
                         dg.add_edge(
                             u,
@@ -273,11 +262,6 @@ def create_hierarchical_icosahedral_mesh_graph(
     dg.graph["mesh_vertices_by_level"] = vertices_by_level
     dg.graph["mesh_faces_by_level"] = faces_by_level
     dg.graph["is_hierarchical"] = True
-
-    # Store both representations for future flexibility
-    dg.graph["mesh_features_2d_by_level"] = level_2d_features
-    dg.graph["mesh_features_3d_by_level"] = level_3d_features
-    dg.graph["mesh_feature_dim"] = 2  # default for now (validator-compliant)
 
     return dg
 

@@ -98,11 +98,13 @@ class TestIcosahedralMeshGraphs:
         assert len(G.nodes) == expected_nodes
         for node, data in G.nodes(data=True):
             assert "pos" in data
-            assert "pos3d" in data
+            assert "pos3d" not in data
             assert data["type"] == "mesh"
             assert data["level"] is None
-            pos3d = data["pos3d"]
-            assert np.allclose(np.linalg.norm(pos3d), 1.0, atol=1e-10)
+            pos = data["pos"]
+            assert pos.shape == (2,)
+            assert -90 <= pos[0] <= 90
+            assert -180 <= pos[1] <= 180
         for u, v, data in G.edges(data=True):
             assert "len" in data
             assert "vdiff" in data
@@ -143,11 +145,12 @@ class TestIcosahedralMeshGraphs:
 
     def test_vdiff_is_tangential_2d_for_icosahedral(self):
         G = create_flat_icosahedral_mesh_graph(subdivisions=1)
+        vertices = G.graph["vertices"]
         for u, v, data in G.edges(data=True):
             vdiff = data["vdiff"]
             assert vdiff.shape == (2,), f"Expected vdiff shape (2,), got {vdiff.shape}"
-            src_pos3d = G.nodes[u]["pos3d"]
-            dst_pos3d = G.nodes[v]["pos3d"]
+            src_pos3d = vertices[u]
+            dst_pos3d = vertices[v]
             outward_normal = src_pos3d / np.linalg.norm(src_pos3d)
             raw_displacement = src_pos3d - dst_pos3d
             normal_component = np.dot(raw_displacement, outward_normal)
