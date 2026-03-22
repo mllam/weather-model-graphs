@@ -141,19 +141,19 @@ class TestHaversineKNearest:
 
 # Haversine – within_radius
 class TestHaversineWithRadius:
-    def test_radius_in_radians_inclusive(self, simple_geo_coords):
-        """A 0.2 rad radius from origin includes points at 0° and 10° lon."""
+    def test_radius_in_degrees_inclusive(self, simple_geo_coords):
+        """A 12° radius from origin includes points at 0° and 10° lon."""
         sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
-        radius_rad = 0.2
-        idxs, dists = sel.within_radius([0.0, 0.0], radius=radius_rad)
+        radius_deg = 12.0
+        idxs, dists = sel.within_radius([0.0, 0.0], radius=radius_deg)
         assert 0 in idxs  # self
-        assert 1 in idxs  # 10° lon ≈ 0.1745 rad away
+        assert 1 in idxs  # 10° lon away
 
-    def test_radius_in_radians_exclusive(self, simple_geo_coords):
-        """A 0.1 rad radius from origin excludes the 10° point."""
+    def test_radius_in_degrees_exclusive(self, simple_geo_coords):
+        """A 5° radius from origin excludes the 10° point."""
         sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
-        radius_rad = 0.1
-        idxs, _ = sel.within_radius([0.0, 0.0], radius=radius_rad)
+        radius_deg = 5.0
+        idxs, _ = sel.within_radius([0.0, 0.0], radius=radius_deg)
         assert set(idxs) == {0}
 
 class TestHaversineLongitudeWrapAround:
@@ -179,7 +179,7 @@ class TestHaversineLongitudeWrapAround:
     def test_radius_query_crosses_longitude_seam(self, equator_periodic_coords):
         """Radius query near 360 deg should include 0 deg neighbour across seam."""
         sel = SpatialCoordinateValuesSelector("haversine", equator_periodic_coords)
-        idxs, _ = sel.within_radius([359.0, 0.0], radius=np.deg2rad(5.0))
+        idxs, _ = sel.within_radius([359.0, 0.0], radius=5.0)
         lons_in_radius = set(equator_periodic_coords[idxs, 0])
 
         # 0 deg is within 1 degree across seam; 351 deg is 8 degrees away and excluded.
