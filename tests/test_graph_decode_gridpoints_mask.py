@@ -57,6 +57,9 @@ def test_graph_decode_gridpoints_mask():
     # decode mask
    # Only keep edges where BOTH nodes are selected (more strict & correct)
 unfiltered_edge_mask = decode_mask[adj_unfiltered[0]] & decode_mask[adj_unfiltered[1]]
+# Validate that all retained edges satisfy decode mask
+for src, dst in adj_unfiltered_masked.T:
+    assert decode_mask[src] and decode_mask[dst]
     # Filter edges from full set
     adj_unfiltered_masked = adj_unfiltered[:, unfiltered_edge_mask]
 
