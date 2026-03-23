@@ -1,3 +1,10 @@
+import importlib.metadata
+
+try:
+    __version__ = importlib.metadata.version("weather-model-graphs")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "unknown"
+
 from . import create, save, visualise
 from .filtering import filter_graph
 from .networkx_utils import (
