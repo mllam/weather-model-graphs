@@ -55,7 +55,8 @@ def test_graph_decode_gridpoints_mask():
     # Use the decode mask to find out which edges to retain by taking the
     # grid-index values from the m2g adjacency list and indexing into the
     # decode mask
-    unfiltered_edge_mask = decode_mask[adj_unfiltered[1]]
+   # Only keep edges where BOTH nodes are selected (more strict & correct)
+unfiltered_edge_mask = decode_mask[adj_unfiltered[0]] & decode_mask[adj_unfiltered[1]]
     # Filter edges from full set
     adj_unfiltered_masked = adj_unfiltered[:, unfiltered_edge_mask]
 
