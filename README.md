@@ -98,3 +98,19 @@ for component, graph in graph_components.items():
 # Documentation
 
 The documentation is built using [Jupyter Book](https://jupyterbook.org/intro.html) and can be found at [https://mllam.github.io/weather-model-graphs](https://mllam.github.io/weather-model-graphs). This includes background on graph-based weather models, the design principles of `weather-model-graphs` and how to use it to create your own graph architectures.
+
+## 🚀 Quick Start
+
+### Installation
+
+```bash
+git clone https://github.com/bhawna346/weather-model-graphs.git
+cd weather-model-graphs
+pip install -r requirements.txt
+import networkx as nx
+
+G = nx.DiGraph()
+G.add_edge("Node1", "Node2")
+
+print("Nodes:", G.nodes())
+print("Edges:", G.edges())
