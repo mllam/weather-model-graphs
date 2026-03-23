@@ -23,16 +23,16 @@ from ..networkx_utils import (
     split_on_edge_attribute_existance,
 )
 from .grid import create_grid_graph_nodes
-from .mesh.coords import (
-    create_multirange_2d_mesh_primitives,
-    create_single_level_2d_mesh_primitive,
-)
-from .mesh.kinds.flat import (
+from .mesh.connectivity.flat import (
     create_flat_multiscale_from_coordinates,
     create_flat_singlescale_from_coordinates,
 )
-from .mesh.kinds.hierarchical import (
+from .mesh.connectivity.hierarchical import (
     create_hierarchical_from_coordinates,
+)
+from .mesh.coords import (
+    create_multirange_2d_mesh_primitives,
+    create_single_level_2d_mesh_primitive,
 )
 
 
@@ -292,9 +292,9 @@ def create_all_graph_components(
                 mesh_node_spacing=mesh_node_spacing,
             )
             if "refinement_factor" in mesh_layout_kwargs:
-                primitives_kwargs["interlevel_refinement_factor"] = (
-                    mesh_layout_kwargs["refinement_factor"]
-                )
+                primitives_kwargs["interlevel_refinement_factor"] = mesh_layout_kwargs[
+                    "refinement_factor"
+                ]
             if "max_num_refinement_levels" in mesh_layout_kwargs:
                 primitives_kwargs["max_num_levels"] = mesh_layout_kwargs[
                     "max_num_refinement_levels"
@@ -337,9 +337,9 @@ def create_all_graph_components(
                 mesh_node_spacing=mesh_node_spacing,
             )
             if "refinement_factor" in mesh_layout_kwargs:
-                primitives_kwargs["interlevel_refinement_factor"] = (
-                    mesh_layout_kwargs["refinement_factor"]
-                )
+                primitives_kwargs["interlevel_refinement_factor"] = mesh_layout_kwargs[
+                    "refinement_factor"
+                ]
             if "max_num_refinement_levels" in mesh_layout_kwargs:
                 primitives_kwargs["max_num_levels"] = mesh_layout_kwargs[
                     "max_num_refinement_levels"

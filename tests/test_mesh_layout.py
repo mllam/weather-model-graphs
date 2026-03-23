@@ -23,17 +23,17 @@ from loguru import logger
 
 import tests.utils as test_utils
 import weather_model_graphs as wmg
+from weather_model_graphs.create.mesh.connectivity.flat import (
+    create_flat_multiscale_from_coordinates,
+    create_flat_singlescale_from_coordinates,
+)
+from weather_model_graphs.create.mesh.connectivity.hierarchical import (
+    create_hierarchical_from_coordinates,
+)
 from weather_model_graphs.create.mesh.coords import (
     create_directed_mesh_graph,
     create_multirange_2d_mesh_primitives,
     create_single_level_2d_mesh_primitive,
-)
-from weather_model_graphs.create.mesh.kinds.flat import (
-    create_flat_multiscale_from_coordinates,
-    create_flat_singlescale_from_coordinates,
-)
-from weather_model_graphs.create.mesh.kinds.hierarchical import (
-    create_hierarchical_from_coordinates,
 )
 
 # ====================

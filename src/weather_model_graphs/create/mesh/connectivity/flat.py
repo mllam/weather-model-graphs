@@ -46,7 +46,7 @@ def _check_required_graph_attributes(G: networkx.Graph, context: str):
 
 def create_flat_multiscale_from_coordinates(
     G_coords_list: List[networkx.Graph],
-    pattern: str = "8-star",
+    **kwargs,
 ):
     """
     Create flat multiscale mesh graph from a list of coordinate graphs.
@@ -58,10 +58,6 @@ def create_flat_multiscale_from_coordinates(
     In a flat multiscale graph, coarser levels are merged into the finer level
     by coincident node positions (no separate inter-level connectivity needed).
 
-    The ``pattern`` argument defines the spatial neighbourhood connectivity:
-    - ``"4-star"``: only cardinal directions (horizontal and vertical neighbours)
-    - ``"8-star"``: cardinal directions plus diagonals (all 8 surrounding neighbours)
-
     Parameters
     ----------
     G_coords_list : list of networkx.Graph
@@ -71,9 +67,9 @@ def create_flat_multiscale_from_coordinates(
         - Edge attributes: ``"adjacency_type"`` (str, ``"cardinal"`` or ``"diagonal"``)
         - Graph attribute: ``"interlevel_refinement_factor"`` (int)
         Created by ``create_multirange_2d_mesh_primitives``.
-    pattern : str
-        Connectivity pattern for intra-level edges: ``"4-star"`` or ``"8-star"``
-        (default: ``"8-star"``)
+    **kwargs
+        Additional keyword arguments passed to ``create_directed_mesh_graph``
+        (e.g. ``pattern="8-star"``).
 
     Returns
     -------
@@ -107,7 +103,7 @@ def create_flat_multiscale_from_coordinates(
 
     # Convert each level's coordinate graph to directed graph with chosen pattern
     G_all_levels = [
-        mesh_coords.create_directed_mesh_graph(g_coords, pattern=pattern)
+        mesh_coords.create_directed_mesh_graph(g_coords, **kwargs)
         for g_coords in G_coords_list
     ]
 
@@ -155,19 +151,13 @@ def create_flat_multiscale_from_coordinates(
     return G_tot
 
 
-def create_flat_singlescale_from_coordinates(
-    G_coords: networkx.Graph, pattern: str = "8-star"
-):
+def create_flat_singlescale_from_coordinates(G_coords: networkx.Graph, **kwargs):
     """
     Create a flat single-scale directed mesh graph from a mesh primitive graph.
 
     This is the connectivity creation step for flat single-scale meshes.
     It converts an undirected mesh primitive graph to a directed mesh graph
     using the specified connectivity pattern.
-
-    The ``pattern`` argument defines the spatial neighbourhood connectivity:
-    - ``"4-star"``: only cardinal directions (horizontal and vertical neighbours)
-    - ``"8-star"``: cardinal directions plus diagonals (all 8 surrounding neighbours)
 
     Parameters
     ----------
@@ -176,8 +166,9 @@ def create_flat_singlescale_from_coordinates(
         - Node attributes: ``"pos"`` (np.ndarray of shape [2,]), ``"type"`` (str)
         - Edge attributes: ``"adjacency_type"`` (str, ``"cardinal"`` or ``"diagonal"``)
         Created by ``create_single_level_2d_mesh_primitive``.
-    pattern : str
-        Connectivity pattern: ``"4-star"`` or ``"8-star"`` (default: ``"8-star"``)
+    **kwargs
+        Additional keyword arguments passed to ``create_directed_mesh_graph``
+        (e.g. ``pattern="8-star"``).
 
     Returns
     -------
@@ -187,7 +178,7 @@ def create_flat_singlescale_from_coordinates(
     _check_required_graph_attributes(
         G_coords, "create_flat_singlescale_from_coordinates"
     )
-    return mesh_coords.create_directed_mesh_graph(G_coords, pattern=pattern)
+    return mesh_coords.create_directed_mesh_graph(G_coords, **kwargs)
 
 
 def create_flat_multiscale_mesh_graph(
