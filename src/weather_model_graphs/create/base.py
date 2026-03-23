@@ -27,9 +27,7 @@ from .mesh.connectivity.flat import (
     create_flat_multiscale_from_coordinates,
     create_flat_singlescale_from_coordinates,
 )
-from .mesh.connectivity.hierarchical import (
-    create_hierarchical_from_coordinates,
-)
+from .mesh.connectivity.hierarchical import create_hierarchical_from_coordinates
 from .mesh.coords import (
     create_multirange_2d_mesh_primitives,
     create_single_level_2d_mesh_primitive,
