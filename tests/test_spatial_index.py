@@ -117,11 +117,11 @@ class TestEuclideanWithRadius:
 
 # Haversine – k_nearest_to
 class TestHaversineKNearest:
-    def test_self_distance_is_zero(self, simple_geo_coords):
+    def test_distance_is_returned_in_degrees(self, simple_geo_coords):
         sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
-        idxs, dists = sel.k_nearest_to([0.0, 0.0], k=1)
+        idxs, dists = sel.k_nearest_to([-10.0, 0.0], k=1)
         assert idxs[0] == 0
-        assert dists[0] == pytest.approx(0.0, abs=1e-3)
+        assert dists[0] == pytest.approx(10.0, rel=1e-4)
 
     def test_distances_in_radians(self, simple_geo_coords):
         """10° longitude at equator is 10° * pi/180 radians."""
