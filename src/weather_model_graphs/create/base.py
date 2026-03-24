@@ -8,7 +8,6 @@ used to represent the encode-process-decode steps respectively. These are create
 function uses `connect_nodes_across_graphs` to connect nodes across the component graphs.
 """
 
-
 from typing import Iterable
 
 import networkx
