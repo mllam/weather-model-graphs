@@ -145,9 +145,11 @@ class TestHaversineWithRadius:
         sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
         radius_deg = 12.0
         idxs, dists = sel.within_radius([0.0, 0.0], radius=radius_deg)
-        assert 0 in idxs  # self
-        assert 1 in idxs  # 10° lon away
-        assert any(d == pytest.approx(10.0, rel=1e-4) for d in dists)
+        order = np.argsort(dists)
+        sorted_idxs = idxs[order]
+        sorted_dists = dists[order]
+        np.testing.assert_array_equal(sorted_idxs, np.array([0, 1]))
+        np.testing.assert_allclose(sorted_dists, np.array([0.0, 10.0]), rtol=1e-4)
 
     def test_radius_in_degrees_exclusive(self, simple_geo_coords):
         """A 5° radius from origin excludes the 10° point."""
