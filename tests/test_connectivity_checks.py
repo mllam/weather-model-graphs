@@ -1,7 +1,7 @@
 import networkx as nx
 import pytest
 
-from weather_model_graphs.create.diagnostics import check_graph_consistency
+from weather_model_graphs.diagnostics import check_graph_consistency
 
 
 def test_g2m_connectivity_raises_value_error_on_isolated_nodes():
