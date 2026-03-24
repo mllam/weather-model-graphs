@@ -4,7 +4,7 @@ Tests for :class:`weather_model_graphs.spatial.SpatialCoordinateValuesSelector`.
 Covers:
 - Initialisation (valid / invalid metric)
 - Euclidean k-nearest-to and within_radius queries
-- Haversine k-nearest-to and within_radius queries (distances in radians)
+- Haversine k-nearest-to and within_radius queries (distances in degrees)
 - Factory method SpatialCoordinateValuesSelector.for_crs()
 - Warning emitted for rectilinear mesh + geographic CRS in create_all_graph_components
 """
@@ -123,20 +123,19 @@ class TestHaversineKNearest:
         assert idxs[0] == 0
         assert dists[0] == pytest.approx(10.0, rel=1e-4)
 
-    def test_distances_in_radians(self, simple_geo_coords):
-        """10° longitude at equator is 10° * pi/180 radians."""
+    def test_distances_in_degrees(self, simple_geo_coords):
+        """10° longitude at equator should be returned as 10.0 degrees."""
         sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
         idxs, dists = sel.k_nearest_to([0.0, 0.0], k=2)
-        # nearest is self (0 rad), second is [10, 0] = deg2rad(10)
-        expected_rad = np.deg2rad(10.0)
-        assert dists[1] == pytest.approx(expected_rad, rel=1e-4)
+        # nearest is self (0 deg), second is [10, 0] = 10 deg
+        assert dists[1] == pytest.approx(10.0, rel=1e-4)
 
-    def test_distances_are_native_haversine_radians(self):
-        """For geographic coords, haversine returns radians."""
+    def test_distances_are_haversine_degrees(self):
+        """For geographic coords, haversine distances are returned in degrees."""
         coords = np.array([[0.0, 0.0], [1.0, 0.0]])
         sel = SpatialCoordinateValuesSelector("haversine", coords)
         _, d_hav = sel.k_nearest_to([0.0, 0.0], k=2)
-        assert d_hav[1] == pytest.approx(np.deg2rad(1.0), rel=1e-4)
+        assert d_hav[1] == pytest.approx(1.0, rel=1e-4)
 
 
 # Haversine – within_radius
@@ -175,7 +174,7 @@ class TestHaversineLongitudeWrapAround:
 
         # 0 deg is 1 degree away on the sphere, while 351 deg is 8 degrees away.
         assert 0.0 in nearest_lons
-        assert dists.min() == pytest.approx(np.deg2rad(1.0), rel=1e-4)
+        assert dists.min() == pytest.approx(1.0, rel=1e-4)
 
     def test_radius_query_crosses_longitude_seam(self, equator_periodic_coords):
         """Radius query near 360 deg should include 0 deg neighbour across seam."""
@@ -304,7 +303,7 @@ class TestIntegrationGraphCreation:
     """
     Smoke-test that graph creation completes without error when a geographic
     CRS is supplied, and that the haversine-based edge lengths are physically
-    reasonable in radians for a ~10° domain.
+    reasonable in degrees for a ~10° domain.
     """
 
     def _make_lonlat_coords(self, n=8):
@@ -336,7 +335,7 @@ class TestIntegrationGraphCreation:
             logger.remove(sink_id)
 
         assert any("rectilinear" in message for message in warning_messages)
-        # The g2m / m2g edges use haversine (distances in radians).
+        # The g2m / m2g edges use haversine (distances in degrees).
         # The m2m internal mesh edges still use Euclidean (degrees) because
         # create_single_level_2d_mesh_graph does not receive the CRS.
         g2m_m2g_lens = [
@@ -345,9 +344,9 @@ class TestIntegrationGraphCreation:
             if d.get("component") in ("g2m", "m2g") and "len" in d
         ]
         assert len(g2m_m2g_lens) > 0, "Expected g2m/m2g edges with 'len' attribute"
-        # For a ~9 degree domain, haversine edge lengths should be below ~0.2 rad
-        # and clearly not degree-scale values.
-        assert all(1e-4 < l < 0.5 for l in g2m_m2g_lens), (
+        # For a ~9 degree domain, haversine edge lengths should stay in a
+        # plausible degree range and remain well below half the globe.
+        assert all(1e-3 < l < 20.0 for l in g2m_m2g_lens), (
             f"g2m/m2g edge lengths out of expected haversine range: "
-            f"min={min(g2m_m2g_lens):.6f} rad, max={max(g2m_m2g_lens):.6f} rad"
+            f"min={min(g2m_m2g_lens):.6f} deg, max={max(g2m_m2g_lens):.6f} deg"
         )
