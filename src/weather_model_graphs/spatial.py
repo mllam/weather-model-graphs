@@ -121,12 +121,16 @@ class SpatialCoordinateValuesSelector:
             of the *k* nearest neighbours, ordered by increasing distance.
         distances : np.ndarray, shape (k,)
             Corresponding distances.  For ``"euclidean"`` these are in the same
-            units as *coords*; for ``"haversine"`` these are in **radians**.
+            units as *coords*; for ``"haversine"`` these are in **degrees**.
         """
         tree_point = self._prepare_query_point(point)
         raw_dists, raw_idxs = self._tree.query(tree_point, k=k)
         indices = raw_idxs.flatten()
-        distances = raw_dists.flatten()
+        distances = (
+            np.rad2deg(raw_dists.flatten())
+            if self.distance_metric == "haversine"
+            else raw_dists.flatten()
+        )
         return indices, distances
 
     def within_radius(
