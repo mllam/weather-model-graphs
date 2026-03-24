@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `__version__` attribute to the package init
   [\#56](https://github.com/mllam/weather-model-graphs/pull/56) @AdMub
 
+### Changed
+
+- Auto-detect spatial metric from CRS, with degree-based external haversine inputs/outputs and internal radian conversion. [\#86](https://github.com/mllam/weather-model-graphs/pull/86), @FAbdullah17
+
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
 
 
