@@ -8,7 +8,6 @@ used to represent the encode-process-decode steps respectively. These are create
 function uses `connect_nodes_across_graphs` to connect nodes across the component graphs.
 """
 
-
 from typing import Iterable
 
 import networkx
@@ -23,7 +22,6 @@ from ..networkx_utils import (
     split_graph_by_edge_attribute,
     split_on_edge_attribute_existance,
 )
-from .connectivity_checks import check_for_unconnected_grid_nodes
 from .grid import create_grid_graph_nodes
 from .mesh.kinds.flat import (
     create_flat_multiscale_mesh_graph,
@@ -44,7 +42,6 @@ def create_all_graph_components(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
-    allow_unconnected_grid_nodes: bool = False,
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -163,9 +160,6 @@ def create_all_graph_components(
     )
     graph_components["g2m"] = G_g2m
 
-    if not allow_unconnected_grid_nodes:
-        # Pass the actual grid nodes to check their out-degree
-        check_for_unconnected_grid_nodes(G_g2m, list(G_grid.nodes))
     if decode_mask is None:
         # decode to all grid nodes
         decode_grid = G_grid
