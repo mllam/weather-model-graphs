@@ -75,6 +75,7 @@ def test_create_graph_generic(m2g_connectivity, g2m_connectivity, m2m_connectivi
                 graph = wmg.create.create_all_graph_components(
                     coords=xy,
                     m2m_connectivity=m2m_connectivity,
+                    mesh_layout="rectilinear",
                     m2m_connectivity_kwargs=m2m_kwargs,
                     g2m_connectivity=g2m_connectivity,
                     g2m_connectivity_kwargs=g2m_kwargs,
