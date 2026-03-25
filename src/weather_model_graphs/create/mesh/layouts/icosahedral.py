@@ -1,0 +1,759 @@
+"""Icosahedral mesh layout for global graphs."""
+
+import warnings
+from typing import Optional
+
+import networkx as nx
+import numpy as np
+from scipy.spatial import KDTree
+
+
+def get_mesh_feature_dimension(mesh_features: np.ndarray) -> int:
+    """
+    Detect the feature dimension of mesh node features.
+
+    For backward compatibility:
+    - If shape[1] == 2: assumes 2D lat/lon coordinates
+    - If shape[1] == 3: assumes 3D Cartesian coordinates
+    - Otherwise: raises warning and assumes 2D for backward compatibility
+
+    Parameters
+    ----------
+    mesh_features : numpy.ndarray
+        (N_mesh, D) array of mesh node features.
+
+    Returns
+    -------
+    int
+        Detected feature dimension (2 or 3).
+    """
+    if mesh_features.ndim != 2:
+        raise ValueError(f"Expected 2D array, got shape {mesh_features.shape}")
+
+    dim = mesh_features.shape[1]
+
+    if dim == 2:
+        return 2
+    elif dim == 3:
+        return 3
+    else:
+        warnings.warn(
+            f"Unexpected mesh feature dimension {dim}. "
+            f"Expected 2 (lat/lon) or 3 (Cartesian). "
+            f"Assuming 2 for backward compatibility.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return 2
+
+
+def create_hierarchy_of_icosahedral_meshes(
+    max_subdivisions: int, radius: float = 1.0
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """
+    Create a list of icosahedral meshes at different refinement levels.
+
+    Parameters
+    ----------
+    max_subdivisions : int
+        Maximum number of subdivisions.
+    radius : float, optional
+        Radius of the sphere. Default is 1.0.
+
+    Returns
+    -------
+    list of tuple
+        List of (vertices, faces) tuples for each level from coarsest to finest.
+    """
+    mesh_list = []
+    for level in range(max_subdivisions + 1):
+        vertices, faces = generate_icosahedral_mesh(level, radius)
+        mesh_list.append((vertices, faces))
+    return mesh_list
+
+
+def create_flat_icosahedral_mesh_graph(
+    subdivisions: int = 3,
+    radius: float = 1.0,
+    add_edge_length: bool = True,
+    add_edge_vector: bool = True,
+) -> nx.DiGraph:
+    """
+    Create a flat (single-level) icosahedral mesh graph.
+
+    Parameters
+    ----------
+    subdivisions : int, optional
+        Number of mesh subdivisions (0 = base icosahedron). Default is 3.
+    radius : float, optional
+        Sphere radius. Default is 1.0.
+    add_edge_length : bool, optional
+        Add 'len' attribute to edges with Euclidean distance. Default is True.
+    add_edge_vector : bool, optional
+        Add 'vdiff' attribute with vector difference. Default is True.
+
+    Returns
+    -------
+    networkx.DiGraph
+        Directed graph with mesh nodes and edges.
+    """
+    vertices, faces = generate_icosahedral_mesh(subdivisions, radius)
+    lat_lon = cartesian_to_lat_lon(vertices)
+
+    g = nx.Graph()
+    for i in range(len(vertices)):
+        g.add_node(
+            i,
+            pos=lat_lon[i],
+            type="mesh",
+            level=None,
+        )
+
+    for face in faces:
+        for i in range(3):
+            for j in range(i + 1, 3):
+                u, v = face[i], face[j]
+                if not g.has_edge(u, v):
+                    g.add_edge(u, v)
+
+    dg = nx.DiGraph()
+    dg.add_nodes_from(g.nodes(data=True))
+
+    for u, v in g.edges():
+        src3d = vertices[u]
+        dst3d = vertices[v]
+        dist = np.linalg.norm(src3d - dst3d)
+        dg.add_edge(
+            u, v, len=dist, vdiff=tangential_plane_vdiff(src3d, dst3d), level=None
+        )
+        dg.add_edge(
+            v, u, len=dist, vdiff=tangential_plane_vdiff(dst3d, src3d), level=None
+        )
+
+    dg.graph["mesh_layout"] = "icosahedral"
+    dg.graph["subdivisions"] = subdivisions
+    dg.graph["radius"] = radius
+    dg.graph["vertices"] = vertices
+    dg.graph["faces"] = faces
+    dg.graph["is_hierarchical"] = False
+
+    return dg
+
+
+def create_hierarchical_icosahedral_mesh_graph(
+    max_subdivisions: int = 3,
+    radius: float = 1.0,
+    add_edge_length: bool = True,
+    add_edge_vector: bool = True,
+) -> nx.DiGraph:
+    """
+    Create a hierarchical icosahedral mesh graph with multiple refinement levels.
+
+    Parameters
+    ----------
+    max_subdivisions : int, optional
+        Maximum number of subdivisions. Default is 3.
+    radius : float, optional
+        Sphere radius. Default is 1.0.
+    add_edge_length : bool, optional
+        Add 'len' attribute to edges with Euclidean distance. Default is True.
+    add_edge_vector : bool, optional
+        Add 'vdiff' attribute with vector difference. Default is True.
+
+    Returns
+    -------
+    networkx.DiGraph
+        Directed graph with hierarchical mesh nodes and inter-level edges.
+    """
+    mesh_list = create_hierarchy_of_icosahedral_meshes(max_subdivisions, radius)
+
+    level_offsets = {}
+    current_offset = 0
+    for level in range(max_subdivisions, -1, -1):
+        level_offsets[level] = current_offset
+        vertices = mesh_list[level][0]
+        current_offset += len(vertices)
+
+    dg = nx.DiGraph()
+    vertices_by_level = []
+    faces_by_level = []
+
+    for level in range(max_subdivisions + 1):
+        vertices, faces = mesh_list[level]
+        vertices_by_level.append(vertices)
+        faces_by_level.append(faces)
+        lat_lon = cartesian_to_lat_lon(vertices)
+        offset = level_offsets[level]
+
+        for i in range(len(vertices)):
+            node_id = offset + i
+            dg.add_node(
+                node_id,
+                pos=lat_lon[i],
+                type="mesh",
+                level=level,
+            )
+
+    for level in range(max_subdivisions + 1):
+        vertices, faces = mesh_list[level]
+        offset = level_offsets[level]
+        for face in faces:
+            for i in range(3):
+                for j in range(i + 1, 3):
+                    u = offset + face[i]
+                    v = offset + face[j]
+                    if not dg.has_edge(u, v):
+                        src3d = vertices[face[i]]
+                        dst3d = vertices[face[j]]
+                        dist = np.linalg.norm(src3d - dst3d)
+                        dg.add_edge(
+                            u,
+                            v,
+                            len=dist,
+                            vdiff=tangential_plane_vdiff(src3d, dst3d),
+                            level=level,
+                        )
+                        dg.add_edge(
+                            v,
+                            u,
+                            len=dist,
+                            vdiff=tangential_plane_vdiff(dst3d, src3d),
+                            level=level,
+                        )
+
+    for coarse_level in range(max_subdivisions):
+        fine_level = coarse_level + 1
+        coarse_vertices, _ = mesh_list[coarse_level]
+        fine_vertices, fine_faces = mesh_list[fine_level]
+        coarse_offset = level_offsets[coarse_level]
+        fine_offset = level_offsets[fine_level]
+
+        tree = KDTree(fine_vertices)
+        max_edge_len = compute_max_edge_length(fine_vertices, fine_faces)
+        radius_query = 1.1 * max_edge_len
+
+        for i, coarse_pos in enumerate(coarse_vertices):
+            coarse_node = coarse_offset + i
+            fine_indices = tree.query_ball_point(coarse_pos, radius_query)
+            for fine_idx in fine_indices:
+                fine_node = fine_offset + fine_idx
+                fine_pos3d = fine_vertices[fine_idx]
+                coarse_pos3d = coarse_pos
+                dist = np.linalg.norm(fine_pos3d - coarse_pos3d)
+                dg.add_edge(
+                    fine_node,
+                    coarse_node,
+                    len=dist,
+                    vdiff=tangential_plane_vdiff(fine_pos3d, coarse_pos3d),
+                    level=f"{fine_level}_to_{coarse_level}",
+                )
+                dg.add_edge(
+                    coarse_node,
+                    fine_node,
+                    len=dist,
+                    vdiff=tangential_plane_vdiff(coarse_pos3d, fine_pos3d),
+                    level=f"{coarse_level}_to_{fine_level}",
+                )
+
+    dg.graph["mesh_layout"] = "icosahedral_hierarchical"
+    dg.graph["max_subdivisions"] = max_subdivisions
+    dg.graph["radius"] = radius
+    dg.graph["level_offsets"] = level_offsets
+    dg.graph["mesh_vertices_by_level"] = vertices_by_level
+    dg.graph["mesh_faces_by_level"] = faces_by_level
+    dg.graph["is_hierarchical"] = True
+
+    return dg
+
+
+def connect_grid_to_mesh(
+    grid_lat_lon: np.ndarray,
+    mesh_vertices: np.ndarray,
+    mesh_faces: np.ndarray,
+    radius_factor: float = 0.6,
+) -> np.ndarray:
+    """
+    Grid to Mesh connections (g2m) adapted from create_global_mesh.py lines 224-242.
+
+    Parameters
+    ----------
+    grid_lat_lon : numpy.ndarray
+        (N_grid, 2) array of [lat, lon] in degrees.
+    mesh_vertices : numpy.ndarray
+        (N_mesh, 3) cartesian coordinates.
+    mesh_faces : numpy.ndarray
+        (M, 3) face indices.
+    radius_factor : float, optional
+        Multiplier for max edge distance. Default is 0.6.
+
+    Returns
+    -------
+    numpy.ndarray
+        (2, E) array of [grid_node, mesh_node] connections.
+    """
+    if len(grid_lat_lon) == 0:
+        return np.array([[], []], dtype=int)
+
+    grid_cartesian = lat_lon_to_cartesian(grid_lat_lon[:, 0], grid_lat_lon[:, 1])
+    max_edge_len = compute_max_edge_length(mesh_vertices, mesh_faces)
+    query_radius = radius_factor * max_edge_len
+    tree = KDTree(mesh_vertices)
+    neighbor_lists = tree.query_ball_point(grid_cartesian, query_radius)
+
+    total_connections = sum(len(neighbors) for neighbors in neighbor_lists)
+    if total_connections == 0:
+        return np.array([[], []], dtype=int)
+
+    grid_indices = np.zeros(total_connections, dtype=int)
+    mesh_indices = np.zeros(total_connections, dtype=int)
+    start_idx = 0
+    for i, neighbors in enumerate(neighbor_lists):
+        if neighbors:
+            n_neighbors = len(neighbors)
+            end_idx = start_idx + n_neighbors
+            grid_indices[start_idx:end_idx] = i
+            mesh_indices[start_idx:end_idx] = neighbors
+            start_idx = end_idx
+
+    return np.array([grid_indices, mesh_indices])
+
+
+def connect_mesh_to_grid(
+    mesh_vertices: np.ndarray,
+    mesh_faces: np.ndarray,
+    grid_lat_lon: np.ndarray,
+    fallback_to_nearest: bool = True,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Mesh to Grid connections (m2g).
+
+    For each grid point, find containing mesh triangle and return
+    barycentric weights for interpolation. Falls back to nearest neighbour
+    if triangle containment fails.
+
+    Parameters
+    ----------
+    mesh_vertices : numpy.ndarray
+        (N_mesh, 3) cartesian coordinates of mesh vertices.
+    mesh_faces : numpy.ndarray
+        (M, 3) face indices.
+    grid_lat_lon : numpy.ndarray
+        (N_grid, 2) array of [lat, lon] in degrees.
+    fallback_to_nearest : bool, optional
+        Whether to fall back to nearest-neighbour if containment fails.
+        Default is True.
+
+    Returns
+    -------
+    edge_index : numpy.ndarray
+        (2, E) array of [mesh_node, grid_node] connections.
+    weights : numpy.ndarray
+        (E,) barycentric weights for each edge.
+    """
+    if len(mesh_vertices) > 0:
+        feat_dim = get_mesh_feature_dimension(mesh_vertices)
+        if feat_dim == 3:
+            # 3D Cartesian, ideal for spherical geometry
+            pass
+        else:
+            # 2D lat/lon, validator-compliant for now
+            pass
+    grid_cartesian = lat_lon_to_cartesian(grid_lat_lon[:, 0], grid_lat_lon[:, 1])
+    face_centroids = mesh_vertices[mesh_faces].mean(axis=1)
+    centroid_tree = KDTree(face_centroids)
+
+    if fallback_to_nearest:
+        vertex_tree = KDTree(mesh_vertices)
+
+    mesh_indices, grid_indices, weights = [], [], []
+    failed_points = 0
+
+    for grid_idx, point in enumerate(grid_cartesian):
+        face_idx, bary_weights = find_containing_triangle(
+            point,
+            mesh_vertices,
+            mesh_faces,
+            face_centroids,
+            centroid_tree,
+            k_candidates=10,
+        )
+
+        # Clip negative weights (numerical noise near edges), renormalise to sum=1.
+        # If all weights clip to zero (degenerate case), treat as a failed containment.
+        contained = False
+        if face_idx is not None:
+            clipped = np.clip(bary_weights, 0.0, None)
+            w_sum = clipped.sum()
+            if w_sum > 1e-12:
+                normalised = clipped / w_sum
+                for mesh_idx, w in zip(mesh_faces[face_idx], normalised):
+                    # Skip zero-weight vertices (on triangle edge) — contribute nothing
+                    if w > 0.0:
+                        mesh_indices.append(mesh_idx)
+                        grid_indices.append(grid_idx)
+                        weights.append(float(w))
+                contained = True
+
+        if not contained:
+            if fallback_to_nearest:
+                failed_points += 1
+                dist, nearest_idx = vertex_tree.query(point)
+                mesh_indices.append(nearest_idx)
+                grid_indices.append(grid_idx)
+                weights.append(1.0)
+            else:
+                failed_points += 1
+
+    if failed_points > 0 and len(grid_cartesian) > 0:
+        total_points = len(grid_cartesian)
+        warnings.warn(
+            f"Triangle containment failed for {failed_points}/{total_points} "
+            f"({failed_points / total_points * 100:.1f}%) grid points. "
+            f"{'Used nearest neighbour fallback.' if fallback_to_nearest else 'Points were skipped.'}",
+            UserWarning,
+        )
+
+    if len(mesh_indices) == 0:
+        return np.array([[], []], dtype=int), np.array([])
+
+    return np.array([mesh_indices, grid_indices]), np.array(weights)
+
+
+def lat_lon_to_cartesian(lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
+    """
+    Convert lat/lon degrees to cartesian coordinates on unit sphere.
+
+    Parameters
+    ----------
+    lat : numpy.ndarray
+        Latitude values in degrees.
+    lon : numpy.ndarray
+        Longitude values in degrees.
+
+    Returns
+    -------
+    numpy.ndarray
+        (N, 3) array of (x, y, z) cartesian coordinates.
+    """
+    lat_rad = np.radians(lat)
+    lon_rad = np.radians(lon)
+    x = np.cos(lat_rad) * np.cos(lon_rad)
+    y = np.cos(lat_rad) * np.sin(lon_rad)
+    z = np.sin(lat_rad)
+    return np.column_stack([x, y, z])
+
+
+def cartesian_to_lat_lon(vertices: np.ndarray) -> np.ndarray:
+    """
+    Convert cartesian coordinates to lat/lon degrees.
+
+    Parameters
+    ----------
+    vertices : numpy.ndarray
+        (N, 3) array of (x, y, z) coordinates on unit sphere.
+
+    Returns
+    -------
+    numpy.ndarray
+        (N, 2) array of (latitude, longitude) in degrees.
+        Latitude range: [-90, 90]. Longitude range: [-180, 180].
+    """
+    x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
+    lon = np.degrees(np.arctan2(y, x))
+
+    if np.any(np.abs(z) > 1.0):
+        n_clipped = np.sum(np.abs(z) > 1.0)
+        warnings.warn(
+            f"Clipped {n_clipped} values outside [-1, 1] in cartesian_to_lat_lon. "
+            "This is likely due to floating point errors.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    z_clipped = np.clip(z, -1.0, 1.0)
+    lat = np.degrees(np.arcsin(z_clipped))
+    return np.column_stack([lat, lon])
+
+
+def compute_max_edge_length(vertices: np.ndarray, faces: np.ndarray) -> float:
+    """
+    Compute longest edge in mesh.
+
+    Parameters
+    ----------
+    vertices : numpy.ndarray
+        (N, 3) array of vertex coordinates.
+    faces : numpy.ndarray
+        (M, 3) array of face indices.
+
+    Returns
+    -------
+    float
+        Length of the longest edge in the mesh.
+    """
+    edge_pairs = faces[:, [[0, 1], [1, 2], [2, 0]]]
+    all_edges = edge_pairs.reshape(-1, 2)
+    all_edges = np.unique(np.sort(all_edges, axis=1), axis=0)
+    v1 = vertices[all_edges[:, 0]]
+    v2 = vertices[all_edges[:, 1]]
+    edge_lengths = np.linalg.norm(v1 - v2, axis=1)
+    return np.max(edge_lengths)
+
+
+def find_containing_triangle(
+    point_cartesian: np.ndarray,
+    mesh_vertices: np.ndarray,
+    mesh_faces: np.ndarray,
+    face_centroids: Optional[np.ndarray] = None,
+    centroid_tree: Optional[KDTree] = None,
+    k_candidates: int = 10,
+) -> tuple[Optional[int], Optional[np.ndarray]]:
+    """
+    Optimized triangle containment using spatial indexing.
+
+    Parameters
+    ----------
+    point_cartesian : numpy.ndarray
+        (3,) cartesian point on sphere.
+    mesh_vertices : numpy.ndarray
+        (N_mesh, 3) mesh vertices.
+    mesh_faces : numpy.ndarray
+        (M, 3) face indices.
+    face_centroids : numpy.ndarray, optional
+        Precomputed centroids of faces.
+    centroid_tree : scipy.spatial.KDTree, optional
+        Precomputed KDTree on centroids.
+    k_candidates : int, optional
+        Number of candidate faces to check. Default is 10.
+
+    Returns
+    -------
+    face_index : int or None
+        Index of the containing face, or None if not found.
+    barycentric_weights : numpy.ndarray or None
+        (3,) array of barycentric weights, or None if not found.
+    """
+    point_norm = point_cartesian / np.linalg.norm(point_cartesian)
+    if face_centroids is None or centroid_tree is None:
+        face_centroids = mesh_vertices[mesh_faces].mean(axis=1)
+        centroid_tree = KDTree(face_centroids)
+
+    candidate_indices = centroid_tree.query(point_norm, k=k_candidates)[1]
+
+    best_face = None
+    best_weights = None
+    best_sum = float("inf")
+
+    for face_idx in candidate_indices:
+        face = mesh_faces[face_idx]
+        a, b, c = mesh_vertices[face]
+        weights = barycentric_coordinates(point_norm, a, b, c)
+
+        if weights is not None and np.all(weights >= -0.01) and np.all(weights <= 1.01):
+            weight_sum = np.sum(weights)
+            if abs(weight_sum - 1.0) < 1e-6:
+                return face_idx, weights / weight_sum
+            else:
+                if abs(weight_sum - 1.0) < abs(best_sum - 1.0):
+                    best_sum = weight_sum
+                    best_face = face_idx
+                    best_weights = weights / weight_sum
+
+    return best_face, best_weights
+
+
+def barycentric_coordinates(
+    p: np.ndarray, a: np.ndarray, b: np.ndarray, c: np.ndarray
+) -> Optional[np.ndarray]:
+    """
+    Compute barycentric coordinates using cross products (no matrix solve).
+
+    Much faster than np.linalg.solve.
+
+    Parameters
+    ----------
+    p : numpy.ndarray
+        (3,) point to compute coordinates for.
+    a : numpy.ndarray
+        (3,) first vertex of triangle.
+    b : numpy.ndarray
+        (3,) second vertex of triangle.
+    c : numpy.ndarray
+        (3,) third vertex of triangle.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        (3,) array of barycentric coordinates [u, v, w], or None if the
+        triangle is degenerate.
+    """
+    v0 = b - a
+    v1 = c - a
+    v2 = p - a
+
+    d00 = np.dot(v0, v0)
+    d01 = np.dot(v0, v1)
+    d11 = np.dot(v1, v1)
+    d20 = np.dot(v2, v0)
+    d21 = np.dot(v2, v1)
+
+    denom = d00 * d11 - d01 * d01
+    if abs(denom) < 1e-12:
+        return None
+
+    v = (d11 * d20 - d01 * d21) / denom
+    w = (d00 * d21 - d01 * d20) / denom
+    u = 1.0 - v - w
+
+    return np.array([u, v, w])
+
+
+def generate_icosahedral_mesh(
+    refinement_level: int, radius: float = 1.0
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Generate a spherical icosahedral mesh using Trimesh.
+
+    Parameters
+    ----------
+    refinement_level : int
+        Number of subdivisions. Must be non-negative.
+    radius : float, optional
+        Radius of the sphere. Default is 1.0 for unit sphere.
+
+    Returns
+    -------
+    nodes : numpy.ndarray
+        Shape (N, 3) Cartesian coordinates (x, y, z).
+    faces : numpy.ndarray
+        Shape (M, 3) Triangular faces connecting the nodes.
+
+    Raises
+    ------
+    ValueError
+        If refinement_level is negative.
+    ImportError
+        If trimesh is not available.
+    """
+    if refinement_level < 0:
+        raise ValueError("subdivisions must be non-negative")
+
+    try:
+        import trimesh
+    except ImportError as e:
+        raise ImportError(
+            "trimesh is required for icosahedral mesh generation. "
+            "Please install it with: pip install trimesh"
+        ) from e
+
+    try:
+        mesh = trimesh.creation.icosphere(subdivisions=refinement_level, radius=radius)
+    except ImportError as e:
+        raise ImportError(
+            "trimesh is required for icosahedral mesh generation. "
+            "Please install it with: pip install trimesh"
+        ) from e
+
+    nodes = np.array(mesh.vertices)
+    faces = np.array(mesh.faces)
+    return nodes, faces
+
+
+def refinement_level_from_grid_spacing(
+    grid_spacing_deg: float, radius: float = 1.0
+) -> int:
+    """
+    Determine the appropriate refinement level for a desired grid spacing.
+
+    Selects the finest icosahedral refinement level whose mesh spacing is still
+    >= grid_spacing_deg. This ensures the mesh is not finer than the input grid,
+    avoiding unnecessary computation while maintaining adequate coverage.
+
+    Parameters
+    ----------
+    grid_spacing_deg : float
+        Desired grid spacing in degrees.
+    radius : float, optional
+        Radius of the sphere. Default is 1.0.
+
+    Returns
+    -------
+    int
+        The chosen refinement level.
+    """
+    # Approximate angular spacing in degrees for each refinement level
+    level_spacing_deg = {
+        0: 63.4,  # level0
+        1: 31.7,  # level1
+        2: 15.8,  # level2
+        3: 7.9,  # level3
+        4: 3.95,  # level4
+        5: 1.98,  # level5
+    }
+
+    # Find all levels whose mesh spacing is >= requested grid spacing
+    coarse_enough = {
+        lvl: spacing
+        for lvl, spacing in level_spacing_deg.items()
+        if spacing >= grid_spacing_deg
+    }
+
+    if coarse_enough:
+        # Pick the finest (highest level) among valid candidates
+        chosen_level = max(coarse_enough.keys())
+    else:
+        # Requested spacing is finer than any available level → use finest
+        chosen_level = max(level_spacing_deg.keys())
+        warnings.warn(
+            f"Requested grid spacing {grid_spacing_deg}° is finer than the finest "
+            f"available mesh spacing {level_spacing_deg[chosen_level]:.2f}° at level {chosen_level}. "
+            f"Using finest available level.",
+            UserWarning,
+        )
+
+    return chosen_level
+
+
+def tangential_plane_vdiff(src_pos3d: np.ndarray, dst_pos3d: np.ndarray) -> np.ndarray:
+    """
+    Compute edge displacement in the local tangent plane at the source node.
+
+    Projects the displacement vector (src - dst) onto the tangent plane at src,
+    defined as the plane perpendicular to the outward normal at src (which for a
+    unit sphere is just src itself).
+
+    Returns [delta_x_tangential, delta_y_tangential] a 2D vector in the
+    tangent plane. Pair this with great-circle distance as a scalar to get
+    the full 3-feature edge representation [len, dx_tan, dy_tan].
+
+    Parameters
+        src_pos3d : np.ndarray (3,) Cartesian position of source node on unit sphere.
+        dst_pos3d : np.ndarray (3,) Cartesian position of destination node on unit sphere.
+
+    Returns
+        np.ndarray (2,) tangential displacement [delta_x_tan, delta_y_tan].
+    """
+    outward_normal = src_pos3d / np.linalg.norm(src_pos3d)
+    raw_displacement = src_pos3d - dst_pos3d
+    tangential_displacement = (
+        raw_displacement - np.dot(raw_displacement, outward_normal) * outward_normal
+    )
+
+    north_pole = np.array([0.0, 0.0, 1.0])
+    east_direction = np.cross(north_pole, outward_normal)
+    east_magnitude = np.linalg.norm(east_direction)
+
+    if east_magnitude < 1e-10:
+        east_direction = np.array([1.0, 0.0, 0.0])
+        east_direction = (
+            east_direction - np.dot(east_direction, outward_normal) * outward_normal
+        )
+        east_magnitude = np.linalg.norm(east_direction)
+
+    east_direction = east_direction / east_magnitude
+    north_direction = np.cross(outward_normal, east_direction)
+
+    dx = np.dot(tangential_displacement, east_direction)
+    dy = np.dot(tangential_displacement, north_direction)
+
+    return np.array([dx, dy])

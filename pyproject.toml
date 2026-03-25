@@ -11,6 +11,7 @@ dependencies = [
     "networkx>=3.3",
     "scipy>=1.13.0",
     "pyproj>=3.7.0",
+    "trimesh>=4.0.0",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
@@ -24,6 +25,7 @@ visualisation = [
     "matplotlib>=3.8.4",
     "ipykernel>=6.29.4",
     "cartopy>=0.24.1",
+    "plotly>=5.0.0",
 ]
 docs = [
     "jupyter-book>=1.0.0",
