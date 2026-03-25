@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support for `nx-cugraph` backend by ensuring array-based position math during graph construction
+  [\#62](https://github.com/mllam/weather-model-graphs/pull/62) @AdMub
 - Added a standalone graph consistency checking tool (`wmg.diagnostics.check_graph_consistency`) to ensure structural health, such as verifying all grid nodes successfully connect to the mesh (#42).
 - Add Django-style graph filtering via `filter_graph`, for example to select
   nodes by type (`node__type="mesh"`), edges by component
