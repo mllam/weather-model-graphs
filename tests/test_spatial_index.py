@@ -253,6 +253,7 @@ class TestRectilinearGeographicWarning:
 
         kwargs = dict(
             coords=large_coords,
+            mesh_layout="rectilinear",
             m2m_connectivity=m2m,
             g2m_connectivity="nearest_neighbour",
             m2g_connectivity="nearest_neighbour",
@@ -295,6 +296,7 @@ class TestRectilinearGeographicWarning:
             # Should *not* raise
             wmg.create.create_all_graph_components(
                 coords=coords,
+                mesh_layout="rectilinear",
                 m2m_connectivity="flat",
                 m2m_connectivity_kwargs=dict(mesh_node_distance=3000),
                 g2m_connectivity="nearest_neighbour",
@@ -329,6 +331,7 @@ class TestIntegrationGraphCreation:
         try:
             G = wmg.create.create_all_graph_components(
                 coords=coords,
+                mesh_layout="rectilinear",
                 m2m_connectivity="flat",
                 m2m_connectivity_kwargs=dict(mesh_node_distance=3),
                 g2m_connectivity="nearest_neighbour",

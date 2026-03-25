@@ -331,7 +331,9 @@ def create_all_graph_components(
         # `m2m` (mesh-to-mesh), `mesh_up` (up edge connections) and
         # `mesh_down` (down edge connections)
         m2m_connectivity_kwargs = dict(m2m_connectivity_kwargs)
-        m2m_connectivity_kwargs.setdefault("distance_metric", spatial_coord_selector.distance_metric)
+        m2m_connectivity_kwargs.setdefault(
+            "distance_metric", spatial_coord_selector.distance_metric
+        )
         graph_components["m2m"] = create_hierarchical_from_coordinates(
             G_mesh_coords, **m2m_connectivity_kwargs
         )
