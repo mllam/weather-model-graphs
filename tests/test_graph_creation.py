@@ -266,3 +266,34 @@ def test_edgeless_nodes_preservation_in_different_graphs(
         G_source=graph_source, G_target=graph_target, method=method, **method_kwargs
     )
     assert set(graph.nodes) == set(graph_source.nodes) | set(graph_target.nodes)
+
+
+def test_convex_hull_cropping():
+    import numpy as np
+
+    from weather_model_graphs.create.archetype import create_keisler_graph
+
+    # Create a simple L-shaped grid of coords to leave an empty corner
+    # so the convex hull is visibly smaller than the bounding box
+    x = [0, 1, 2, 0, 1, 0]
+    y = [0, 0, 0, 1, 1, 2]
+    coords = np.array(list(zip(x, y)))
+
+    # Create graph without cropping
+    graph_no_crop = create_keisler_graph(coords, mesh_node_distance=1)
+
+    # Create graph with cropping
+    graph_crop = create_keisler_graph(
+        coords, mesh_node_distance=1, crop_to_convex_hull=True
+    )
+
+    # Count the mesh nodes in both graphs
+    num_mesh_nodes_no_crop = len(
+        [n for n, d in graph_no_crop.nodes(data=True) if d.get("type") == "mesh"]
+    )
+    num_mesh_nodes_crop = len(
+        [n for n, d in graph_crop.nodes(data=True) if d.get("type") == "mesh"]
+    )
+
+    # The cropped graph should have fewer mesh nodes because the empty corner is trimmed
+    assert num_mesh_nodes_crop < num_mesh_nodes_no_crop

@@ -1,9 +1,10 @@
 import networkx
 import numpy as np
 from loguru import logger
+from scipy.spatial import ConvexHull, Delaunay
 
 
-def create_single_level_2d_mesh_graph(xy, nx, ny):
+def create_single_level_2d_mesh_graph(xy, nx, ny, crop_to_convex_hull=False):
     """
     Create directed graph with nx * ny nodes representing a 2D grid with
     positions spanning the range of xy coordinate values (first dimension
@@ -72,6 +73,22 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
         dg.edges[v, u]["len"] = d
         dg.edges[v, u]["vdiff"] = g.nodes[v]["pos"] - g.nodes[u]["pos"]
 
+    if crop_to_convex_hull:
+        # 1. Find the outermost boundary of the actual weather data
+        hull = ConvexHull(xy)
+        # 2. Create a mathematically searchable shape from that boundary
+        hull_delaunay = Delaunay(xy[hull.vertices])
+
+        # 3. Find all mesh nodes that fall outside the boundary
+        nodes_to_remove = [
+            node
+            for node, data in dg.nodes(data=True)
+            if hull_delaunay.find_simplex(data["pos"]) < 0
+        ]
+
+        # 4. Delete them (networkx automatically cleans up the dead edges)
+        dg.remove_nodes_from(nodes_to_remove)
+
     dg.graph["dx"] = dx
     dg.graph["dy"] = dy
 
@@ -79,7 +96,11 @@ def create_single_level_2d_mesh_graph(xy, nx, ny):
 
 
 def create_multirange_2d_mesh_graphs(
-    max_num_levels, xy, mesh_node_distance=3, level_refinement_factor=3
+    max_num_levels,
+    xy,
+    mesh_node_distance=3,
+    level_refinement_factor=3,
+    crop_to_convex_hull=False,
 ):
     """
     Create a list of 2D grid mesh graphs representing different levels of edge-length
@@ -138,7 +159,9 @@ def create_multirange_2d_mesh_graphs(
     for lev in range(mesh_levels_to_create):  # 0-index mesh levels
         # Compute number of nodes on level separate for each direction
         nodes_x, nodes_y = (nleaf / (level_refinement_factor**lev)).astype(int)
-        g = create_single_level_2d_mesh_graph(xy, nodes_x, nodes_y)
+        g = create_single_level_2d_mesh_graph(
+            xy, nodes_x, nodes_y, crop_to_convex_hull=crop_to_convex_hull
+        )
         # Add level information to nodes, edges and full graph
         for node in g.nodes:
             g.nodes[node]["level"] = lev
