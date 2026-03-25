@@ -31,9 +31,7 @@ def simple_euclidean_coords():
 @pytest.fixture()
 def simple_geo_coords():
     """Five lon/lat points along the equator (y = 0 °), 0–40 ° longitude."""
-    return np.array(
-        [[0.0, 0.0], [10.0, 0.0], [20.0, 0.0], [30.0, 0.0], [40.0, 0.0]]
-    )
+    return np.array([[0.0, 0.0], [10.0, 0.0], [20.0, 0.0], [30.0, 0.0], [40.0, 0.0]])
 
 
 # Initialisation
@@ -114,8 +112,9 @@ class TestEuclideanWithRadius:
         assert dists[0] == pytest.approx(0.0)
 
 
-
 # Haversine – k_nearest_to
+
+
 class TestHaversineKNearest:
     def test_distance_is_returned_in_degrees(self, simple_geo_coords):
         sel = SpatialCoordinateValuesSelector("haversine", simple_geo_coords)
@@ -158,6 +157,7 @@ class TestHaversineWithRadius:
         idxs, _ = sel.within_radius([0.0, 0.0], radius=radius_deg)
         assert set(idxs) == {0}
 
+
 class TestHaversineLongitudeWrapAround:
     """Regression tests for periodic longitude behaviour around +/-180 deg."""
 
@@ -189,8 +189,9 @@ class TestHaversineLongitudeWrapAround:
         assert 351.0 not in lons_in_radius
 
 
-
 # Factory: for_crs
+
+
 class TestForCrs:
     def test_geographic_crs_gives_haversine(self):
         coords = np.random.default_rng(0).random((10, 2))
@@ -214,7 +215,9 @@ class TestForCrs:
         rng = np.random.default_rng(1)
         coords = rng.random((20, 2)) * 1e5
         query = [5e4, 5e4]
-        sel_factory = SpatialCoordinateValuesSelector.for_crs(ccrs.LambertConformal(), coords)
+        sel_factory = SpatialCoordinateValuesSelector.for_crs(
+            ccrs.LambertConformal(), coords
+        )
         sel_manual = SpatialCoordinateValuesSelector("euclidean", coords)
         idxs_f, dists_f = sel_factory.k_nearest_to(query, k=3)
         idxs_m, dists_m = sel_manual.k_nearest_to(query, k=3)
@@ -222,8 +225,9 @@ class TestForCrs:
         np.testing.assert_allclose(dists_f, dists_m)
 
 
-
 # Integration: rectilinear + geographic warning
+
+
 class TestRectilinearGeographicWarning:
     """
     When create_all_graph_components is called with a geographic graph_crs and
@@ -279,12 +283,11 @@ class TestRectilinearGeographicWarning:
     def test_no_warning_for_projected_crs(self):
         """No UserWarning for a projected CRS."""
         # Use a small Cartesian grid (pretend it's in some projected CRS)
-        coords = np.column_stack([
-            np.linspace(0, 1e5, 20), np.linspace(0, 1e5, 20)
-        ])
+        coords = np.column_stack([np.linspace(0, 1e5, 20), np.linspace(0, 1e5, 20)])
 
         class _FakeProjectedCRS:
             """Minimal projected CRS stub."""
+
             is_geographic = False
 
         with warnings.catch_warnings():
@@ -348,7 +351,7 @@ class TestIntegrationGraphCreation:
         assert len(g2m_m2g_lens) > 0, "Expected g2m/m2g edges with 'len' attribute"
         # For a ~9 degree domain, haversine edge lengths should stay in a
         # plausible degree range and remain well below half the globe.
-        assert all(1e-3 < l < 20.0 for l in g2m_m2g_lens), (
+        assert all(1e-3 < length < 20.0 for length in g2m_m2g_lens), (
             f"g2m/m2g edge lengths out of expected haversine range: "
             f"min={min(g2m_m2g_lens):.6f} deg, max={max(g2m_m2g_lens):.6f} deg"
         )

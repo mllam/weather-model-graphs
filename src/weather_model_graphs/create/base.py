@@ -16,12 +16,12 @@ import numpy as np
 import pyproj
 from loguru import logger
 
-from ..spatial import SpatialCoordinateValuesSelector
 from ..networkx_utils import (
     replace_node_labels_with_unique_ids,
     split_graph_by_edge_attribute,
     split_on_edge_attribute_existance,
 )
+from ..spatial import SpatialCoordinateValuesSelector
 from .grid import create_grid_graph_nodes
 from .mesh.kinds.flat import (
     create_flat_multiscale_mesh_graph,
@@ -140,7 +140,11 @@ def create_all_graph_components(
     # coordinates.  Equally-spaced lon/lat values are *not* equally spaced on a
     # sphere, so the mesh node density will vary strongly with latitude.
     _is_geographic = getattr(graph_crs, "is_geographic", False)
-    if _is_geographic and m2m_connectivity in ("flat", "flat_multiscale", "hierarchical"):
+    if _is_geographic and m2m_connectivity in (
+        "flat",
+        "flat_multiscale",
+        "hierarchical",
+    ):
         logger.warning(
             f"m2m_connectivity='{m2m_connectivity}' places mesh nodes on a "
             "rectilinear (equally-spaced lon/lat) grid, but the graph CRS is "
@@ -292,9 +296,7 @@ def connect_nodes_across_graphs(
 
     # Build spatial selector for source nodes (e.g. mesh nodes when constructing m2g).
     xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
-    spatial_coord_selector = SpatialCoordinateValuesSelector(
-        distance_metric, xy_source
-    )
+    spatial_coord_selector = SpatialCoordinateValuesSelector(distance_metric, xy_source)
 
     # Determine method and perform checks once.
     # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in loop later.
@@ -317,7 +319,10 @@ def connect_nodes_across_graphs(
         # which is at a relative distance of 1. This relative distance is equal
         # to the diagonal of one rectangle.
         rad_graph = connect_nodes_across_graphs(
-            G_source, G_target, method="within_radius", rel_max_dist=1.0,
+            G_source,
+            G_target,
+            method="within_radius",
+            rel_max_dist=1.0,
             distance_metric=distance_metric,
         )
 

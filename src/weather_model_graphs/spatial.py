@@ -99,9 +99,7 @@ class SpatialCoordinateValuesSelector:
             self._tree = _BallTree(self._coords, metric="euclidean")
 
     # Public query methods
-    def k_nearest_to(
-        self, point: np.ndarray, k: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def k_nearest_to(self, point: np.ndarray, k: int) -> Tuple[np.ndarray, np.ndarray]:
         """
         Return the *k* nearest coordinate values to *point*.
 
@@ -171,7 +169,6 @@ class SpatialCoordinateValuesSelector:
         )
         return indices, distances
 
-    
     # Factory class-method
     @classmethod
     def for_crs(
@@ -218,7 +215,6 @@ class SpatialCoordinateValuesSelector:
         # pyproj CRS exposes is_geographic as a bool property; cartopy CRS does too.
         metric = "haversine" if is_geographic else "euclidean"
         return cls(metric, coords)
-
 
     # Private helpers
     def _prepare_query_point(self, point: np.ndarray) -> np.ndarray:

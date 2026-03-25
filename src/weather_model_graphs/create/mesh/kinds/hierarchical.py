@@ -1,8 +1,8 @@
 import networkx
 import numpy as np
 
-from ....spatial import SpatialCoordinateValuesSelector
 from ....networkx_utils import prepend_node_index
+from ....spatial import SpatialCoordinateValuesSelector
 from .. import mesh as mesh_graph
 
 
