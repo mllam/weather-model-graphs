@@ -2,7 +2,6 @@ from typing import Dict, List, Optional
 
 import networkx
 import numpy as np
-import scipy
 
 from ....networkx_utils import prepend_node_index
 from ....spatial import SpatialCoordinateValuesSelector
@@ -12,9 +11,9 @@ from .general import create_directed_mesh_graph
 
 def create_hierarchical_from_coordinates(
     G_coords_list: List[networkx.Graph],
-    distance_metric: str,
     intra_level: Dict[str, object] = {"pattern": "8-star"},
     inter_level: Dict[str, object] = {"pattern": "nearest", "k": 1},
+    distance_metric: str = "euclidean",
 ) -> networkx.DiGraph:
     """
     Create a hierarchical multiscale mesh graph from a list of mesh primitive
@@ -116,7 +115,9 @@ def create_hierarchical_from_coordinates(
         v_to_list = list(G_to.nodes)
         v_from_list = list(G_from.nodes)
         v_from_xy = np.array([xy for _, xy in G_from.nodes.data("pos")])
-        spatial_coord_selector = SpatialCoordinateValuesSelector(distance_metric, v_from_xy)
+        spatial_coord_selector = SpatialCoordinateValuesSelector(
+            distance_metric, v_from_xy
+        )
 
         # add edges from coarser to finer level
         for v in v_to_list:
@@ -124,10 +125,6 @@ def create_hierarchical_from_coordinates(
             neigh_idxs, neigh_dists = spatial_coord_selector.k_nearest_to(
                 G_down.nodes[v]["pos"], k=inter_level_k
             )
-            if inter_level_k == 1:
-                neigh_idxs = [neigh_idxs]
-                neigh_dists = [neigh_dists]
-
             for idx, d in zip(neigh_idxs, neigh_dists):
                 u = v_from_list[int(idx)]
 
@@ -169,9 +166,9 @@ def create_hierarchical_multiscale_mesh_graph(
     mesh_node_distance: float,
     level_refinement_factor: float,
     max_num_levels: int,
-    distance_metric: str,
     intra_level: Optional[Dict[str, object]] = None,
     inter_level: Optional[Dict[str, object]] = None,
+    distance_metric: str = "euclidean",
 ) -> networkx.DiGraph:
     """
     Create a hierarchical multiscale mesh graph with nearest neighbour
