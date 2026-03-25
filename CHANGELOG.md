@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Auto-detect spatial metric from CRS, with degree-based external haversine inputs/outputs and internal radian conversion. [\#86](https://github.com/mllam/weather-model-graphs/pull/86), @FAbdullah17
+
 ### Added
 
 - Added a standalone graph consistency checking tool (`wmg.diagnostics.check_graph_consistency`) to ensure structural health, such as verifying all grid nodes successfully connect to the mesh (#42).
