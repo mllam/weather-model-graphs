@@ -8,7 +8,7 @@ used to represent the encode-process-decode steps respectively. These are create
 function uses `connect_nodes_across_graphs` to connect nodes across the component graphs.
 """
 
-from typing import Iterable
+from typing import Iterable, List, Union
 
 import networkx
 import networkx as nx
@@ -236,20 +236,36 @@ def create_all_graph_components(
         xy_tuple = coord_transformer.transform(xx=coords[:, 0], yy=coords[:, 1])
         xy = np.stack(xy_tuple, axis=1)
 
-    if m2m_connectivity == "flat":
-        # --- Step 1: Coordinate creation based on mesh_layout ---
-        if mesh_layout == "rectilinear":
-            mesh_node_spacing = mesh_layout_kwargs.get("mesh_node_spacing")
-            # Backward compat: also check for old name "grid_spacing"
-            if mesh_node_spacing is None:
-                mesh_node_spacing = mesh_layout_kwargs.get("grid_spacing")
-            if mesh_node_spacing is None:
-                raise ValueError(
-                    "mesh_layout='rectilinear' requires 'mesh_node_spacing' in "
-                    "mesh_layout_kwargs (or 'mesh_node_distance' in "
-                    "m2m_connectivity_kwargs for backward compatibility)."
-                )
-            # Compute number of mesh nodes from mesh_node_spacing
+    # Validate m2m_connectivity early so that we raise a clear NotImplementedError
+    # before any coordinate creation is attempted
+    _supported_m2m_connectivity = {"flat", "hierarchical", "flat_multiscale"}
+    if m2m_connectivity not in _supported_m2m_connectivity:
+        raise NotImplementedError(
+            f"Kind {m2m_connectivity} not implemented. "
+            f"Supported: {sorted(_supported_m2m_connectivity)}"
+        )
+
+    # -----------------------------------------------------------------------
+    # Step 1: Coordinate creation — produces the mesh primitive graph(s)
+    #         Result type depends on m2m_connectivity:
+    #           - flat:              G_mesh_coords: nx.Graph
+    #           - hierarchical/flat_multiscale: G_mesh_coords: List[nx.Graph]
+    # -----------------------------------------------------------------------
+    G_mesh_coords: Union[networkx.Graph, List[networkx.Graph]]
+
+    if mesh_layout == "rectilinear":
+        mesh_node_spacing = mesh_layout_kwargs.get(
+            "mesh_node_spacing"
+        ) or mesh_layout_kwargs.get("grid_spacing")
+        if mesh_node_spacing is None:
+            raise ValueError(
+                "mesh_layout='rectilinear' requires 'mesh_node_spacing' in "
+                "mesh_layout_kwargs (or 'mesh_node_distance' in "
+                "m2m_connectivity_kwargs for backward compatibility)."
+            )
+
+        if m2m_connectivity == "flat":
+            # Single-level mesh: compute nx/ny from spacing
             range_x, range_y = np.ptp(xy, axis=0)
             nx_mesh = int(range_x / mesh_node_spacing)
             ny_mesh = int(range_y / mesh_node_spacing)
@@ -263,32 +279,8 @@ def create_all_graph_components(
                 )
             G_mesh_coords = create_single_level_2d_mesh_primitive(xy, nx_mesh, ny_mesh)
         else:
-            raise NotImplementedError(
-                f"mesh_layout='{mesh_layout}' is not yet supported. "
-                "Currently only 'rectilinear' is implemented."
-            )
-
-        # --- Step 2: Connectivity creation ---
-        graph_components["m2m"] = create_flat_singlescale_from_coordinates(
-            G_mesh_coords, **m2m_connectivity_kwargs
-        )
-        grid_connect_graph = graph_components["m2m"]
-
-    elif m2m_connectivity == "hierarchical":
-        # --- Step 1: Coordinate creation based on mesh_layout ---
-        if mesh_layout == "rectilinear":
-            mesh_node_spacing = mesh_layout_kwargs.get("mesh_node_spacing")
-            if mesh_node_spacing is None:
-                mesh_node_spacing = mesh_layout_kwargs.get("grid_spacing")
-            if mesh_node_spacing is None:
-                raise ValueError(
-                    "mesh_layout='rectilinear' with m2m_connectivity='hierarchical' "
-                    "requires 'mesh_node_spacing' in mesh_layout_kwargs."
-                )
-            primitives_kwargs = dict(
-                xy=xy,
-                mesh_node_spacing=mesh_node_spacing,
-            )
+            # Multi-level mesh: build kwargs for create_multirange_2d_mesh_primitives
+            primitives_kwargs = dict(xy=xy, mesh_node_spacing=mesh_node_spacing)
             if "refinement_factor" in mesh_layout_kwargs:
                 primitives_kwargs["interlevel_refinement_factor"] = mesh_layout_kwargs[
                     "refinement_factor"
@@ -297,22 +289,28 @@ def create_all_graph_components(
                 primitives_kwargs["max_num_levels"] = mesh_layout_kwargs[
                     "max_num_refinement_levels"
                 ]
-            G_coords_list = create_multirange_2d_mesh_primitives(
-                **primitives_kwargs,
-            )
-        else:
-            raise NotImplementedError(
-                f"mesh_layout='{mesh_layout}' is not yet supported. "
-                "Currently only 'rectilinear' is implemented."
-            )
+            G_mesh_coords = create_multirange_2d_mesh_primitives(**primitives_kwargs)
+    else:
+        raise NotImplementedError(
+            f"mesh_layout='{mesh_layout}' is not yet supported. "
+            "Currently only 'rectilinear' is implemented."
+        )
 
-        # --- Step 2: Connectivity creation ---
-        # hierarchical mesh graph have three sub-graphs:
+    # -----------------------------------------------------------------------
+    # Step 2: Connectivity creation — converts mesh primitives to directed graph
+    # -----------------------------------------------------------------------
+    if m2m_connectivity == "flat":
+        graph_components["m2m"] = create_flat_singlescale_from_coordinates(
+            G_mesh_coords, **m2m_connectivity_kwargs
+        )
+        grid_connect_graph = graph_components["m2m"]
+
+    elif m2m_connectivity == "hierarchical":
+        # hierarchical mesh graph has three sub-graphs:
         # `m2m` (mesh-to-mesh), `mesh_up` (up edge connections) and
         # `mesh_down` (down edge connections)
         graph_components["m2m"] = create_hierarchical_from_coordinates(
-            G_coords_list,
-            **m2m_connectivity_kwargs,
+            G_mesh_coords, **m2m_connectivity_kwargs
         )
         # Only connect grid to bottom level of hierarchy
         grid_connect_graph = split_graph_by_edge_attribute(
@@ -320,43 +318,11 @@ def create_all_graph_components(
         )[0]
 
     elif m2m_connectivity == "flat_multiscale":
-        # --- Step 1: Coordinate creation based on mesh_layout ---
-        if mesh_layout == "rectilinear":
-            mesh_node_spacing = mesh_layout_kwargs.get("mesh_node_spacing")
-            if mesh_node_spacing is None:
-                mesh_node_spacing = mesh_layout_kwargs.get("grid_spacing")
-            if mesh_node_spacing is None:
-                raise ValueError(
-                    "mesh_layout='rectilinear' with m2m_connectivity='flat_multiscale' "
-                    "requires 'mesh_node_spacing' in mesh_layout_kwargs."
-                )
-            primitives_kwargs = dict(
-                xy=xy,
-                mesh_node_spacing=mesh_node_spacing,
-            )
-            if "refinement_factor" in mesh_layout_kwargs:
-                primitives_kwargs["interlevel_refinement_factor"] = mesh_layout_kwargs[
-                    "refinement_factor"
-                ]
-            if "max_num_refinement_levels" in mesh_layout_kwargs:
-                primitives_kwargs["max_num_levels"] = mesh_layout_kwargs[
-                    "max_num_refinement_levels"
-                ]
-            G_coords_list = create_multirange_2d_mesh_primitives(
-                **primitives_kwargs,
-            )
-        else:
-            raise NotImplementedError(
-                f"mesh_layout='{mesh_layout}' is not yet supported. "
-                "Currently only 'rectilinear' is implemented."
-            )
-
-        # --- Step 2: Connectivity creation ---
         graph_components["m2m"] = create_flat_multiscale_from_coordinates(
-            G_coords_list,
-            **m2m_connectivity_kwargs,
+            G_mesh_coords, **m2m_connectivity_kwargs
         )
         grid_connect_graph = graph_components["m2m"]
+
     else:
         raise NotImplementedError(f"Kind {m2m_connectivity} not implemented")
 
