@@ -28,14 +28,17 @@ DEFAULT_COMPONENT_COLORS: dict[str, str] = {
 
 _GRID_MARKER = "circle"
 _MESH_MARKER = "diamond"
-_GRID_Z_FLAT = -1          # z‑coordinate for grid nodes in flat mode
+_GRID_Z_FLAT = -1  # z‑coordinate for grid nodes in flat mode
 
 # Spherical layout defaults
 _DEFAULT_SPHERE_RADIUS_BASE = 1.0
-_DEFAULT_SPHERE_RADIUS_STEP = 0.5   # additional radius per level
-_GRID_RADIUS = 0.8             
+_DEFAULT_SPHERE_RADIUS_STEP = 0.5  # additional radius per level
+_GRID_RADIUS = 0.8
 
-def _lat_lon_to_cartesian(lat: float, lon: float, radius: float) -> tuple[float, float, float]:
+
+def _lat_lon_to_cartesian(
+    lat: float, lon: float, radius: float
+) -> tuple[float, float, float]:
     """
     Convert latitude/longitude (degrees) to 3D Cartesian coordinates on a sphere of given radius.
 
@@ -61,7 +64,9 @@ def _lat_lon_to_cartesian(lat: float, lon: float, radius: float) -> tuple[float,
     return x, y, z
 
 
-def _get_positions_flat(graph: nx.DiGraph) -> tuple[np.ndarray, np.ndarray, np.ndarray, list]:
+def _get_positions_flat(
+    graph: nx.DiGraph,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list]:
     """
     Compute node positions using the flat layout (x=lon, y=lat, z=level).
 
@@ -82,9 +87,9 @@ def _get_positions_flat(graph: nx.DiGraph) -> tuple[np.ndarray, np.ndarray, np.n
 
     for node in node_ids:
         attrs = graph.nodes[node]
-        pos = attrs["pos"]                     # (lat, lon)
-        xs.append(float(pos[1]))               # x = longitude
-        ys.append(float(pos[0]))               # y = latitude
+        pos = attrs["pos"]  # (lat, lon)
+        xs.append(float(pos[1]))  # x = longitude
+        ys.append(float(pos[0]))  # y = latitude
         raw_levels.append(attrs.get("level"))  # None for grid nodes
 
     mesh_levels = [lvl for lvl in raw_levels if lvl is not None]
@@ -130,7 +135,7 @@ def _get_positions_concentric(
     lats, lons, levels = [], [], []
     for node in node_ids:
         attrs = graph.nodes[node]
-        pos = attrs["pos"]                     # (lat, lon)
+        pos = attrs["pos"]  # (lat, lon)
         lats.append(float(pos[0]))
         lons.append(float(pos[1]))
         levels.append(attrs.get("level"))
@@ -309,11 +314,19 @@ def _build_node_traces(
 
     # Color palette for mesh levels
     mesh_palette = [
-        "#E91E63", "#9C27B0", "#673AB7", "#3F51B5",
-        "#00BCD4", "#009688", "#8BC34A", "#FF9800",
+        "#E91E63",
+        "#9C27B0",
+        "#673AB7",
+        "#3F51B5",
+        "#00BCD4",
+        "#009688",
+        "#8BC34A",
+        "#FF9800",
     ]
     mesh_level_keys = sorted(k for k in groups if k.startswith("mesh_level_"))
-    level_colors = {k: mesh_palette[i % len(mesh_palette)] for i, k in enumerate(mesh_level_keys)}
+    level_colors = {
+        k: mesh_palette[i % len(mesh_palette)] for i, k in enumerate(mesh_level_keys)
+    }
 
     traces = []
     # Grid nodes first
@@ -409,6 +422,7 @@ def _build_layout(
         paper_bgcolor="white",
     )
 
+
 def render_with_plotly(
     graph: nx.DiGraph,
     *,
@@ -502,7 +516,9 @@ def render_with_plotly(
         )
         traces.extend(edge_traces)
     else:
-        warnings.warn("Graph has no edges; rendering node positions only.", stacklevel=2)
+        warnings.warn(
+            "Graph has no edges; rendering node positions only.", stacklevel=2
+        )
 
     node_traces = _build_node_traces(
         graph=graph,

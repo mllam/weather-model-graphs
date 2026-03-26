@@ -160,13 +160,17 @@ class TestZAxis:
         fig = render_with_plotly(flat_graph, show=False, layout="flat")
         grid_trace = next(t for t in fig.data if t.name == "grid")
         # All grid nodes should have the same z coordinate = -1
-        assert all(z == -1 for z in grid_trace.z), "Grid nodes in flat layout should have z = -1"
+        assert all(
+            z == -1 for z in grid_trace.z
+        ), "Grid nodes in flat layout should have z = -1"
 
     def test_mesh_nodes_have_non_negative_z_flat(self, flat_graph):
         fig = render_with_plotly(flat_graph, show=False, layout="flat")
         mesh_traces = [t for t in fig.data if t.name.startswith("mesh level")]
         for trace in mesh_traces:
-            assert all(z >= 0 for z in trace.z), f"Mesh trace {trace.name} has negative z"
+            assert all(
+                z >= 0 for z in trace.z
+            ), f"Mesh trace {trace.name} has negative z"
 
     def test_concentric_layout_has_non_negative_z(self, flat_graph):
         # In concentric layout, z values are coordinates on spheres, can be positive or negative.
