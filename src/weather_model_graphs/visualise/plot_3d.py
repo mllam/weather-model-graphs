@@ -5,27 +5,23 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING
 
 import networkx as nx
 import numpy as np
-
-if TYPE_CHECKING:  # pragma: no cover
-    import plotly.graph_objects as go   
 
 try:
     import plotly.graph_objects as _go
 
     HAS_PLOTLY = True
-except ImportError: 
+except ImportError:
     HAS_PLOTLY = False
 
 # Constants defined at module level, not imported from within the module
 DEFAULT_COMPONENT_COLORS: dict[str, str] = {
-    "g2m": "blue",   
-    "m2m": "green",   
-    "m2g": "red",   
-    "unknown": "#9E9E9E",  
+    "g2m": "blue",
+    "m2m": "green",
+    "m2g": "red",
+    "unknown": "#9E9E9E",
 }
 
 # marker symbol used for grid nodes vs mesh nodes.
@@ -33,6 +29,7 @@ _GRID_MARKER = "circle"
 _MESH_MARKER = "diamond"
 
 _GRID_Z = -1
+
 
 def _get_node_positions(
     graph: nx.DiGraph,
@@ -54,25 +51,25 @@ def _get_node_positions(
     """
     node_ids = list(graph.nodes())
     xs, ys, raw_levels = [], [], []
-    
+
     for node in node_ids:
         attrs = graph.nodes[node]
         pos = attrs["pos"]
         xs.append(float(pos[0]))
         ys.append(float(pos[1]))
         raw_levels.append(attrs.get("level"))  # None for grid nodes
-    
+
     # Find minimum level to normalize mesh node z values to start at 0
-    mesh_levels = [l for l in raw_levels if l is not None]
+    mesh_levels = [lvl for lvl in raw_levels if lvl is not None]
     level_offset = min(mesh_levels) if mesh_levels else 0
-    
+
     zs = []
     for level in raw_levels:
         if level is not None:
             zs.append(float(level - level_offset))
         else:
             zs.append(float(_GRID_Z))
-    
+
     return np.array(xs), np.array(ys), np.array(zs), node_ids
 
 
@@ -190,7 +187,9 @@ def _build_node_traces(
 
         if key not in groups:
             groups[key] = {
-                "x": [], "y": [], "z": [],
+                "x": [],
+                "y": [],
+                "z": [],
                 "text": [],
                 "symbol": symbol,
                 "label": label,
@@ -205,15 +204,18 @@ def _build_node_traces(
 
     # Assign colours: grid nodes grey, mesh nodes use a qualitative palette
     mesh_palette = [
-        "#E91E63", "#9C27B0", "#673AB7", "#3F51B5",
-        "#00BCD4", "#009688", "#8BC34A", "#FF9800",
+        "#E91E63",
+        "#9C27B0",
+        "#673AB7",
+        "#3F51B5",
+        "#00BCD4",
+        "#009688",
+        "#8BC34A",
+        "#FF9800",
     ]
-    mesh_level_keys = sorted(
-        k for k in groups if k.startswith("mesh_level_")
-    )
+    mesh_level_keys = sorted(k for k in groups if k.startswith("mesh_level_"))
     level_colors = {
-        k: mesh_palette[i % len(mesh_palette)]
-        for i, k in enumerate(mesh_level_keys)
+        k: mesh_palette[i % len(mesh_palette)] for i, k in enumerate(mesh_level_keys)
     }
 
     traces = []
@@ -222,12 +224,14 @@ def _build_node_traces(
         g = groups["grid"]
         traces.append(
             _go.Scatter3d(
-                x=g["x"], y=g["y"], z=g["z"],
+                x=g["x"],
+                y=g["y"],
+                z=g["z"],
                 mode="markers",
                 name="grid",
                 marker=dict(
-                    size=node_size * 0.7,   # slightly smaller than mesh nodes
-                    color="#78909C",        # blue-grey
+                    size=node_size * 0.7,  # slightly smaller than mesh nodes
+                    color="#78909C",  # blue-grey
                     symbol=g["symbol"],
                     opacity=0.6,
                 ),
@@ -241,7 +245,9 @@ def _build_node_traces(
         g = groups[key]
         traces.append(
             _go.Scatter3d(
-                x=g["x"], y=g["y"], z=g["z"],
+                x=g["x"],
+                y=g["y"],
+                z=g["z"],
                 mode="markers",
                 name=g["label"],
                 marker=dict(
@@ -296,6 +302,7 @@ def _build_layout(title: str | None) -> "_go.Layout":
         margin=dict(l=0, r=0, b=0, t=50),
         paper_bgcolor="white",
     )
+
 
 def render_with_plotly(
     graph: nx.DiGraph,
@@ -365,11 +372,11 @@ def render_with_plotly(
     # Merge caller-supplied colours with defaults
     colors = {**DEFAULT_COMPONENT_COLORS, **(component_colors or {})}
 
-    # extract positions 
+    # extract positions
     x_nodes, y_nodes, z_nodes, node_ids = _get_node_positions(graph)
     node_index = _node_id_to_index(node_ids)
 
-    # build traces 
+    # build traces
     traces: list = []
 
     # Edge traces first so they render beneath nodes
@@ -400,7 +407,7 @@ def render_with_plotly(
     )
     traces.extend(node_traces)
 
-    #assemble figure 
+    # assemble figure
     fig = _go.Figure(data=traces, layout=_build_layout(title))
 
     if show:

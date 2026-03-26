@@ -13,13 +13,14 @@ import pytest
 
 import weather_model_graphs as wmg
 from weather_model_graphs.visualise.plot_3d import (
-    DEFAULT_COMPONENT_COLORS,
     _GRID_Z,
+    DEFAULT_COMPONENT_COLORS,
     _get_node_positions,
     render_with_plotly,
 )
 
 pytest.importorskip("plotly", reason="plotly not installed skipping 3D plot tests")
+
 
 def _make_xy(n: int = 15) -> np.ndarray:
     """Return an (n*n, 2) array of evenly-spaced 2-D coordinates."""
@@ -44,20 +45,20 @@ def flat_graph(xy):
     )
 
 
-
 @pytest.fixture
 def multiscale_graph(xy):
     return wmg.create.create_all_graph_components(
         coords=xy,
         m2m_connectivity="flat_multiscale",
         m2m_connectivity_kwargs=dict(
-            mesh_node_distance=1,       # small enough for 2 levels to fit in [0,10]
+            mesh_node_distance=1,  # small enough for 2 levels to fit in [0,10]
             level_refinement_factor=3,
             max_num_levels=2,
         ),
         g2m_connectivity="nearest_neighbour",
         m2g_connectivity="nearest_neighbour",
     )
+
 
 @pytest.fixture
 def hierarchical_graph(xy):
@@ -65,14 +66,13 @@ def hierarchical_graph(xy):
         coords=xy,
         m2m_connectivity="hierarchical",
         m2m_connectivity_kwargs=dict(
-            mesh_node_distance=1,       # level 0 at spacing 1, level 1 at spacing 3
+            mesh_node_distance=1,  # level 0 at spacing 1, level 1 at spacing 3
             level_refinement_factor=3,
             max_num_levels=2,
         ),
         g2m_connectivity="nearest_neighbour",
         m2g_connectivity="nearest_neighbour",
     )
-
 
 
 def _trace_names(fig) -> set[str]:
@@ -143,9 +143,9 @@ class TestTraceStructure:
         fig = render_with_plotly(flat_graph, show=False)
         names = [t.name for t in fig.data]
         for comp in ("g2m", "m2m", "m2g"):
-            assert names.count(comp) == 1, (
-                f"Expected exactly 1 trace named '{comp}', got {names.count(comp)}"
-            )
+            assert (
+                names.count(comp) == 1
+            ), f"Expected exactly 1 trace named '{comp}', got {names.count(comp)}"
 
 
 class TestZAxis:
@@ -156,24 +156,23 @@ class TestZAxis:
         for node, z in zip(node_ids, z_nodes):
             attrs = flat_graph.nodes[node]
             if "level" not in attrs:
-                assert z == _GRID_Z, (
-                    f"Grid node {node!r} should have z={_GRID_Z}, got {z}"
-                )
+                assert (
+                    z == _GRID_Z
+                ), f"Grid node {node!r} should have z={_GRID_Z}, got {z}"
 
     def test_mesh_nodes_have_non_negative_z(self, flat_graph):
         _, _, z_nodes, node_ids = _get_node_positions(flat_graph)
         for node, z in zip(node_ids, z_nodes):
             attrs = flat_graph.nodes[node]
             if "level" in attrs:
-                assert z >= 0, (
-                    f"Mesh node {node!r} should have z >= 0, got {z}"
-                )
+                assert z >= 0, f"Mesh node {node!r} should have z >= 0, got {z}"
 
     def test_hierarchical_z_values_match_levels(self, hierarchical_graph):
         _, _, z_nodes, node_ids = _get_node_positions(hierarchical_graph)
         # levels are shifted so min level -> 0; check relative differences preserved
         mesh_nodes = [
-            (node, z) for node, z in zip(node_ids, z_nodes)
+            (node, z)
+            for node, z in zip(node_ids, z_nodes)
             if "level" in hierarchical_graph.nodes[node]
         ]
         raw_levels = [hierarchical_graph.nodes[n]["level"] for n, _ in mesh_nodes]
@@ -194,9 +193,9 @@ class TestEdgeBatching:
         edge_trace_names = {"g2m", "m2m", "m2g"}
         for trace in fig.data:
             if trace.name in edge_trace_names:
-                assert None in list(trace.x), (
-                    f"Trace '{trace.name}' should use None separators in x-coords"
-                )
+                assert None in list(
+                    trace.x
+                ), f"Trace '{trace.name}' should use None separators in x-coords"
 
     def test_number_of_edge_traces_equals_components(self, flat_graph):
         """There should be one edge trace per component, not one per edge."""
@@ -265,7 +264,7 @@ class TestErrorHandling:
 
     def test_missing_pos_raises_value_error(self):
         g = nx.DiGraph()
-        g.add_node(0)   # no pos attribute
+        g.add_node(0)  # no pos attribute
         g.add_node(1, pos=np.array([1.0, 2.0]))
         with pytest.raises(ValueError, match="'pos'"):
             render_with_plotly(g, show=False)
