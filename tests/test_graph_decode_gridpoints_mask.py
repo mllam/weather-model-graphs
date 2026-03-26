@@ -92,3 +92,6 @@ for src, dst in adj_unfiltered_masked.T:
     )
 
     np.testing.assert_equal(reindexed_wmg_filtered, reindexed_post_filtered)
+# Validate that all retained edges satisfy decode mask
+for src, dst in adj_unfiltered_masked.T:
+    assert decode_mask[src] and decode_mask[dst]
