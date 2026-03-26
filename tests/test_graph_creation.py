@@ -197,8 +197,8 @@ def test_create_lat_lon(kind):
 @pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
 def test_create_decode_mask(kind):
     """
-    Tests that the decode mask for m2g works, resulting in less edges than
-    no filtering.
+    Tests that the decode mask for m2g works, resulting in fewer m2g edges than
+    without a decode mask.
     """
     xy = test_utils.create_fake_irregular_coords(100)
     fn_name = f"create_{kind}_graph"
@@ -214,8 +214,14 @@ def test_create_decode_mask(kind):
         coords=xy, mesh_node_distance=mesh_node_distance, decode_mask=decode_mask
     )
 
-    # Check that some filtering has been performed
-    assert len(filtered_graph.edges) < len(unfiltered_graph.edges)
+    # Check that m2g edges (mesh-to-grid / decoding edges) are filtered
+    unfiltered_m2g_edges = [
+        e for e in unfiltered_graph.edges(data=True) if e[2].get("component") == "m2g"
+    ]
+    filtered_m2g_edges = [
+        e for e in filtered_graph.edges(data=True) if e[2].get("component") == "m2g"
+    ]
+    assert len(filtered_m2g_edges) < len(unfiltered_m2g_edges)
 
 
 @pytest.mark.parametrize("kind", ["graphcast", "oskarsson_hierarchical"])

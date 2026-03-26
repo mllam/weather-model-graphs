@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `__version__` attribute to the package init
   [\#56](https://github.com/mllam/weather-model-graphs/pull/56) @AdMub
 
+### Changed
+
+- Make `test_create_decode_mask` more specific and future-proof by checking only m2g (decoding) edges instead of total edges. [\#104](https://github.com/mllam/weather-model-graphs/pull/104) @zweihuehner
+
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
 
 
