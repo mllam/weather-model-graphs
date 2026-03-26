@@ -53,21 +53,26 @@ def _get_node_positions(
     node_ids : list of length N, the node identifiers in the same order.
     """
     node_ids = list(graph.nodes())
-    xs, ys, zs = [], [], []
+    xs, ys, raw_levels = [], [], []
+    
     for node in node_ids:
         attrs = graph.nodes[node]
-        pos = attrs["pos"]          # always present; shape (2,)
+        pos = attrs["pos"]
         xs.append(float(pos[0]))
         ys.append(float(pos[1]))
-        
-        # Get level attribute, ensuring it's non-negative
-        level = attrs.get("level")
+        raw_levels.append(attrs.get("level"))  # None for grid nodes
+    
+    # Find minimum level to normalize mesh node z values to start at 0
+    mesh_levels = [l for l in raw_levels if l is not None]
+    level_offset = min(mesh_levels) if mesh_levels else 0
+    
+    zs = []
+    for level in raw_levels:
         if level is not None:
-            # Ensure level is non-negative
-            zs.append(float(max(0, level)))
+            zs.append(float(level - level_offset))
         else:
             zs.append(float(_GRID_Z))
-            
+    
     return np.array(xs), np.array(ys), np.array(zs), node_ids
 
 
