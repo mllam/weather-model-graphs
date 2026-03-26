@@ -1,4 +1,4 @@
-"""
+f"""
 Generic routines for creating the graph components used in the message-passing
 graph, and for connecting nodes across these component graphs.
 
@@ -332,6 +332,8 @@ def connect_nodes_across_graphs(
         if max_num_neighbours is None:
             raise Exception(
                 "to use `nearest_neighbours` you should set the max number with `max_num_neighbours`"
+                        neigh_idxs = np.atleast_1d(neigh_idxs)
+
             )
         if max_dist is not None or rel_max_dist is not None:
             raise Exception(
@@ -340,6 +342,7 @@ def connect_nodes_across_graphs(
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
             neigh_idxs = kdt_s.query(xy_target, max_num_neighbours)[1]
+                            neigh_idxs = np.atleast_1d(neigh_idxs)
             return neigh_idxs
 
     elif method == "within_radius":
