@@ -1,13 +1,12 @@
-import urllib.request
-import tempfile
-from pathlib import Path
 import importlib.util
+import tempfile
+import urllib.request
+from pathlib import Path
 
 import pytest
 
-import weather_model_graphs as wmg
 import tests.utils as test_utils
-
+import weather_model_graphs as wmg
 
 VALIDATOR_URL = (
     "https://raw.githubusercontent.com/mllam/neural-lam/"
@@ -43,9 +42,7 @@ def test_saved_graph_passes_neural_lam_validator():
 
     xy = test_utils.create_fake_xy(N=64)
 
-    graph = wmg.create.archetype.create_oskarsson_hierarchical_graph(
-        coords=xy
-    )
+    graph = wmg.create.archetype.create_oskarsson_hierarchical_graph(coords=xy)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         graph_dir = Path(tmpdir) / "graph"
