@@ -51,6 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix example in README
   [\#38](https://github.com/mllam/weather-model-graphs/pull/38) @leifdenby
 
+- Fix crash in `connect_nodes_across_graphs` when using `method="nearest_neighbours"` with `max_num_neighbours=1`, caused by `KDTree.query` returning a scalar for `k=1`
+  [#90](https://github.com/mllam/weather-model-graphs/pull/90)  @leifdenby
+
 ### Maintenance
 
 - Update github CI actions, including pre-commit action to fix caching issue
