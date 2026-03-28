@@ -61,8 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [\#49](https://github.com/mllam/weather-model-graphs/pull/49),
   [\#54](https://github.com/mllam/weather-model-graphs/pull/54), @leifdenby
 
-- Improve isolation of README example tests by executing each code block in an isolated namespace.
-  [#65](https://github.com/mllam/weather-model-graphs/pull/64) @Shristi-Goel
+- Improve isolation of README example tests by executing each code block in an isolated namespace
+  [#65](https://github.com/mllam/weather-model-graphs/pull/65) @Shristi-Goel
 
 ## [v0.2.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.2.0)
 
