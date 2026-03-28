@@ -61,11 +61,16 @@ def create_hierarchical_multiscale_mesh_graph(
         for level_i, graph in enumerate(Gs_all_levels)
     ]
 
-    # add `direction` attribute to all edges with value `same``
+    # Add edge metadata using a consistent schema across all directions.
     for i, G in enumerate(Gs_all_levels):
         for u, v in G.edges:
+            # Remove legacy keys to keep one consistent edge schema.
+            G.edges[u, v].pop("level", None)
+            G.edges[u, v].pop("levels", None)
             G.edges[u, v]["direction"] = "same"
-            G.edges[u, v]["level"] = i
+            G.edges[u, v]["from_level"] = i
+            G.edges[u, v]["to_level"] = i
+            G.edges[u, v]["connection"] = f"{i}>{i}"
 
     # Create inter-level mesh edges
     up_graphs = []
@@ -105,15 +110,19 @@ def create_hierarchical_multiscale_mesh_graph(
             G_down.edges[u, v]["vdiff"] = (
                 G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]
             )
-            G_down.edges[u, v]["levels"] = f"{from_level}>{to_level}"
             G_down.edges[u, v]["direction"] = "down"
+            G_down.edges[u, v]["from_level"] = from_level
+            G_down.edges[u, v]["to_level"] = to_level
+            G_down.edges[u, v]["connection"] = f"{from_level}>{to_level}"
 
         G_up = networkx.DiGraph()
         G_up.add_nodes_from(G_down.nodes(data=True))
         for u, v, data in G_down.edges(data=True):
             data = data.copy()
-            data["levels"] = f"{to_level}>{from_level}"
             data["direction"] = "up"
+            data["from_level"] = to_level
+            data["to_level"] = from_level
+            data["connection"] = f"{to_level}>{from_level}"
             G_up.add_edge(v, u, **data)
 
         up_graphs.append(G_up)

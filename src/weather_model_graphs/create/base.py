@@ -138,9 +138,16 @@ def create_all_graph_components(
             **m2m_connectivity_kwargs,
         )
         # Only connect grid to bottom level of hierarchy
-        grid_connect_graph = split_graph_by_edge_attribute(
-            graph_components["m2m"], "level"
-        )[0]
+        bottom_same_level_edges = [
+            (u, v)
+            for u, v, edge_data in graph_components["m2m"].edges(data=True)
+            if edge_data.get("direction") == "same"
+            and edge_data.get("from_level") == 0
+            and edge_data.get("to_level") == 0
+        ]
+        grid_connect_graph = graph_components["m2m"].edge_subgraph(
+            bottom_same_level_edges
+        )
     elif m2m_connectivity == "flat_multiscale":
         graph_components["m2m"] = create_flat_multiscale_mesh_graph(
             xy=xy,
@@ -364,20 +371,39 @@ def connect_nodes_across_graphs(
             for edge_check_graph in (G_source, G_target):
                 # Check if graph has edges
                 if len(edge_check_graph.edges) > 0:
-                    (
-                        level_subgraph,
-                        no_level_subgraph,
-                    ) = split_on_edge_attribute_existance(edge_check_graph, "level")
-
-                    # Check if graph has levels (hierarchical or multi-scale edges)
-                    if nx.is_empty(level_subgraph):
-                        # Consider edges in whole graph (whole graph is level 1)
-                        first_level_graph = edge_check_graph  # == no_level_subgraph
+                    # Hierarchical mesh graphs expose a direction + level-range
+                    # edge schema. In that case use only same-level edges on
+                    # bottom level to estimate local characteristic edge length.
+                    if any(
+                        "from_level" in edge_data and "to_level" in edge_data
+                        for _, _, edge_data in edge_check_graph.edges(data=True)
+                    ):
+                        first_level_graph = edge_check_graph.edge_subgraph(
+                            [
+                                (u, v)
+                                for u, v, edge_data in edge_check_graph.edges(data=True)
+                                if edge_data.get("direction") == "same"
+                                and edge_data.get("from_level") == 0
+                                and edge_data.get("to_level") == 0
+                            ]
+                        )
                     else:
-                        # Has levels, only consider edges in level 1 graph
-                        first_level_graph = split_graph_by_edge_attribute(
-                            level_subgraph, "level"
-                        )[0]
+                        (
+                            level_subgraph,
+                            _no_level_subgraph,
+                        ) = split_on_edge_attribute_existance(edge_check_graph, "level")
+
+                        # Check if graph has levels (hierarchical or
+                        # multi-scale edges)
+                        if nx.is_empty(level_subgraph):
+                            # Consider edges in whole graph (whole graph is
+                            # level 1)
+                            first_level_graph = edge_check_graph  # == no_level_subgraph
+                        else:
+                            # Has levels, only consider edges in level 1 graph
+                            first_level_graph = split_graph_by_edge_attribute(
+                                level_subgraph, "level"
+                            )[0]
                     longest_graph_edge = max(
                         first_level_graph.edges(data=True),
                         key=lambda x: x[2].get("len", 0),

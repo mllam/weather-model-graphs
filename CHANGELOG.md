@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [\#32](https://github.com/mllam/weather-model-graphs/pull/32), @joeloskarsson
 
 ### Fixed
+- Fix issue #45 about inconsistent edge metadata and improves compatibility
+  [\#66](https://github.com/mllam/weather-model-graphs/pull/66),
+  @siddhantcookie
 
 - Fix the bug with edgeless nodes being dropped
   [\#51](https://github.com/mllam/weather-model-graphs/pull/51), @pkhalaj, @wi-spang, @krikru
