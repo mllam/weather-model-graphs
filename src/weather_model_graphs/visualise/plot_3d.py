@@ -150,7 +150,6 @@ def _get_positions_concentric(
         return _get_positions_flat(graph)
 
     min_level = min(mesh_levels)
-    max_level = max(mesh_levels)
 
     # Map each level to its sphere radius
     radius_map = {}
@@ -284,7 +283,6 @@ def _build_node_traces(
     for i, node in enumerate(node_ids):
         attrs = graph.nodes[node]
         pos = attrs["pos"]
-        z = z_nodes[i]
 
         if "level" not in attrs or attrs["level"] is None:
             key = "grid"
