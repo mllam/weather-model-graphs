@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `__version__` attribute to the package init
   [\#56](https://github.com/mllam/weather-model-graphs/pull/56) @AdMub
 
+
+- Add 3D interactive graph visualisation via `wmg.visualise.render_with_plotly`,
+
+  rendering node positions (x, y) with mesh `level` mapped to the z-axis and
+  grid nodes placed at z = -1. Edges are batched per component (`g2m`, `m2m`,
+  `m2g`) into single `Scatter3d` traces with `None` separators, keeping HTML
+  output small for large graphs. `plotly` is an optional dependency installable
+  via `pip install weather-model-graphs[visualisation]`.
+
+  [\#118](https://github.com/mllam/weather-model-graphs/pull/118), @yuvraajnarula
+
+
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
 
 
