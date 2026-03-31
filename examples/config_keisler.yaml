@@ -1,0 +1,24 @@
+# Keisler (2021) Graph Configuration
+# Single-scale flat mesh architecture
+graph_type: keisler
+grid_size: 32
+mesh_distance: 0.0625
+temporal_steps: 1
+temporal_window: 0
+
+features:
+  - temperature
+  - humidity
+  - pressure
+
+connectivity:
+  g2m_connectivity_kwargs:
+    max_num_neighbours: 1
+  m2g_connectivity_kwargs:
+    max_num_neighbours: 1
+
+metadata:
+  name: "Keisler-32"
+  description: "Keisler 2021 flat mesh graph on 32x32 grid"
+  reference: "https://arxiv.org/abs/2010.02513"
+  author: "Keisler, R."

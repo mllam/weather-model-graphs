@@ -1,0 +1,18 @@
+# Table of contents
+# Learn more at https://jupyterbook.org/customize/toc.html
+
+format: jb-book
+root: intro
+chapters:
+- file: background
+- file: design
+- file: design_v0_4
+  title: "Design (v0.4 Architecture)"
+- file: advanced_features
+  title: "Advanced Features (v0.4)"
+- file: ml_pipeline
+  title: "ML Pipeline Integration"
+- file: creating_the_graph
+- file: lat_lons
+- file: decoding_mask
+- file: filtering_graphs

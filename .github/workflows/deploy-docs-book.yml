@@ -1,0 +1,51 @@
+name: build-docs
+
+# Run this when the master or main branch changes
+on:
+  push:
+    branches:
+    - master
+    - main
+
+# This job installs dependencies, builds the book, and pushes it to `gh-pages`
+jobs:
+  deploy-book:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PDM
+      uses: pdm-project/setup-pdm@v4
+      with:
+        cache: true
+
+    - name: Install dependencies
+      # note we pin to using python 3.12 here because there aren't scipy wheels
+      # available for python3.13 unless we enforce use of numpy>=2.1 which
+      # seems quite aggressive for now. And without a scipy wheel we have to
+      # build from source, which would mean installing openblas which seems
+      # unnecessary
+      run: |
+        pdm use --auto-install-min 3.12
+        pdm install --prod
+        pdm install --group docs
+        pdm install --group visualisation
+
+    # Build the book
+    - name: Build the book
+      run: |
+        LOGURU_LEVEL=WARNING pdm run jupyter-book build docs/
+
+    # Upload the book's HTML as an artifact
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v4
+      with:
+        path: "docs/_build/html"
+
+    # Deploy the book's HTML to GitHub Pages
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4

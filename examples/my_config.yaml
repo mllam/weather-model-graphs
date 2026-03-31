@@ -1,0 +1,16 @@
+connectivity: {}
+decoding: null
+encoding: null
+features:
+- temperature
+- humidity
+- pressure
+graph_type: graphcast
+grid_size: 32
+mesh_distance: 0.0625
+metadata:
+  name: test-config
+  resolution: medium
+processing: null
+temporal_steps: 1
+temporal_window: 1

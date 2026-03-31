@@ -1,0 +1,29 @@
+# GraphCast (Lam et al., 2023) Graph Configuration
+# Multiscale flat mesh architecture
+graph_type: graphcast
+grid_size: 64
+mesh_distance: 0.0625
+temporal_steps: 10
+temporal_window: 2
+
+features:
+  - temperature
+  - humidity
+  - pressure
+  - wind_u
+  - wind_v
+
+connectivity:
+  m2m_connectivity_kwargs:
+    max_num_levels: 2
+    level_refinement_factor: 3
+  g2m_connectivity_kwargs:
+    max_num_neighbours: 1
+  m2g_connectivity_kwargs:
+    max_num_neighbours: 1
+
+metadata:
+  name: "GraphCast-64"
+  description: "GraphCast multiscale mesh graph on 64x64 grid"
+  reference: "https://arxiv.org/abs/2212.12794"
+  authors: ["Lam et al."]
