@@ -1,6 +1,6 @@
 """
 3D interactive graph visualisation using Plotly, with support for
-flat and concentric spherical layouts.
+flat and concentric spherical layouts, and an optional coastline layer.
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ try:
 except ImportError:
     HAS_PLOTLY = False
 
+# Import coastline data from the module contributed by @Prince637-boo
+from .geo_data import COAST_LONS, COAST_LATS
 
 DEFAULT_COMPONENT_COLORS: dict[str, str] = {
     "g2m": "blue",
@@ -33,7 +35,6 @@ _GRID_Z_FLAT = -1  # z‑coordinate for grid nodes in flat mode
 # Spherical layout defaults
 _DEFAULT_SPHERE_RADIUS_BASE = 1.0
 _DEFAULT_SPHERE_RADIUS_STEP = 0.5  # additional radius per level
-_GRID_RADIUS = 0.8
 
 
 def _lat_lon_to_cartesian(
@@ -41,20 +42,6 @@ def _lat_lon_to_cartesian(
 ) -> tuple[float, float, float]:
     """
     Convert latitude/longitude (degrees) to 3D Cartesian coordinates on a sphere of given radius.
-
-    Parameters
-    ----------
-    lat : float
-        Latitude in degrees.
-    lon : float
-        Longitude in degrees.
-    radius : float
-        Sphere radius.
-
-    Returns
-    -------
-    tuple[float, float, float]
-        (x, y, z) coordinates.
     """
     lat_rad = np.radians(lat)
     lon_rad = np.radians(lon)
@@ -64,33 +51,49 @@ def _lat_lon_to_cartesian(
     return x, y, z
 
 
+def _build_coastline_trace(radius: float) -> "_go.Scatter3d":
+    """
+    Build a Plotly trace for coastlines at a given sphere radius.
+
+    The coastline data is stored in geo_data.py as lists of (lon, lat) pairs,
+    with `None` values separating line segments.
+    """
+    xs, ys, zs = [], [], []
+    for lat, lon in zip(COAST_LATS, COAST_LONS):
+        if lat is None:  # separator between line segments
+            xs.append(None)
+            ys.append(None)
+            zs.append(None)
+        else:
+            x, y, z = _lat_lon_to_cartesian(lat, lon, radius)
+            xs.append(x)
+            ys.append(y)
+            zs.append(z)
+    return _go.Scatter3d(
+        x=xs,
+        y=ys,
+        z=zs,
+        mode="lines",
+        name="coastlines",
+        line=dict(color="#424242", width=1),
+        opacity=0.4,
+        hoverinfo="none",
+    )
+
+
 def _get_positions_flat(
     graph: nx.DiGraph,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, list]:
-    """
-    Compute node positions using the flat layout (x=lon, y=lat, z=level).
-
-    Grid nodes (no 'level' attribute) are placed at z = _GRID_Z_FLAT.
-
-    Parameters
-    ----------
-    graph : networkx.DiGraph
-        Graph with node attributes 'pos' (lat, lon) and optionally 'level'.
-
-    Returns
-    -------
-    tuple[np.ndarray, np.ndarray, np.ndarray, list]
-        (x, y, z, node_ids) arrays and the ordered node list.
-    """
+    """Compute flat layout positions (x=lon, y=lat, z=level)."""
     node_ids = list(graph.nodes())
     xs, ys, raw_levels = [], [], []
 
     for node in node_ids:
         attrs = graph.nodes[node]
         pos = attrs["pos"]  # (lat, lon)
-        xs.append(float(pos[1]))  # x = longitude
-        ys.append(float(pos[0]))  # y = latitude
-        raw_levels.append(attrs.get("level"))  # None for grid nodes
+        xs.append(float(pos[1]))
+        ys.append(float(pos[0]))
+        raw_levels.append(attrs.get("level"))
 
     mesh_levels = [lvl for lvl in raw_levels if lvl is not None]
     level_offset = min(mesh_levels) if mesh_levels else 0
@@ -110,32 +113,13 @@ def _get_positions_concentric(
     base_radius: float = _DEFAULT_SPHERE_RADIUS_BASE,
     radius_step: float = _DEFAULT_SPHERE_RADIUS_STEP,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, list]:
-    """
-    Compute node positions using a concentric spherical layout.
-
-    Each mesh level is placed on a sphere of radius = base_radius + (level - min_level) * step.
-    Grid nodes are placed on a sphere slightly smaller than the innermost mesh level.
-
-    Parameters
-    ----------
-    graph : networkx.DiGraph
-        Graph with node attributes 'pos' (lat, lon) and optionally 'level'.
-    base_radius : float, default=1.0
-        Radius for the innermost mesh level.
-    radius_step : float, default=0.5
-        Additional radius added per increasing mesh level.
-
-    Returns
-    -------
-    tuple[np.ndarray, np.ndarray, np.ndarray, list]
-        (x, y, z, node_ids) arrays and the ordered node list.
-    """
+    """Compute concentric spherical layout positions."""
     node_ids = list(graph.nodes())
 
     lats, lons, levels = [], [], []
     for node in node_ids:
         attrs = graph.nodes[node]
-        pos = attrs["pos"]  # (lat, lon)
+        pos = attrs["pos"]
         lats.append(float(pos[0]))
         lons.append(float(pos[1]))
         levels.append(attrs.get("level"))
@@ -143,23 +127,21 @@ def _get_positions_concentric(
     mesh_levels = [lvl for lvl in levels if lvl is not None]
     if not mesh_levels:
         warnings.warn(
-            "No mesh nodes found in graph. Falling back to flat layout.",
+            "No mesh nodes found. Falling back to flat layout.",
             UserWarning,
             stacklevel=2,
         )
         return _get_positions_flat(graph)
 
     min_level = min(mesh_levels)
-
-    # Map each level to its sphere radius
-    radius_map = {}
-    for lvl in mesh_levels:
-        radius_map[lvl] = base_radius + (lvl - min_level) * radius_step
+    radius_map = {
+        lvl: base_radius + (lvl - min_level) * radius_step for lvl in mesh_levels
+    }
 
     xs, ys, zs = [], [], []
     for lat, lon, lvl in zip(lats, lons, levels):
         if lvl is None:
-            # Grid node – place on a sphere slightly smaller than innermost mesh level
+            # Place grid nodes slightly inside the innermost mesh sphere
             r = base_radius - radius_step * 0.5
             if r <= 0:
                 r = 0.5
@@ -175,19 +157,7 @@ def _get_positions_concentric(
 
 
 def _node_id_to_index(node_ids: list) -> dict:
-    """
-    Build a mapping from node identifier to its position in a list.
-
-    Parameters
-    ----------
-    node_ids : list
-        List of node identifiers.
-
-    Returns
-    -------
-    dict
-        Mapping node_id -> index.
-    """
+    """Map node identifier to its index in the list."""
     return {nid: i for i, nid in enumerate(node_ids)}
 
 
@@ -200,30 +170,7 @@ def _build_edge_traces(
     component_colors: dict[str, str],
     edge_width: float,
 ) -> list:
-    """
-    Create Plotly scatter traces for edges, one per component.
-
-    Edges of the same component are batched into a single trace using None
-    separators to keep file size small.
-
-    Parameters
-    ----------
-    graph : networkx.DiGraph
-        Graph with edge attribute 'component'.
-    x_nodes, y_nodes, z_nodes : np.ndarray
-        Node position arrays.
-    node_index : dict
-        Mapping from node ID to index in position arrays.
-    component_colors : dict
-        Mapping component name to CSS color.
-    edge_width : float
-        Line width for edges.
-
-    Returns
-    -------
-    list
-        List of plotly.graph_objects.Scatter3d objects.
-    """
+    """Create one Scatter3d trace per edge component (g2m, m2m, m2g)."""
     component_edges: dict[str, list[tuple]] = {}
     for u, v, attrs in graph.edges(data=True):
         comp = attrs.get("component", "unknown")
@@ -239,16 +186,17 @@ def _build_edge_traces(
             ez.extend([z_nodes[ui], z_nodes[vi], None])
 
         color = component_colors.get(comp, component_colors.get("unknown", "#9E9E9E"))
-        trace = _go.Scatter3d(
-            x=ex,
-            y=ey,
-            z=ez,
-            mode="lines",
-            name=comp,
-            line=dict(color=color, width=edge_width),
-            hoverinfo="none",
+        traces.append(
+            _go.Scatter3d(
+                x=ex,
+                y=ey,
+                z=ez,
+                mode="lines",
+                name=comp,
+                line=dict(color=color, width=edge_width),
+                hoverinfo="none",
+            )
         )
-        traces.append(trace)
     return traces
 
 
@@ -260,25 +208,7 @@ def _build_node_traces(
     node_ids: list,
     node_size: float,
 ) -> list:
-    """
-    Create Plotly scatter traces for nodes, separated by type (grid / mesh level).
-
-    Parameters
-    ----------
-    graph : networkx.DiGraph
-        Graph with node attributes 'pos' and optionally 'level'.
-    x_nodes, y_nodes, z_nodes : np.ndarray
-        Node position arrays.
-    node_ids : list
-        Node identifiers in the same order as position arrays.
-    node_size : float
-        Base marker size for mesh nodes (grid nodes slightly smaller).
-
-    Returns
-    -------
-    list
-        List of plotly.graph_objects.Scatter3d objects.
-    """
+    """Create separate traces for grid nodes and each mesh level."""
     groups: dict[str, dict] = {}
     for i, node in enumerate(node_ids):
         attrs = graph.nodes[node]
@@ -310,16 +240,10 @@ def _build_node_traces(
         groups[key]["z"].append(z_nodes[i])
         groups[key]["text"].append(hover)
 
-    # Color palette for mesh levels
+    # Colour palette for mesh levels
     mesh_palette = [
-        "#E91E63",
-        "#9C27B0",
-        "#673AB7",
-        "#3F51B5",
-        "#00BCD4",
-        "#009688",
-        "#8BC34A",
-        "#FF9800",
+        "#E91E63", "#9C27B0", "#673AB7", "#3F51B5",
+        "#00BCD4", "#009688", "#8BC34A", "#FF9800",
     ]
     mesh_level_keys = sorted(k for k in groups if k.startswith("mesh_level_"))
     level_colors = {
@@ -376,21 +300,7 @@ def _build_layout(
     title: str | None,
     layout_type: Literal["flat", "concentric"],
 ) -> "_go.Layout":
-    """
-    Create a Plotly layout with appropriate axis labels for the chosen layout.
-
-    Parameters
-    ----------
-    title : str or None
-        Figure title.
-    layout_type : {"flat", "concentric"}
-        Layout style.
-
-    Returns
-    -------
-    plotly.graph_objects.Layout
-        Configured layout object.
-    """
+    """Create a clean Plotly layout with appropriate axis labels."""
     axis_style = dict(
         backgroundcolor="white",
         gridcolor="#E0E0E0",
@@ -430,16 +340,12 @@ def render_with_plotly(
     edge_width: float = 1.5,
     component_colors: dict[str, str] | None = None,
     layout: Literal["flat", "concentric"] = "flat",
+    add_coastlines: bool = False,
     sphere_base_radius: float = _DEFAULT_SPHERE_RADIUS_BASE,
     sphere_radius_step: float = _DEFAULT_SPHERE_RADIUS_STEP,
 ) -> "_go.Figure":
     """
     Render a weather-model-graphs networkx.DiGraph in 3D using Plotly.
-
-    Node positions are taken from the 'pos' node attribute (latitude, longitude).
-    Mesh nodes may have an integer 'level' attribute used for layering.
-    Grid nodes (without 'level') are placed at the bottom in flat layout,
-    or on an inner sphere in concentric layout.
 
     Parameters
     ----------
@@ -448,28 +354,25 @@ def render_with_plotly(
     show : bool, default=True
         If True, call fig.show() before returning.
     title : str or None, optional
-        Figure title. Default: "Weather Model Graph (3D)".
+        Figure title.
     node_size : float, default=4.0
         Marker size for mesh nodes. Grid nodes are slightly smaller.
     edge_width : float, default=1.5
         Line width for edges.
     component_colors : dict or None, optional
-        Mapping from edge component name to CSS color. Missing components fall back
-        to DEFAULT_COMPONENT_COLORS. Pass an empty dict to use all defaults.
+        Mapping from edge component name to CSS color.
     layout : {"flat", "concentric"}, default="flat"
-        - "flat" : x = longitude, y = latitude, z = level (grid at -1).
-        - "concentric" : nodes placed on concentric spheres; mesh level N on a sphere
-          of radius = base_radius + (N - min_level) * step. Grid nodes on a sphere
-          slightly smaller than the innermost mesh sphere.
+        Layout style.
+    add_coastlines : bool, default=False
+        If True, add a coastline layer (only effective in concentric layout).
     sphere_base_radius : float, default=1.0
-        Radius for the innermost mesh level (used only in concentric layout).
+        Radius for the innermost mesh level (concentric layout).
     sphere_radius_step : float, default=0.5
-        Additional radius added per increasing mesh level (concentric layout).
+        Additional radius per level (concentric layout).
 
     Returns
     -------
     plotly.graph_objects.Figure
-        Interactive 3D figure.
     """
     if not HAS_PLOTLY:
         raise ImportError(
@@ -492,16 +395,31 @@ def render_with_plotly(
 
     if layout == "concentric":
         x_nodes, y_nodes, z_nodes, node_ids = _get_positions_concentric(
-            graph,
-            base_radius=sphere_base_radius,
-            radius_step=sphere_radius_step,
+            graph, base_radius=sphere_base_radius, radius_step=sphere_radius_step
         )
-    else:  # flat
+    else:
         x_nodes, y_nodes, z_nodes, node_ids = _get_positions_flat(graph)
 
     node_index = _node_id_to_index(node_ids)
 
     traces = []
+
+    # Add coastline if requested (only meaningful in concentric layout)
+    if add_coastlines:
+        if layout == "concentric":
+            # Place coastline slightly below the innermost mesh sphere
+            coast_radius = sphere_base_radius - sphere_radius_step * 0.5
+            if coast_radius <= 0:
+                coast_radius = 0.5
+            traces.append(_build_coastline_trace(radius=coast_radius))
+        else:
+            warnings.warn(
+                "Coastlines are only supported in concentric layout. "
+                "Ignoring add_coastlines=True.",
+                UserWarning,
+                stacklevel=2,
+            )
+
     if graph.number_of_edges() > 0:
         edge_traces = _build_edge_traces(
             graph=graph,
@@ -514,9 +432,7 @@ def render_with_plotly(
         )
         traces.extend(edge_traces)
     else:
-        warnings.warn(
-            "Graph has no edges; rendering node positions only.", stacklevel=2
-        )
+        warnings.warn("Graph has no edges; rendering node positions only.", stacklevel=2)
 
     node_traces = _build_node_traces(
         graph=graph,
