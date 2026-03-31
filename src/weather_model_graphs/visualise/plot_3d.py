@@ -19,7 +19,7 @@ except ImportError:
     HAS_PLOTLY = False
 
 # Import coastline data from the module contributed by @Prince637-boo
-from .geo_data import COAST_LONS, COAST_LATS
+from .geo_data import COAST_LATS, COAST_LONS
 
 DEFAULT_COMPONENT_COLORS: dict[str, str] = {
     "g2m": "blue",
@@ -242,8 +242,14 @@ def _build_node_traces(
 
     # Colour palette for mesh levels
     mesh_palette = [
-        "#E91E63", "#9C27B0", "#673AB7", "#3F51B5",
-        "#00BCD4", "#009688", "#8BC34A", "#FF9800",
+        "#E91E63",
+        "#9C27B0",
+        "#673AB7",
+        "#3F51B5",
+        "#00BCD4",
+        "#009688",
+        "#8BC34A",
+        "#FF9800",
     ]
     mesh_level_keys = sorted(k for k in groups if k.startswith("mesh_level_"))
     level_colors = {
@@ -432,7 +438,9 @@ def render_with_plotly(
         )
         traces.extend(edge_traces)
     else:
-        warnings.warn("Graph has no edges; rendering node positions only.", stacklevel=2)
+        warnings.warn(
+            "Graph has no edges; rendering node positions only.", stacklevel=2
+        )
 
     node_traces = _build_node_traces(
         graph=graph,

@@ -255,10 +255,12 @@ class TestParameters:
         assert fig is not None
         fig2 = render_with_plotly(flat_graph, show=False, layout="flat")
         assert fig2 is not None
+
     def test_coastline_flag_accepted(self, flat_graph):
         """Passing add_coastlines=True should not raise."""
         fig = render_with_plotly(flat_graph, show=False, add_coastlines=True)
         assert fig is not None
+
 
 class TestErrorHandling:
     def test_empty_graph_raises_value_error(self):
