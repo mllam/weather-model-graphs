@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `m2g`) into single `Scatter3d` traces with `None` separators, keeping HTML
   output small for large graphs. `plotly` is an optional dependency installable
   via `pip install weather-model-graphs[visualisation]`.
+- 3D interactive graph visualisation with `render_with_plotly()`: flat and concentric spherical layouts, batched edge traces, optional coastline layer. Co-authored with @Joltsy10, @mandeepsingh2007, and @Prince637-boo. (#126)
 
   [\#118](https://github.com/mllam/weather-model-graphs/pull/118), @yuvraajnarula
 
