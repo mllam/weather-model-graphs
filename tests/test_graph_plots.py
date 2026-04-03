@@ -64,3 +64,54 @@ def test_plot():
 
     with tempfile.NamedTemporaryFile(suffix=".png") as f:
         fig.savefig(f.name)
+
+
+def test_plot_nodes_only_graph_with_edge_color_attr():
+    """Plotting a graph with nodes but no edges and edge_color_attr should
+    not crash (previously raised IndexError)."""
+    import networkx as nx
+
+    G = nx.DiGraph()
+    G.add_node(0, pos=np.array([1.0, 2.0]), type="mesh")
+    G.add_node(1, pos=np.array([3.0, 4.0]), type="grid")
+
+    # Should silently skip edge colouring, not raise IndexError
+    ax = wmg.visualise.nx_draw_with_pos_and_attr(G, edge_color_attr="len")
+    assert ax is not None
+    plt.close("all")
+
+
+def test_plot_empty_graph_with_node_color_attr():
+    """Plotting a completely empty graph with node_color_attr should not crash."""
+    import networkx as nx
+
+    G = nx.DiGraph()
+
+    ax = wmg.visualise.nx_draw_with_pos_and_attr(G, node_color_attr="type")
+    assert ax is not None
+    plt.close("all")
+
+
+def test_get_graph_attr_values_raises_on_empty_edges():
+    """_get_graph_attr_values should raise a clear ValueError for empty edges."""
+    import networkx as nx
+
+    from weather_model_graphs.visualise.plot_2d import _get_graph_attr_values
+
+    G = nx.DiGraph()
+    G.add_node(0, pos=np.array([1.0, 2.0]))
+
+    with pytest.raises(ValueError, match="no edges"):
+        _get_graph_attr_values(G, "len", component="edges")
+
+
+def test_get_graph_attr_values_raises_on_empty_nodes():
+    """_get_graph_attr_values should raise a clear ValueError for empty nodes."""
+    import networkx as nx
+
+    from weather_model_graphs.visualise.plot_2d import _get_graph_attr_values
+
+    G = nx.DiGraph()
+
+    with pytest.raises(ValueError, match="no nodes"):
+        _get_graph_attr_values(G, "type", component="nodes")
