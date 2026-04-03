@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix an `IndexError` crash when plotting a graph component with zero edges or zero nodes using `wmg.visualise.nx_draw_with_pos_and_attr`.
+- Fix an `IndexError` crash when plotting a graph component with zero edges or zero nodes using `wmg.visualise.nx_draw_with_pos_and_attr`. [\#131](https://github.com/mllam/weather-model-graphs/pull/131) @sudhansu-24
 
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
 
