@@ -5,7 +5,7 @@ try:
 except importlib.metadata.PackageNotFoundError:
     __version__ = "unknown"
 
-from . import create, save, visualise
+from . import create, save, visualise, validator
 from .filtering import filter_graph
 from .networkx_utils import (
     replace_node_labels_with_unique_ids,
