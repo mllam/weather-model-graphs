@@ -18,8 +18,8 @@ try:
 except ImportError:
     HAS_PLOTLY = False
 
-# Import coastline data from the module contributed by @Prince637-boo
-from .geo_data import COAST_LATS, COAST_LONS
+# Import coastline data from the module contributed by @Prince637-bo (scraped out as a suggestion by @Mohit-Lakra)
+import cartopy.feature as cfeature
 
 DEFAULT_COMPONENT_COLORS: dict[str, str] = {
     "g2m": "blue",
@@ -53,22 +53,37 @@ def _lat_lon_to_cartesian(
 
 def _build_coastline_trace(radius: float) -> "_go.Scatter3d":
     """
-    Build a Plotly trace for coastlines at a given sphere radius.
-
-    The coastline data is stored in geo_data.py as lists of (lon, lat) pairs,
-    with `None` values separating line segments.
+    Build a Plotly trace for coastlines at a given sphere radius
+    using Cartopy coastline geometries.
     """
     xs, ys, zs = [], [], []
-    for lat, lon in zip(COAST_LATS, COAST_LONS):
-        if lat is None:  # separator between line segments
-            xs.append(None)
-            ys.append(None)
-            zs.append(None)
-        else:
-            x, y, z = _lat_lon_to_cartesian(lat, lon, radius)
-            xs.append(x)
-            ys.append(y)
-            zs.append(z)
+
+    coastlines = cfeature.COASTLINE.geometries()
+
+    for geom in coastlines:
+        try:
+            # Handle MultiLineString or LineString
+            if hasattr(geom, "geoms"):
+                lines = geom.geoms
+            else:
+                lines = [geom]
+
+            for line in lines:
+                coords = list(line.coords)
+                for lon, lat in coords:
+                    x, y, z = _lat_lon_to_cartesian(lat, lon, radius)
+                    xs.append(x)
+                    ys.append(y)
+                    zs.append(z)
+
+                # Separator between segments
+                xs.append(None)
+                ys.append(None)
+                zs.append(None)
+
+        except Exception:
+            continue  # skip problematic geometries safely
+
     return _go.Scatter3d(
         x=xs,
         y=ys,
