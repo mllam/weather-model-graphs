@@ -21,9 +21,21 @@ def nx_draw_with_pos(g, with_labels=False, **kwargs):
 
 def _get_graph_attr_values(g, attr_name, component="edges"):
     if component == "edges":
-        features = list(g.edges(data=True))[0][2].keys()
+        edge_data = list(g.edges(data=True))
+        if len(edge_data) == 0:
+            raise ValueError(
+                f"Cannot colour by edge attribute '{attr_name}' because the "
+                "graph has no edges."
+            )
+        features = edge_data[0][2].keys()
     elif component == "nodes":
-        features = list(g.nodes(data=True))[0][1].keys()
+        node_data = list(g.nodes(data=True))
+        if len(node_data) == 0:
+            raise ValueError(
+                f"Cannot colour by node attribute '{attr_name}' because the "
+                "graph has no nodes."
+            )
+        features = node_data[0][1].keys()
     else:
         raise ValueError(
             f"`component` should be either 'edges' or 'nodes', but got '{component}'"
@@ -141,7 +153,7 @@ def nx_draw_with_pos_and_attr(
     if node_zorder_attr is not None:
         graph = nx_utils.sort_nodes_internally(graph, node_attr=node_zorder_attr)
 
-    if edge_color_attr is not None:
+    if edge_color_attr is not None and graph.number_of_edges() > 0:
         edge_attr_vals = _get_graph_attr_values(
             graph, edge_color_attr, component="edges"
         )
@@ -154,8 +166,10 @@ def nx_draw_with_pos_and_attr(
         kwargs["edge_color"] = edge_attr_vals["values"]
         kwargs["edge_vmin"] = min(edge_attr_vals["values"])
         kwargs["edge_vmax"] = max(edge_attr_vals["values"])
+    elif edge_color_attr is not None:
+        edge_color_attr = None  # nothing to colour
 
-    if node_color_attr is not None:
+    if node_color_attr is not None and graph.number_of_nodes() > 0:
         node_attr_vals = _get_graph_attr_values(
             graph, node_color_attr, component="nodes"
         )
@@ -167,6 +181,8 @@ def nx_draw_with_pos_and_attr(
         kwargs["node_color"] = node_attr_vals["values"]
         kwargs["vmin"] = min(node_attr_vals["values"])
         kwargs["vmax"] = max(node_attr_vals["values"])
+    elif node_color_attr is not None:
+        node_color_attr = None  # nothing to colour
 
     ax = nx_draw_with_pos(
         graph,
