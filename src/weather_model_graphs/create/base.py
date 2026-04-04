@@ -8,7 +8,7 @@ used to represent the encode-process-decode steps respectively. These are create
 function uses `connect_nodes_across_graphs` to connect nodes across the component graphs.
 """
 
-from typing import Iterable
+from typing import Iterable, Optional
 
 import networkx
 import networkx as nx
@@ -17,6 +17,7 @@ import pyproj
 import scipy.spatial
 from loguru import logger
 
+from ..backends import get_backend, GraphBackend
 from ..networkx_utils import (
     replace_node_labels_with_unique_ids,
     split_graph_by_edge_attribute,
@@ -42,6 +43,7 @@ def create_all_graph_components(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
+    backend: Optional[str] = None,
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -93,6 +95,9 @@ def create_all_graph_components(
 
     `return_components` is a boolean flag, if True the function returns a dict with
     m2g, m2m and g2m as separate graphs. If false returns one combined graph.
+
+    `backend` specifies the graph backend to use. Options are 'networkx' (default),
+    'pytorch_geometric', or 'dgl'. If None, defaults to 'networkx' for backward compatibility.
     """
     graph_components: dict[networkx.DiGraph] = {}
 
@@ -190,6 +195,15 @@ def create_all_graph_components(
             comp_name: replace_node_labels_with_unique_ids(subgraph)
             for comp_name, subgraph in graph_components.items()
         }
+        
+        # Convert to desired backend if specified
+        if backend is not None:
+            backend_instance = get_backend(backend)
+            graph_components = {
+                comp_name: backend_instance.from_networkx(subgraph)
+                for comp_name, subgraph in graph_components.items()
+            }
+        
         return graph_components
 
     # merge to single graph
@@ -204,6 +218,11 @@ def create_all_graph_components(
             del G_tot.graph[key]
 
     G_tot = replace_node_labels_with_unique_ids(graph=G_tot)
+
+    # Convert to desired backend if specified
+    if backend is not None:
+        backend_instance = get_backend(backend)
+        G_tot = backend_instance.from_networkx(G_tot)
 
     return G_tot
 

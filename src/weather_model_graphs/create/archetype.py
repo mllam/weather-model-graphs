@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Optional
 
 import pyproj
 
@@ -12,6 +12,7 @@ def create_keisler_graph(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
+    backend: Optional[str] = None,
 ):
     """
     Create a flat LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -49,11 +50,14 @@ def create_keisler_graph(
     return_components: bool, default False
         If True, the function returns a dict with m2g, m2m, and g2m as separate
         graphs. If False, returns one combined graph.
+    backend: str, optional
+        Graph backend to use ('networkx', 'pytorch_geometric', 'dgl'). 
+        If None, defaults to 'networkx'.
 
     Returns
     -------
-    networkx.DiGraph or dict[networkx.DiGraph]
-        The graph or graph components.
+    Graph or dict[Graph]
+        The graph or graph components in the specified backend format.
     """
     return create_all_graph_components(
         coords=coords,
@@ -71,6 +75,7 @@ def create_keisler_graph(
         graph_crs=graph_crs,
         decode_mask=decode_mask,
         return_components=return_components,
+        backend=backend,
     )
 
 
@@ -83,6 +88,7 @@ def create_graphcast_graph(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
+    backend: Optional[str] = None,
 ):
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -150,6 +156,7 @@ def create_graphcast_graph(
         graph_crs=graph_crs,
         decode_mask=decode_mask,
         return_components=return_components,
+        backend=backend,
     )
 
 
@@ -162,6 +169,7 @@ def create_oskarsson_hierarchical_graph(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
+    backend: Optional[str] = None,
 ):
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -234,4 +242,5 @@ def create_oskarsson_hierarchical_graph(
         graph_crs=graph_crs,
         decode_mask=decode_mask,
         return_components=return_components,
+        backend=backend,
     )
