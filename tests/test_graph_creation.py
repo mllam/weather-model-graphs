@@ -1,7 +1,17 @@
 import tempfile
 
-import cartopy.crs as ccrs
-import matplotlib.pyplot as plt
+try:
+    import cartopy.crs as ccrs
+    HAS_CARTOPY = True
+except ImportError:
+    HAS_CARTOPY = False
+
+try:
+    import matplotlib.pyplot as plt
+    HAS_MATPLOTLIB = True
+except ImportError:
+    HAS_MATPLOTLIB = False
+
 import networkx as nx
 import numpy as np
 import pytest
@@ -10,6 +20,7 @@ import tests.utils as test_utils
 import weather_model_graphs as wmg
 
 
+@pytest.mark.skipif(not HAS_MATPLOTLIB, reason="matplotlib not available")
 def test_create_single_level_mesh_graph():
     xy = test_utils.create_fake_xy(N=4)
     mesh_graph = wmg.create.mesh.create_single_level_2d_mesh_graph(xy=xy, nx=5, ny=5)

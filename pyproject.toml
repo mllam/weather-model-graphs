@@ -20,6 +20,9 @@ pytorch = [
     "torch>=2.3.0",
     "torch-geometric>=2.5.3",
 ]
+dgl = [
+    "dgl>=1.0.0",
+]
 visualisation = [
     "matplotlib>=3.8.4",
     "ipykernel>=6.29.4",
