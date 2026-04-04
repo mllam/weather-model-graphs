@@ -101,7 +101,7 @@ def create_all_graph_components(
     ), "Grid node coordinates should be given as an array of shape [num_grid_nodes, 2]."
 
     # Translate between coordinate crs and crs to use for graph creation
-    if coords_crs is None and coords_crs is None:
+    if coords_crs is None and graph_crs is None:
         logger.debug(
             "No `coords_crs` given: Assuming `coords` contains in-projection Cartesian coordinates."
         )
