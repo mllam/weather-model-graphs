@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixes
+
+- Fix duplicate `coords_crs` condition in `create_all_graph_components` that should check `graph_crs`
+  [\#69](https://github.com/mllam/weather-model-graphs/issues/69)
+
 ### Added
 
 - Added a standalone graph consistency checking tool (`wmg.diagnostics.check_graph_consistency`) to ensure structural health, such as verifying all grid nodes successfully connect to the mesh (#42).
