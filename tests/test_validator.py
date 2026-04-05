@@ -1,6 +1,10 @@
 import torch
 import pytest
-from weather_model_graphs.validator import validate_geometric_consistency, validate_connectivity_health
+from weather_model_graphs.validator import (
+    validate_geometric_consistency,
+    validate_connectivity_health,
+    validate_hierarchical_integrity,
+)
 
 def test_spherical_consistency_valid():
     """Test that points perfectly on the unit sphere pass validation."""
@@ -38,6 +42,40 @@ def test_connectivity_health_valid():
 
     assert validate_connectivity_health(graph_tensors) is True
 
+def test_hierarchical_integrity_valid():
+    """Test that inverse up/down edge sets pass validation."""
+    mesh_up = torch.tensor([
+        [0, 1],
+        [2, 3],
+    ])
+    mesh_down = torch.tensor([
+        [2, 3],
+        [0, 1],
+    ])
+    graph_tensors = {
+        'mesh_up_edge_index': mesh_up,
+        'mesh_down_edge_index': mesh_down,
+    }
+
+    assert validate_hierarchical_integrity(graph_tensors) is True
+
+
+def test_hierarchical_integrity_invalid_orientation():
+    """Test that non-inverse hierarchical edges fail validation."""
+    mesh_up = torch.tensor([
+        [0, 1],
+        [2, 3],
+    ])
+    mesh_down = torch.tensor([
+        [0, 1],
+        [2, 4],
+    ])
+    graph_tensors = {
+        'mesh_up_edge_index': mesh_up,
+        'mesh_down_edge_index': mesh_down,
+    }
+
+    assert validate_hierarchical_integrity(graph_tensors) is False
 def test_connectivity_health_invalid():
     """Test that graphs with isolated nodes fail connectivity validation."""
     # Create edges that reference node 3

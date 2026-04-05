@@ -224,14 +224,16 @@ def validate_hierarchical_integrity(graph_tensors: Dict[str, Any]) -> bool:
         all_valid = False
 
     # Check that up and down are inverses (bidirectional connectivity)
-    # This is a simplified check - in practice, the mapping should be proper
+    # mesh_up edges are expected to connect fine -> coarse, while mesh_down
+    # edges connect coarse -> fine. The edge pairs should therefore be inverse.
     up_set = set(zip(mesh_up[0], mesh_up[1]))
     down_set = set(zip(mesh_down[0], mesh_down[1]))
+    down_inverted = {(dst, src) for src, dst in down_set}
 
-    # Check for symmetry (up and down should connect same node pairs)
-    symmetric = up_set == down_set
+    # Check for symmetry (up should be the inverse of down)
+    symmetric = up_set == down_inverted
     if not symmetric:
-        warnings.warn("Inter-level edges are not symmetric between up and down")
+        warnings.warn("Inter-level edges are not inverse between mesh_up and mesh_down")
         all_valid = False
 
     # Check for isolated nodes in inter-level connectivity
