@@ -22,6 +22,7 @@ from ..networkx_utils import (
     split_graph_by_edge_attribute,
     split_on_edge_attribute_existance,
 )
+from ..spatial_index import create_spatial_index
 from .grid import create_grid_graph_nodes
 from .mesh.kinds.flat import (
     create_flat_multiscale_mesh_graph,
@@ -255,12 +256,12 @@ def connect_nodes_across_graphs(
         Graph containing the nodes in `G_source` and `G_target` and directed edges
         from nodes in `G_source` to nodes in `G_target`
     """
-    source_nodes_list = list(G_source.nodes)
+    source_nodes_list = sorted(G_source.nodes)  # Sort nodes for consistent indexing
     target_nodes_list = list(G_target.nodes)
 
-    # build kd tree for source nodes (e.g. the mesh nodes when constructing m2g)
-    xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
-    kdt_s = scipy.spatial.KDTree(xy_source)
+    # build spatial index for source nodes (e.g. the mesh nodes when constructing m2g)
+    xy_source = np.array([G_source.nodes[node]["pos"] for node in source_nodes_list])
+    spatial_index = create_spatial_index(xy_source, method="kdtree")
 
     # Determine method and perform checks once
     # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in
@@ -325,8 +326,8 @@ def connect_nodes_across_graphs(
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idx = kdt_s.query(xy_target, 1)[1]
-            return [neigh_idx]
+            distances, indices = spatial_index.query(np.array([xy_target]), k=1)
+            return indices[0].tolist()  # Convert to list to match original
 
     elif method == "nearest_neighbours":
         if max_num_neighbours is None:
@@ -339,8 +340,8 @@ def connect_nodes_across_graphs(
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idxs = kdt_s.query(xy_target, max_num_neighbours)[1]
-            return neigh_idxs
+            distances, indices = spatial_index.query(np.array([xy_target]), k=max_num_neighbours)
+            return indices[0].tolist()  # Convert to list
 
     elif method == "within_radius":
         if max_num_neighbours is not None:
@@ -351,13 +352,13 @@ def connect_nodes_across_graphs(
         if max_dist is not None:
             if rel_max_dist is not None:
                 raise Exception(
-                    "to use `witin_radius` method you should only set one of `max_dist` or `rel_max_dist"
+                    "to use `within_radius` method you should only set one of `max_dist` or `rel_max_dist"
                 )
             query_dist = max_dist
         elif rel_max_dist is not None:
             if max_dist is not None:
                 raise Exception(
-                    "to use `witin_radius` method you should only set one of `max_dist` or `rel_max_dist"
+                    "to use `within_radius` method you should only set one of `max_dist` or `rel_max_dist"
                 )
             # Figure out longest edge in (lowest level) mesh graph
             longest_edge = 0.0
@@ -386,12 +387,12 @@ def connect_nodes_across_graphs(
             query_dist = longest_edge * rel_max_dist
         else:
             raise Exception(
-                "to use `witin_radius` method you shold set `max_dist` or `rel_max_dist"
+                "to use `within_radius` method you should set `max_dist` or `rel_max_dist"
             )
 
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idxs = kdt_s.query_ball_point(xy_target, query_dist)
-            return neigh_idxs
+            distances, indices = spatial_index.query(np.array([xy_target]), radius=query_dist)
+            return indices.tolist()  # Convert to list
 
     else:
         raise NotImplementedError(method)
