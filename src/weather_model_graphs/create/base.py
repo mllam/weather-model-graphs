@@ -157,8 +157,20 @@ def create_all_graph_components(
         G_target=grid_connect_graph,
         method=g2m_connectivity,
         **g2m_connectivity_kwargs,
-    )
+)
     graph_components["g2m"] = G_g2m
+
+    grid_nodes_in_g2m = {u for u, v in G_g2m.edges()}
+    all_grid_nodes = set(G_grid.nodes)
+    missing_nodes = all_grid_nodes - grid_nodes_in_g2m
+
+    if missing_nodes:
+        raise ValueError(
+            f"Found {len(missing_nodes)} grid node(s) with no g2m connection! "
+            f"Missing nodes: {missing_nodes}. "
+            f"This means these grid nodes won't participate in the encode phase. "
+            f"Try increasing g2m rel_max_dist or max_dist."
+        )
 
     if decode_mask is None:
         # decode to all grid nodes
@@ -407,6 +419,7 @@ def connect_nodes_across_graphs(
     for target_node in target_nodes_list:
         xy_target = G_target.nodes[target_node]["pos"]
         neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(xy_target)
+        neigh_idxs = np.atleast_1d(neigh_idxs)
         for i in neigh_idxs:
             source_node = source_nodes_list[i]
             # add edge from source to target

@@ -6,7 +6,7 @@ from .. import mesh as mesh_graph
 
 
 def create_flat_multiscale_mesh_graph(
-    xy, mesh_node_distance: float, level_refinement_factor: int, max_num_levels: int
+    xy, mesh_node_distance: float, level_refinement_factor: int, max_num_levels: int,
 ):
     """
     Create flat mesh graph by merging the single-level mesh
