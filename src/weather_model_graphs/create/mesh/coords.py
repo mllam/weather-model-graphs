@@ -3,7 +3,13 @@ import numpy as np
 from loguru import logger
 
 
-def create_single_level_2d_mesh_primitive(xy: np.ndarray, nx: int, ny: int):
+def create_single_level_2d_mesh_primitive(
+    xy: np.ndarray,
+    nx: int = None,
+    ny: int = None,
+    *,
+    mesh_node_spacing: float = None,
+):
     """
     Create an undirected mesh primitive graph (nx.Graph) with node positions
     and spatial adjacency edges, representing the coordinate creation step.
@@ -24,15 +30,25 @@ def create_single_level_2d_mesh_primitive(xy: np.ndarray, nx: int, ny: int):
     1. Coordinate creation (this function) -> nx.Graph with spatial adjacency
     2. Connectivity creation (create_directed_mesh_graph) -> nx.DiGraph
 
+    Either provide ``nx`` and ``ny`` directly, or provide
+    ``mesh_node_spacing`` to have them computed automatically from the
+    coordinate extent of ``xy``.
+
     Parameters
     ----------
     xy : np.ndarray
         Grid point coordinates, shaped [N_grid_points, 2], with first column
         representing x coordinates and second column y coordinates.
-    nx : int
-        Number of nodes in x direction
-    ny : int
-        Number of nodes in y direction
+    nx : int, optional
+        Number of nodes in x direction. If not given, computed from
+        ``mesh_node_spacing``.
+    ny : int, optional
+        Number of nodes in y direction. If not given, computed from
+        ``mesh_node_spacing``.
+    mesh_node_spacing : float, optional
+        Distance between mesh nodes (in coordinate units). When provided,
+        ``nx`` and ``ny`` are computed as
+        ``int(range / mesh_node_spacing)`` and validated to be > 0.
 
     Returns
     -------
@@ -40,6 +56,23 @@ def create_single_level_2d_mesh_primitive(xy: np.ndarray, nx: int, ny: int):
         Undirected mesh primitive graph with node positions and annotated
         spatial adjacency edges.
     """
+    if mesh_node_spacing is not None:
+        range_x, range_y = np.ptp(xy, axis=0)
+        nx = int(range_x / mesh_node_spacing)
+        ny = int(range_y / mesh_node_spacing)
+        if nx == 0 or ny == 0:
+            raise ValueError(
+                "The given `mesh_node_spacing` is too large for the provided "
+                f"coordinates. Got mesh_node_spacing={mesh_node_spacing}, but the "
+                f"x-range is {range_x} and y-range is {range_y}. Maybe you "
+                "want to decrease the `mesh_node_spacing` so that the mesh nodes "
+                "are spaced closer together?"
+            )
+    elif nx is None or ny is None:
+        raise ValueError(
+            "Either provide both `nx` and `ny`, or provide "
+            "`mesh_node_spacing` to compute them automatically."
+        )
     xm, xM = np.amin(xy[:, 0]), np.amax(xy[:, 0])
     ym, yM = np.amin(xy[:, 1]), np.amax(xy[:, 1])
 

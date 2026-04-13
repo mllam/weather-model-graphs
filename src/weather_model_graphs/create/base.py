@@ -265,19 +265,10 @@ def create_all_graph_components(
             )
 
         if m2m_connectivity == "flat":
-            # Single-level mesh: compute nx/ny from spacing
-            range_x, range_y = np.ptp(xy, axis=0)
-            nx_mesh = int(range_x / mesh_node_spacing)
-            ny_mesh = int(range_y / mesh_node_spacing)
-            if nx_mesh == 0 or ny_mesh == 0:
-                raise ValueError(
-                    "The given `mesh_node_spacing` is too large for the provided "
-                    f"coordinates. Got mesh_node_spacing={mesh_node_spacing}, but the "
-                    f"x-range is {range_x} and y-range is {range_y}. Maybe you "
-                    "want to decrease the `mesh_node_spacing` so that the mesh nodes "
-                    "are spaced closer together?"
-                )
-            G_mesh_coords = create_single_level_2d_mesh_primitive(xy, nx_mesh, ny_mesh)
+            # Single-level mesh
+            G_mesh_coords = create_single_level_2d_mesh_primitive(
+                xy, mesh_node_spacing=mesh_node_spacing
+            )
         else:
             # Multi-level mesh: build kwargs for create_multirange_2d_mesh_primitives
             primitives_kwargs = dict(xy=xy, mesh_node_spacing=mesh_node_spacing)
