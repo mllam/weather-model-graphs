@@ -1,7 +1,6 @@
 import tempfile
 from pathlib import Path
 
-import numpy as np
 import pytest
 import torch
 from loguru import logger
@@ -266,9 +265,7 @@ class TestToNeuralLamHierarchical:
         down_ei = torch.load(
             Path(tmpdir) / "mesh_down_edge_index.pt", weights_only=True
         )
-        down_f = torch.load(
-            Path(tmpdir) / "mesh_down_features.pt", weights_only=True
-        )
+        down_f = torch.load(Path(tmpdir) / "mesh_down_features.pt", weights_only=True)
 
         n_levels = len(m2m_ei)
         # Up/down should have n_levels - 1 entries

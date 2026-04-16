@@ -345,16 +345,12 @@ def to_neural_lam(
 
     if hierarchical:
         # Split by direction: "same", "up", "down"
-        direction_subgraphs = split_graph_by_edge_attribute(
-            m2m_graph, attr="direction"
-        )
+        direction_subgraphs = split_graph_by_edge_attribute(m2m_graph, attr="direction")
 
         # --- Intra-level (same-level) m2m edges ---
         same_graph = direction_subgraphs["same"]
         try:
-            level_subgraphs = split_graph_by_edge_attribute(
-                same_graph, attr="level"
-            )
+            level_subgraphs = split_graph_by_edge_attribute(same_graph, attr="level")
         except MissingEdgeAttributeError:
             level_subgraphs = {0: same_graph}
         sorted_levels = sorted(level_subgraphs.keys())
@@ -388,9 +384,7 @@ def to_neural_lam(
         # --- Inter-level down edges ---
         down_graph = direction_subgraphs["down"]
         try:
-            down_subgraphs = split_graph_by_edge_attribute(
-                down_graph, attr="levels"
-            )
+            down_subgraphs = split_graph_by_edge_attribute(down_graph, attr="levels")
         except MissingEdgeAttributeError:
             down_subgraphs = {"0": down_graph}
         sorted_down_keys = sorted(down_subgraphs.keys())
@@ -403,18 +397,10 @@ def to_neural_lam(
             mesh_down_features_list.append(ef)
 
         # Save hierarchical-only files
-        torch.save(
-            mesh_up_edge_indices, output_dir / "mesh_up_edge_index.pt"
-        )
-        torch.save(
-            mesh_up_features_list, output_dir / "mesh_up_features.pt"
-        )
-        torch.save(
-            mesh_down_edge_indices, output_dir / "mesh_down_edge_index.pt"
-        )
-        torch.save(
-            mesh_down_features_list, output_dir / "mesh_down_features.pt"
-        )
+        torch.save(mesh_up_edge_indices, output_dir / "mesh_up_edge_index.pt")
+        torch.save(mesh_up_features_list, output_dir / "mesh_up_features.pt")
+        torch.save(mesh_down_edge_indices, output_dir / "mesh_down_edge_index.pt")
+        torch.save(mesh_down_features_list, output_dir / "mesh_down_features.pt")
         logger.info(
             f"Saved hierarchical mesh_up ({len(mesh_up_edge_indices)} levels) "
             f"and mesh_down ({len(mesh_down_edge_indices)} levels)"
@@ -423,9 +409,7 @@ def to_neural_lam(
     else:
         # Non-hierarchical: split by "level" if available, otherwise single list
         try:
-            level_subgraphs = split_graph_by_edge_attribute(
-                m2m_graph, attr="level"
-            )
+            level_subgraphs = split_graph_by_edge_attribute(m2m_graph, attr="level")
         except MissingEdgeAttributeError:
             level_subgraphs = {0: m2m_graph}
         sorted_levels = sorted(level_subgraphs.keys())
@@ -447,9 +431,7 @@ def to_neural_lam(
     logger.info(f"Saved m2m edges: {len(m2m_edge_indices)} level(s)")
 
     # --- mesh_features.pt: normalized mesh node positions ---
-    pos_max = max(
-        torch.max(torch.abs(nf)) for nf in mesh_node_features_list
-    )
+    pos_max = max(torch.max(torch.abs(nf)) for nf in mesh_node_features_list)
     mesh_features_normalized = [nf / pos_max for nf in mesh_node_features_list]
     torch.save(mesh_features_normalized, output_dir / "mesh_features.pt")
     logger.info(
