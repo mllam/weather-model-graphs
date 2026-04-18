@@ -44,7 +44,7 @@ def test_save_to_pyg(list_from_attribute):
             )
 
 
-# ─── to_neural_lam tests ───
+# ─── to_torch_tensors_on_disk tests ───
 
 # Files expected for all graph types
 CORE_FILES = [
@@ -91,7 +91,7 @@ def _create_and_save(archetype, hierarchical, N=64):
         raise ValueError(f"Unknown archetype: {archetype}")
 
     tmpdir = tempfile.mkdtemp()
-    wmg.save.to_neural_lam(
+    wmg.save.to_torch_tensors_on_disk(
         graph_components=components,
         output_directory=tmpdir,
         hierarchical=hierarchical,
@@ -99,8 +99,8 @@ def _create_and_save(archetype, hierarchical, N=64):
     return tmpdir, components
 
 
-class TestToNeuralLamKeisler:
-    """Tests for to_neural_lam with keisler (flat single-scale) archetype."""
+class TestToTorchTensorsKeisler:
+    """Tests for to_torch_tensors_on_disk with keisler (flat single-scale) archetype."""
 
     def test_core_files_created(self):
         _skip_if_no_pyg()
@@ -186,8 +186,8 @@ class TestToNeuralLamKeisler:
         assert m2m_ei[0].shape[1] > 0
 
 
-class TestToNeuralLamGraphcast:
-    """Tests for to_neural_lam with graphcast (flat multiscale) archetype."""
+class TestToTorchTensorsGraphcast:
+    """Tests for to_torch_tensors_on_disk with graphcast (flat multiscale) archetype."""
 
     def test_core_files_created(self):
         _skip_if_no_pyg()
@@ -229,8 +229,8 @@ class TestToNeuralLamGraphcast:
         assert m2g_ei.shape[0] == 2
 
 
-class TestToNeuralLamHierarchical:
-    """Tests for to_neural_lam with oskarsson hierarchical archetype."""
+class TestToTorchTensorsHierarchical:
+    """Tests for to_torch_tensors_on_disk with oskarsson hierarchical archetype."""
 
     def test_all_files_created(self):
         _skip_if_no_pyg()
@@ -301,14 +301,14 @@ class TestToNeuralLamHierarchical:
             assert torch.max(torch.abs(level_f)) <= 1.0 + 1e-6
 
 
-class TestToNeuralLamEdgeCases:
+class TestToTorchTensorsEdgeCases:
     """Edge case and validation tests."""
 
     def test_missing_component_raises(self):
         _skip_if_no_pyg()
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.raises(ValueError, match="missing required keys"):
-                wmg.save.to_neural_lam(
+                wmg.save.to_torch_tensors_on_disk(
                     graph_components={"g2m": None, "m2m": None},
                     output_directory=tmpdir,
                 )
@@ -317,7 +317,7 @@ class TestToNeuralLamEdgeCases:
         _skip_if_no_pyg()
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.raises(ValueError, match="missing required keys"):
-                wmg.save.to_neural_lam(
+                wmg.save.to_torch_tensors_on_disk(
                     graph_components={},
                     output_directory=tmpdir,
                 )
@@ -331,7 +331,7 @@ class TestToNeuralLamEdgeCases:
         with tempfile.TemporaryDirectory() as tmpdir:
             nested_dir = Path(tmpdir) / "deeply" / "nested" / "dir"
             assert not nested_dir.exists()
-            wmg.save.to_neural_lam(
+            wmg.save.to_torch_tensors_on_disk(
                 graph_components=components,
                 output_directory=str(nested_dir),
                 hierarchical=False,
@@ -412,7 +412,7 @@ class TestToNeuralLamEdgeCases:
             coords=xy, return_components=True
         )
         with tempfile.TemporaryDirectory() as tmpdir:
-            wmg.save.to_neural_lam(
+            wmg.save.to_torch_tensors_on_disk(
                 graph_components=components,
                 output_directory=tmpdir,
                 hierarchical=False,
@@ -428,13 +428,13 @@ class TestToNeuralLamEdgeCases:
             coords=xy, return_components=True
         )
         with tempfile.TemporaryDirectory() as tmpdir:
-            wmg.save.to_neural_lam(
+            wmg.save.to_torch_tensors_on_disk(
                 graph_components=components,
                 output_directory=tmpdir,
                 hierarchical=False,
             )
             # Save again — should not raise
-            wmg.save.to_neural_lam(
+            wmg.save.to_torch_tensors_on_disk(
                 graph_components=components,
                 output_directory=tmpdir,
                 hierarchical=False,

@@ -254,7 +254,7 @@ def _graph_to_node_features(graph, node_features=None):
     return torch.cat(v_concat, dim=1).to(torch.float32)
 
 
-def to_neural_lam(
+def to_torch_tensors_on_disk(
     graph_components: Dict[str, networkx.DiGraph],
     output_directory: str,
     hierarchical: bool = False,
