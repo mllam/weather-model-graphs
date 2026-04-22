@@ -255,12 +255,15 @@ def connect_nodes_across_graphs(
         Graph containing the nodes in `G_source` and `G_target` and directed edges
         from nodes in `G_source` to nodes in `G_target`
     """
-    source_nodes_list = list(G_source.nodes)
+    source_nodes_list = sorted(G_source.nodes)
     target_nodes_list = list(G_target.nodes)
 
-    # build kd tree for source nodes (e.g. the mesh nodes when constructing m2g)
-    xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
+    # build kd tree for source nodes; order must match source_nodes_list
+    xy_source = np.array([G_source.nodes[n]["pos"] for n in source_nodes_list])
     kdt_s = scipy.spatial.KDTree(xy_source)
+
+    xy_target_all = np.array([G_target.nodes[n]["pos"] for n in target_nodes_list])
+    N_target = len(target_nodes_list)
 
     # Determine method and perform checks once
     # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in
@@ -399,9 +402,6 @@ def connect_nodes_across_graphs(
     G_connect = networkx.DiGraph()
     G_connect.add_nodes_from(sorted(G_source.nodes(data=True)))
     G_connect.add_nodes_from(sorted(G_target.nodes(data=True)))
-
-    # sort nodes by index
-    source_nodes_list = sorted(G_source.nodes)
 
     # add edges
     for target_node in target_nodes_list:
