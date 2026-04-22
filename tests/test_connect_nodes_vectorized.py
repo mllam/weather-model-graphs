@@ -57,6 +57,9 @@ def test_nearest_neighbours_at_most_k_per_target(k):
         source, target, method="nearest_neighbours", max_num_neighbours=k
     )
 
+    # Precondition: fixture must have enough source nodes for all targets to get exactly k
+    assert source.number_of_nodes() >= k, "fixture too small; test precondition violated"
+
     for node in target.nodes:
         preds = list(G.predecessors(node))
         # source has 25 nodes >= max k=8, so every target always gets exactly k neighbours

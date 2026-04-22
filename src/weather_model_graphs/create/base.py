@@ -265,9 +265,8 @@ def connect_nodes_across_graphs(
     xy_target_all = np.array([G_target.nodes[n]["pos"] for n in target_nodes_list])
     N_target = len(target_nodes_list)
 
-    # Determine method and perform checks once
-    # Conditionally define _find_neighbour_node_idxs_in_source_mesh for use in
-    # loop later
+    # Validate arguments and run batch KDTree query for the chosen method.
+    # Each branch sets source_indices and target_indices (1-D, aligned).
     if method == "containing_rectangle":
         if (
             max_dist is not None
