@@ -326,10 +326,9 @@ def connect_nodes_across_graphs(
             raise Exception(
                 "to use `nearest_neighbour` you should not set `max_dist`, `rel_max_dist`or `max_num_neighbours`"
             )
-
-        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idx = kdt_s.query(xy_target, 1)[1]
-            return [neigh_idx]
+        # Batch query: shape (N_target,)
+        source_indices = kdt_s.query(xy_target_all, 1)[1]
+        target_indices = np.arange(N_target)
 
     elif method == "nearest_neighbours":
         if max_num_neighbours is None:
@@ -340,10 +339,10 @@ def connect_nodes_across_graphs(
             raise Exception(
                 "to use `nearest_neighbours` you should not set `max_dist` or `rel_max_dist`"
             )
-
-        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idxs = kdt_s.query(xy_target, max_num_neighbours)[1]
-            return neigh_idxs
+        # Batch query: shape (N_target, max_num_neighbours)
+        neigh_idxs = kdt_s.query(xy_target_all, max_num_neighbours)[1]
+        source_indices = neigh_idxs.ravel()
+        target_indices = np.repeat(np.arange(N_target), max_num_neighbours)
 
     elif method == "within_radius":
         if max_num_neighbours is not None:
@@ -392,38 +391,37 @@ def connect_nodes_across_graphs(
                 "to use `witin_radius` method you shold set `max_dist` or `rel_max_dist"
             )
 
-        def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idxs = kdt_s.query_ball_point(xy_target, query_dist)
-            return neigh_idxs
+        # Batch query: ragged because each target may have different neighbour count
+        neigh_idxs_ragged = kdt_s.query_ball_point(xy_target_all, query_dist)
+        counts = [len(row) for row in neigh_idxs_ragged]
+        target_indices = np.repeat(np.arange(N_target), counts)
+        nonempty_rows = [row for row in neigh_idxs_ragged if len(row) > 0]
+        source_indices = (
+            np.concatenate(nonempty_rows).astype(int)
+            if nonempty_rows
+            else np.array([], dtype=int)
+        )
 
     else:
         raise NotImplementedError(method)
+
+    # Vectorized edge attribute computation
+    xy_src = xy_source[source_indices]        # (N_edges, 2)
+    xy_tgt = xy_target_all[target_indices]    # (N_edges, 2)
+    vdiffs = xy_src - xy_tgt                  # (N_edges, 2)
+    lengths = np.linalg.norm(vdiffs, axis=1)  # (N_edges,)
 
     G_connect = networkx.DiGraph()
     G_connect.add_nodes_from(sorted(G_source.nodes(data=True)))
     G_connect.add_nodes_from(sorted(G_target.nodes(data=True)))
 
-    # add edges
-    for target_node in target_nodes_list:
-        xy_target = G_target.nodes[target_node]["pos"]
-        neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(xy_target)
-        for i in neigh_idxs:
-            source_node = source_nodes_list[i]
-            # add edge from source to target
-            G_connect.add_edge(source_node, target_node)
-            d = np.sqrt(
-                np.sum(
-                    (
-                        G_connect.nodes[source_node]["pos"]
-                        - G_connect.nodes[target_node]["pos"]
-                    )
-                    ** 2
-                )
-            )
-            G_connect.edges[source_node, target_node]["len"] = d
-            G_connect.edges[source_node, target_node]["vdiff"] = (
-                G_connect.nodes[source_node]["pos"]
-                - G_connect.nodes[target_node]["pos"]
-            )
+    G_connect.add_edges_from(
+        (
+            source_nodes_list[si],
+            target_nodes_list[ti],
+            {"len": float(lengths[e]), "vdiff": vdiffs[e]},
+        )
+        for e, (si, ti) in enumerate(zip(source_indices, target_indices))
+    )
 
     return G_connect

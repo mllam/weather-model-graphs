@@ -50,12 +50,7 @@ def test_nearest_neighbour_one_edge_per_target():
     _assert_edge_attrs_valid(G, source, target)
 
 
-@pytest.mark.parametrize("k", [
-    pytest.param(1, marks=pytest.mark.xfail(
-        strict=True, reason="k=1 triggers scalar-vs-array bug in serial loop; fixed by vectorization"
-    )),
-    3, 4, 8,
-])
+@pytest.mark.parametrize("k", [1, 3, 4, 8])
 def test_nearest_neighbours_at_most_k_per_target(k):
     source, target = _make_source_target()
     G = connect_nodes_across_graphs(
