@@ -81,11 +81,13 @@ def to_pyg(
     if len(set(graph.nodes)) != len(graph.nodes):
         raise ValueError("Node labels must be unique.")
 
+    graph_to_save = graph.copy()
+
     # remove all node attributes but the ones we want to keep
-    for node in graph.nodes:
-        for attr in list(graph.nodes[node].keys()):
+    for node in graph_to_save.nodes:
+        for attr in list(graph_to_save.nodes[node].keys()):
             if attr not in node_features:
-                del graph.nodes[node][attr]
+                del graph_to_save.nodes[node][attr]
 
     def _get_edge_indecies(pyg_g):
         return pyg_g.edge_index
@@ -114,14 +116,14 @@ def to_pyg(
                 value
                 for key, value in sorted(
                     split_graph_by_edge_attribute(
-                        graph=graph, attr=list_from_attribute
+                        graph=graph_to_save, attr=list_from_attribute
                     ).items()
                 )
             ]
         except MissingEdgeAttributeError:
             # neural-lam still expects a list of graphs, so if the attribute is missing
             # we just return the original graph as a list
-            sub_graphs = [graph]
+            sub_graphs = [graph_to_save]
         # Nodes must be sorted if we want to preserve the ordering in node
         # labels when we convert to a pyg object. This conversion does not care
         # about node labels inherently.
@@ -129,7 +131,7 @@ def to_pyg(
             pyg_convert.from_networkx(sort_nodes_in_graph(g)) for g in sub_graphs
         ]
     else:
-        pyg_graphs = [pyg_convert.from_networkx(sort_nodes_in_graph(graph))]
+        pyg_graphs = [pyg_convert.from_networkx(sort_nodes_in_graph(graph_to_save))]
 
     edge_features_values = [
         _concat_pyg_features(pyg_g, features=edge_features) for pyg_g in pyg_graphs
