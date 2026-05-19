@@ -5,9 +5,10 @@ import numpy as np
 
 from ....networkx_utils import prepend_node_index
 from .. import coords as mesh_coords
+from .directed import create_directed_mesh_graph
 
 
-def _check_required_graph_attributes(G: networkx.Graph, context: str):
+def _check_required_graph_attributes(G: networkx.Graph, context: str) -> None:
     """Check that a coordinate graph has the required node and edge attributes.
 
     Parameters
@@ -47,7 +48,7 @@ def _check_required_graph_attributes(G: networkx.Graph, context: str):
 def create_flat_multiscale_from_coordinates(
     G_coords_list: List[networkx.Graph],
     **kwargs,
-):
+) -> networkx.DiGraph:
     """
     Create flat multiscale mesh graph from a list of coordinate graphs.
 
@@ -103,8 +104,7 @@ def create_flat_multiscale_from_coordinates(
 
     # Convert each level's coordinate graph to directed graph with chosen pattern
     G_all_levels = [
-        mesh_coords.create_directed_mesh_graph(g_coords, **kwargs)
-        for g_coords in G_coords_list
+        create_directed_mesh_graph(g_coords, **kwargs) for g_coords in G_coords_list
     ]
 
     # combine all levels to one graph
@@ -151,7 +151,9 @@ def create_flat_multiscale_from_coordinates(
     return G_tot
 
 
-def create_flat_singlescale_from_coordinates(G_coords: networkx.Graph, **kwargs):
+def create_flat_singlescale_from_coordinates(
+    G_coords: networkx.Graph, **kwargs
+) -> networkx.DiGraph:
     """
     Create a flat single-scale directed mesh graph from a mesh primitive graph.
 
@@ -178,12 +180,12 @@ def create_flat_singlescale_from_coordinates(G_coords: networkx.Graph, **kwargs)
     _check_required_graph_attributes(
         G_coords, "create_flat_singlescale_from_coordinates"
     )
-    return mesh_coords.create_directed_mesh_graph(G_coords, **kwargs)
+    return create_directed_mesh_graph(G_coords, **kwargs)
 
 
 def create_flat_multiscale_mesh_graph(
     xy, mesh_node_distance: float, level_refinement_factor: int, max_num_levels: int
-):
+) -> networkx.DiGraph:
     """
     Create flat mesh graph by merging the single-level mesh
     graphs across all levels in `G_all_levels`.
@@ -208,7 +210,7 @@ def create_flat_multiscale_mesh_graph(
         Maximum number of levels in the multi-scale graph
     Returns
     -------
-    G_tot : networkx.Graph
+    G_tot : networkx.DiGraph
         The merged mesh graph
     """
     G_coords_list = mesh_coords.create_multirange_2d_mesh_primitives(
@@ -224,7 +226,7 @@ def create_flat_multiscale_mesh_graph(
     )
 
 
-def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
+def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float) -> networkx.DiGraph:
     """
     Create flat mesh graph of single level
 
@@ -243,7 +245,7 @@ def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float):
         in coordinate system of xy
     Returns
     -------
-    G_flat : networkx.Graph
+    G_flat : networkx.DiGraph
         The flat mesh graph
     """
     # Compute number of mesh nodes in x and y dimensions

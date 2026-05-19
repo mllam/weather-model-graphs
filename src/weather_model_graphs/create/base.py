@@ -8,7 +8,7 @@ used to represent the encode-process-decode steps respectively. These are create
 function uses `connect_nodes_across_graphs` to connect nodes across the component graphs.
 """
 
-from typing import Iterable, List, Union
+from typing import Dict, Iterable, List, Tuple, Union
 
 import networkx
 import networkx as nx
@@ -34,7 +34,9 @@ from .mesh.coords import (
 )
 
 
-def _migrate_deprecated_kwargs(mesh_layout_kwargs, m2m_connectivity_kwargs):
+def _migrate_deprecated_kwargs(
+    mesh_layout_kwargs, m2m_connectivity_kwargs
+) -> Tuple[dict, dict]:
     """Migrate old-style kwargs to the new mesh_layout_kwargs structure.
 
     In the old API, ``mesh_node_distance``, ``level_refinement_factor``, and
@@ -108,7 +110,7 @@ def create_all_graph_components(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
-):
+) -> Union[networkx.DiGraph, Dict[str, networkx.DiGraph]]:
     """
     Create all graph components used in creating the message-passing graph,
         grid-to-mesh (g2m), mesh-to-mesh (m2m) and mesh-to-grid (m2g),
@@ -382,7 +384,7 @@ def connect_nodes_across_graphs(
     max_dist=None,
     rel_max_dist=None,
     max_num_neighbours=None,
-):
+) -> networkx.DiGraph:
     """
     Create a new graph containing the nodes in `G_source` and `G_target` and add
     directed edges from nodes in `G_source` to nodes in `G_target` based on the

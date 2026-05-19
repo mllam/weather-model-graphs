@@ -13,6 +13,7 @@ These tests verify:
 6. Error handling for invalid inputs
 """
 
+import inspect
 import io
 import warnings
 
@@ -23,7 +24,14 @@ from loguru import logger
 
 import tests.utils as test_utils
 import weather_model_graphs as wmg
+from weather_model_graphs.create.mesh.connectivity import (
+    create_directed_mesh_graph as cdmg_from_connectivity_init,
+)
+from weather_model_graphs.create.mesh.connectivity.directed import (
+    create_directed_mesh_graph as cdmg_from_directed,
+)
 from weather_model_graphs.create.mesh.connectivity.flat import (
+    _check_required_graph_attributes,
     create_flat_multiscale_from_coordinates,
     create_flat_singlescale_from_coordinates,
 )
@@ -1330,3 +1338,361 @@ class TestGraphStructuralProperties:
             up_count == down_count
         ), f"Up edges ({up_count}) != Down edges ({down_count})"
         assert up_count > 0, "Should have at least some up/down edges"
+
+
+# ====================
+# Module location and re-export tests (Leif's review: move create_directed_mesh_graph)
+# ====================
+
+
+class TestDirectedMeshGraphModuleLocation:
+    """Verify create_directed_mesh_graph is defined in connectivity/directed.py
+    and is also accessible via backward-compat re-exports.
+    These tests directly verify Leif's review request to move create_directed_mesh_graph
+    out of create.mesh.coords and into create.mesh.connectivity.
+    """
+
+    def test_canonical_source_is_connectivity_directed(self):
+        """create_directed_mesh_graph should be defined in connectivity/directed.py."""
+        src = inspect.getsourcefile(cdmg_from_directed)
+        assert "connectivity" in src.replace("\\", "/"), (
+            f"Expected source in connectivity/, got: {src}"
+        )
+        assert "directed.py" in src, f"Expected source file directed.py, got: {src}"
+
+    def test_coords_reexport_same_function(self):
+        """create_directed_mesh_graph re-exported from coords should be same object."""
+        assert create_directed_mesh_graph is cdmg_from_directed
+
+    def test_connectivity_init_reexport_same_function(self):
+        """create_directed_mesh_graph from connectivity __init__ should be same object."""
+        assert cdmg_from_connectivity_init is cdmg_from_directed
+
+    def test_function_not_defined_in_coords_source(self):
+        """coords.py should not define create_directed_mesh_graph - only re-export it."""
+        import weather_model_graphs.create.mesh.coords as coords_module
+
+        src_file = inspect.getsourcefile(coords_module.create_directed_mesh_graph)
+        # The source file must be directed.py, NOT coords.py
+        assert "coords.py" not in src_file, (
+            "create_directed_mesh_graph should not be defined in coords.py, "
+            f"but source file is: {src_file}"
+        )
+
+    def test_backward_compat_callable_from_coords(self):
+        """create_directed_mesh_graph should still be callable via coords namespace."""
+        import weather_model_graphs.create.mesh.coords as coords_module
+
+        xy = test_utils.create_fake_xy(N=10)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=3, ny=3)
+        G = coords_module.create_directed_mesh_graph(G_coords, pattern="8-star")
+        assert isinstance(G, nx.DiGraph)
+
+    def test_all_connectivity_functions_return_digraph(self):
+        """All connectivity functions must return DiGraph (Leif's annotation request)."""
+        import typing
+
+        xy = test_utils.create_fake_xy(N=10)
+        checks = [
+            (cdmg_from_directed, "create_directed_mesh_graph"),
+        ]
+        for fn, name in checks:
+            ret = fn.__annotations__.get("return")
+            assert ret is not None, f"{name} missing return type annotation"
+            assert issubclass(ret, nx.DiGraph), (
+                f"{name} should return DiGraph, got {ret}"
+            )
+
+    def test_all_coords_functions_have_return_annotations(self):
+        """All functions in coords.py should have return type annotations."""
+        import weather_model_graphs.create.mesh.coords as coords_module
+
+        functions = [
+            "create_single_level_2d_mesh_primitive",
+            "create_single_level_2d_mesh_graph",
+            "create_multirange_2d_mesh_primitives",
+            "create_multirange_2d_mesh_graphs",
+        ]
+        for name in functions:
+            fn = getattr(coords_module, name)
+            assert "return" in fn.__annotations__, (
+                f"{name} in coords.py missing return type annotation"
+            )
+
+    def test_connectivity_functions_have_return_annotations(self):
+        """All connectivity creation functions should have return type annotations."""
+        from weather_model_graphs.create.mesh.connectivity import flat, hierarchical
+
+        checks = [
+            (flat.create_flat_multiscale_from_coordinates, "create_flat_multiscale_from_coordinates"),
+            (flat.create_flat_singlescale_from_coordinates, "create_flat_singlescale_from_coordinates"),
+            (flat.create_flat_multiscale_mesh_graph, "create_flat_multiscale_mesh_graph"),
+            (flat.create_flat_singlescale_mesh_graph, "create_flat_singlescale_mesh_graph"),
+            (hierarchical.create_hierarchical_from_coordinates, "create_hierarchical_from_coordinates"),
+            (hierarchical.create_hierarchical_multiscale_mesh_graph, "create_hierarchical_multiscale_mesh_graph"),
+        ]
+        for fn, name in checks:
+            assert "return" in fn.__annotations__, (
+                f"{name} missing return type annotation"
+            )
+
+
+# ====================
+# Graph attribute validation edge cases
+# ====================
+
+
+class TestGraphAttributeValidation:
+    """Tests for _check_required_graph_attributes and attribute error handling."""
+
+    def test_missing_pos_attribute_raises(self):
+        """Graph with nodes missing 'pos' attribute should raise ValueError."""
+        G = nx.Graph()
+        G.add_node((0, 0), type="mesh")  # no 'pos'
+        G.add_node((1, 0), type="mesh")
+        G.add_edge((0, 0), (1, 0), adjacency_type="cardinal")
+        with pytest.raises(ValueError, match="'pos' attribute"):
+            _check_required_graph_attributes(G, "test_context")
+
+    def test_missing_type_attribute_raises(self):
+        """Graph with nodes missing 'type' attribute should raise ValueError."""
+        import numpy as np
+
+        G = nx.Graph()
+        G.add_node((0, 0), pos=np.array([0.0, 0.0]))  # no 'type'
+        G.add_node((1, 0), pos=np.array([1.0, 0.0]))
+        G.add_edge((0, 0), (1, 0), adjacency_type="cardinal")
+        with pytest.raises(ValueError, match="'type' attribute"):
+            _check_required_graph_attributes(G, "test_context")
+
+    def test_missing_adjacency_type_on_edge_raises(self):
+        """Graph with edges missing 'adjacency_type' should raise ValueError."""
+        import numpy as np
+
+        G = nx.Graph()
+        G.add_node((0, 0), pos=np.array([0.0, 0.0]), type="mesh")
+        G.add_node((1, 0), pos=np.array([1.0, 0.0]), type="mesh")
+        G.add_edge((0, 0), (1, 0))  # no 'adjacency_type'
+        with pytest.raises(ValueError, match="'adjacency_type'"):
+            _check_required_graph_attributes(G, "test_context")
+
+    def test_empty_graph_passes_validation(self):
+        """An empty graph (no nodes, no edges) should pass validation."""
+        G = nx.Graph()
+        # Should not raise
+        _check_required_graph_attributes(G, "test_context")
+
+    def test_flat_singlescale_missing_pos_raises(self):
+        """create_flat_singlescale_from_coordinates should raise on bad graph."""
+        import numpy as np
+
+        G = nx.Graph()
+        G.add_node((0, 0), type="mesh")  # missing pos
+        with pytest.raises(ValueError, match="'pos' attribute"):
+            create_flat_singlescale_from_coordinates(G, pattern="8-star")
+
+    def test_flat_multiscale_missing_interlevel_refinement_factor_raises(self):
+        """create_flat_multiscale_from_coordinates should raise if
+        interlevel_refinement_factor is not in graph attributes."""
+        xy = test_utils.create_fake_xy(N=30)
+        G = create_single_level_2d_mesh_primitive(xy, nx=5, ny=5)
+        # G is a valid coord graph but lacks interlevel_refinement_factor
+        with pytest.raises(ValueError, match="interlevel_refinement_factor"):
+            create_flat_multiscale_from_coordinates([G])
+
+    def test_flat_multiscale_even_refinement_factor_raises(self):
+        """create_flat_multiscale_from_coordinates should raise if
+        interlevel_refinement_factor is even (e.g. 2 or 4)."""
+        xy = test_utils.create_fake_xy(N=30)
+        G_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=2,
+            xy=xy,
+            mesh_node_spacing=3,
+            interlevel_refinement_factor=3,
+        )
+        # Manually override to an even value to trigger the error
+        for G in G_list:
+            G.graph["interlevel_refinement_factor"] = 2
+        with pytest.raises(ValueError, match="odd integer"):
+            create_flat_multiscale_from_coordinates(G_list)
+
+    def test_flat_multiscale_non_integer_refinement_factor_raises(self):
+        """Non-integer interlevel_refinement_factor should raise ValueError."""
+        xy = test_utils.create_fake_xy(N=30)
+        G_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=2,
+            xy=xy,
+            mesh_node_spacing=3,
+            interlevel_refinement_factor=3,
+        )
+        # Manually override to a non-integer
+        for G in G_list:
+            G.graph["interlevel_refinement_factor"] = 2.5
+        with pytest.raises(ValueError, match="odd integer"):
+            create_flat_multiscale_from_coordinates(G_list)
+
+
+# ====================
+# Additional create_directed_mesh_graph edge cases
+# ====================
+
+
+class TestDirectedMeshGraphAdditionalEdgeCases:
+    """Additional edge cases for create_directed_mesh_graph from connectivity/directed."""
+
+    def test_graph_attributes_preserved_for_level(self):
+        """Graph-level 'level' attribute from multirange should be preserved."""
+        xy = test_utils.create_fake_xy(N=30)
+        G_list = create_multirange_2d_mesh_primitives(
+            max_num_levels=2, xy=xy, mesh_node_spacing=3, interlevel_refinement_factor=3
+        )
+        for G_coords in G_list:
+            G_directed = cdmg_from_directed(G_coords, pattern="8-star")
+            assert "level" in G_directed.graph, "level graph attribute not preserved"
+            assert "dx" in G_directed.graph, "dx graph attribute not preserved"
+            assert "dy" in G_directed.graph, "dy graph attribute not preserved"
+
+    def test_4star_no_diagonal_edge_attributes(self):
+        """4-star graph should have no edges with adjacency_type='diagonal'."""
+        xy = test_utils.create_fake_xy(N=10)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=5, ny=5)
+        G_4star = cdmg_from_directed(G_coords, pattern="4-star")
+        for u, v, d in G_4star.edges(data=True):
+            adj = d.get("adjacency_type")
+            assert adj != "diagonal", (
+                f"4-star graph has diagonal edge ({u},{v})"
+            )
+
+    def test_node_count_preserved(self):
+        """Directed graph should have same number of nodes as undirected."""
+        xy = test_utils.create_fake_xy(N=10)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=5, ny=5)
+        G_directed = cdmg_from_directed(G_coords, pattern="8-star")
+        assert len(G_directed.nodes) == len(G_coords.nodes)
+
+    def test_node_attributes_preserved(self):
+        """Node pos and type should be preserved in the directed graph."""
+        xy = test_utils.create_fake_xy(N=10)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
+        G_directed = cdmg_from_directed(G_coords, pattern="8-star")
+        for node in G_directed.nodes:
+            assert "pos" in G_directed.nodes[node]
+            assert "type" in G_directed.nodes[node]
+
+    def test_invalid_pattern_message_contains_valid_options(self):
+        """ValueError for invalid pattern should mention the valid options."""
+        xy = test_utils.create_fake_xy(N=10)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=3, ny=3)
+        with pytest.raises(ValueError, match="4-star"):
+            cdmg_from_directed(G_coords, pattern="bad-pattern")
+        with pytest.raises(ValueError, match="8-star"):
+            cdmg_from_directed(G_coords, pattern="bad-pattern")
+
+    def test_same_result_from_coords_and_directed_import(self):
+        """Calling via coords re-export and via connectivity.directed should give same result."""
+        import weather_model_graphs.create.mesh.coords as coords_module
+
+        xy = test_utils.create_fake_xy(N=10)
+        G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
+
+        G_via_coords = coords_module.create_directed_mesh_graph(G_coords, pattern="8-star")
+        G_via_directed = cdmg_from_directed(G_coords, pattern="8-star")
+
+        assert len(G_via_coords.nodes) == len(G_via_directed.nodes)
+        assert len(G_via_coords.edges) == len(G_via_directed.edges)
+        assert set(G_via_coords.nodes) == set(G_via_directed.nodes)
+        assert set(G_via_coords.edges) == set(G_via_directed.edges)
+
+
+# ====================
+# Return type annotation tests
+# ====================
+
+
+class TestReturnTypeAnnotations:
+    """Verify all public functions across the package have return type annotations.
+    This directly addresses Leif's review: 'ensure all functions have type annotations
+    for the return types. That way we can quickly scan through if nx.Graph or
+    nx.DiGraph is returned.'
+    """
+
+    def test_create_single_level_2d_mesh_primitive_returns_graph(self):
+        """create_single_level_2d_mesh_primitive should annotate -> networkx.Graph."""
+        import networkx
+
+        ret = create_single_level_2d_mesh_primitive.__annotations__["return"]
+        assert ret is networkx.Graph or (
+            hasattr(ret, "__origin__") and issubclass(ret.__origin__, networkx.Graph)
+        ), f"Expected networkx.Graph, got {ret}"
+
+    def test_create_directed_mesh_graph_returns_digraph(self):
+        """create_directed_mesh_graph should annotate -> networkx.DiGraph."""
+        import networkx
+
+        ret = cdmg_from_directed.__annotations__["return"]
+        assert ret is networkx.DiGraph or issubclass(ret, networkx.DiGraph), (
+            f"Expected networkx.DiGraph, got {ret}"
+        )
+
+    def test_create_single_level_2d_mesh_graph_returns_digraph(self):
+        """create_single_level_2d_mesh_graph (backward compat) -> networkx.DiGraph."""
+        import weather_model_graphs.create.mesh.coords as coords_module
+        import networkx
+
+        fn = coords_module.create_single_level_2d_mesh_graph
+        ret = fn.__annotations__["return"]
+        assert ret is networkx.DiGraph, f"Expected networkx.DiGraph, got {ret}"
+
+    def test_create_multirange_2d_mesh_primitives_returns_list_of_graph(self):
+        """create_multirange_2d_mesh_primitives should annotate -> List[networkx.Graph]."""
+        import typing
+
+        ret = create_multirange_2d_mesh_primitives.__annotations__["return"]
+        # Should be List[networkx.Graph]
+        assert hasattr(ret, "__args__"), f"Expected generic list type, got {ret}"
+
+    def test_create_flat_singlescale_from_coordinates_returns_digraph(self):
+        """create_flat_singlescale_from_coordinates should annotate -> networkx.DiGraph."""
+        import networkx
+
+        ret = create_flat_singlescale_from_coordinates.__annotations__["return"]
+        assert ret is networkx.DiGraph, f"Expected networkx.DiGraph, got {ret}"
+
+    def test_create_flat_multiscale_from_coordinates_returns_digraph(self):
+        """create_flat_multiscale_from_coordinates should annotate -> networkx.DiGraph."""
+        import networkx
+
+        ret = create_flat_multiscale_from_coordinates.__annotations__["return"]
+        assert ret is networkx.DiGraph, f"Expected networkx.DiGraph, got {ret}"
+
+    def test_create_hierarchical_from_coordinates_returns_digraph(self):
+        """create_hierarchical_from_coordinates should annotate -> networkx.DiGraph."""
+        import networkx
+
+        ret = create_hierarchical_from_coordinates.__annotations__["return"]
+        assert ret is networkx.DiGraph, f"Expected networkx.DiGraph, got {ret}"
+
+    def test_create_all_graph_components_has_return_annotation(self):
+        """create_all_graph_components should have a return type annotation."""
+        from weather_model_graphs.create.base import create_all_graph_components
+
+        assert "return" in create_all_graph_components.__annotations__, (
+            "create_all_graph_components missing return type annotation"
+        )
+
+    def test_connect_nodes_across_graphs_returns_digraph(self):
+        """connect_nodes_across_graphs should annotate -> networkx.DiGraph."""
+        import networkx
+        from weather_model_graphs.create.base import connect_nodes_across_graphs
+
+        ret = connect_nodes_across_graphs.__annotations__["return"]
+        assert ret is networkx.DiGraph, f"Expected networkx.DiGraph, got {ret}"
+
+    def test_create_grid_graph_nodes_returns_graph(self):
+        """create_grid_graph_nodes should annotate -> networkx.Graph."""
+        import networkx
+        from weather_model_graphs.create.grid.grid import create_grid_graph_nodes
+
+        ret = create_grid_graph_nodes.__annotations__["return"]
+        assert ret is networkx.Graph, f"Expected networkx.Graph, got {ret}"
+

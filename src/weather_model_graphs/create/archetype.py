@@ -1,5 +1,6 @@
-from typing import Iterable
+from typing import Dict, Iterable, Union
 
+import networkx
 import pyproj
 
 from .base import create_all_graph_components
@@ -12,7 +13,7 @@ def create_keisler_graph(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
-):
+) -> Union[networkx.DiGraph, Dict[str, networkx.DiGraph]]:
     """
     Create a flat LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     This graph setup is inspired by the global graph used by Keisler (2022, https://arxiv.org/abs/2202.07575).
@@ -80,7 +81,7 @@ def create_graphcast_graph(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
-):
+) -> Union[networkx.DiGraph, Dict[str, networkx.DiGraph]]:
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     This graph setup is inspired by the global GraphCast graph used by Lam et al (2023, https://arxiv.org/abs/2212.12794)
@@ -156,7 +157,7 @@ def create_oskarsson_hierarchical_graph(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
-):
+) -> Union[networkx.DiGraph, Dict[str, networkx.DiGraph]]:
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
     hierarchical architecture.

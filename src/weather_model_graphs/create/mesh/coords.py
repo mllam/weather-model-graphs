@@ -1,6 +1,10 @@
+from typing import List
+
 import networkx
 import numpy as np
 from loguru import logger
+
+from .connectivity.directed import create_directed_mesh_graph  # noqa: F401
 
 
 def create_single_level_2d_mesh_primitive(
@@ -9,7 +13,7 @@ def create_single_level_2d_mesh_primitive(
     ny: int = None,
     *,
     mesh_node_spacing: float = None,
-):
+) -> networkx.Graph:
     """
     Create an undirected mesh primitive graph (nx.Graph) with node positions
     and spatial adjacency edges, representing the coordinate creation step.
@@ -111,84 +115,7 @@ def create_single_level_2d_mesh_primitive(
     return g
 
 
-def create_directed_mesh_graph(G_undirected: networkx.Graph, pattern: str = "8-star"):
-    """
-    Convert an undirected mesh primitive graph with spatial adjacency edges to a
-    directed mesh graph (nx.DiGraph) based on the specified connectivity pattern.
-
-    This is the second step in the two-step mesh creation process:
-    1. Coordinate creation (create_single_level_2d_mesh_primitive) -> nx.Graph
-    2. Connectivity creation (this function) -> nx.DiGraph
-
-    The ``pattern`` argument defines the spatial neighbourhood connectivity:
-    - ``"4-star"``: only cardinal directions (horizontal and vertical neighbours)
-    - ``"8-star"``: cardinal directions plus diagonals (all 8 surrounding neighbours)
-
-    Parameters
-    ----------
-    G_undirected : networkx.Graph
-        Undirected mesh primitive graph. Expected node attributes:
-        - ``"pos"``: np.ndarray of shape [2,], spatial coordinates.
-        Expected edge attributes:
-        - ``"adjacency_type"``: str, either ``"cardinal"`` or ``"diagonal"``.
-        Additional edge attributes (e.g. ``"level"``) are preserved in the
-        output directed graph.
-    pattern : str
-        Connectivity pattern. Options:
-        - ``"4-star"``: only cardinal edges (horizontal/vertical neighbours)
-        - ``"8-star"``: all edges (cardinal + diagonal neighbours)
-
-    Returns
-    -------
-    networkx.DiGraph
-        Directed graph with bidirectional edges, each having ``"len"`` and
-        ``"vdiff"`` attributes. All original edge attributes from the
-        primitive graph are preserved.
-    """
-    if pattern == "4-star":
-        # Filter to only cardinal edges, preserving edge data
-        edges_to_use = [
-            (u, v, d)
-            for u, v, d in G_undirected.edges(data=True)
-            if d.get("adjacency_type") == "cardinal"
-        ]
-    elif pattern == "8-star":
-        # Use all edges with their data
-        edges_to_use = list(G_undirected.edges(data=True))
-    else:
-        raise ValueError(
-            f"Unknown connectivity pattern: '{pattern}'. "
-            "Choose '4-star' or '8-star'."
-        )
-
-    # Create filtered undirected graph with only selected edges (preserving attrs)
-    g_filtered = networkx.Graph()
-    g_filtered.add_nodes_from(G_undirected.nodes(data=True))
-    g_filtered.add_edges_from(edges_to_use)
-
-    # Convert to directed graph (creates edges in both directions)
-    dg = networkx.DiGraph(g_filtered)
-    for u, v in g_filtered.edges():
-        d = np.sqrt(
-            np.sum((G_undirected.nodes[u]["pos"] - G_undirected.nodes[v]["pos"]) ** 2)
-        )
-        dg.edges[u, v]["len"] = d
-        dg.edges[u, v]["vdiff"] = (
-            G_undirected.nodes[u]["pos"] - G_undirected.nodes[v]["pos"]
-        )
-        # Ensure reverse edge exists and has attributes
-        dg.edges[v, u]["len"] = d
-        dg.edges[v, u]["vdiff"] = (
-            G_undirected.nodes[v]["pos"] - G_undirected.nodes[u]["pos"]
-        )
-
-    # Preserve graph-level attributes (dx, dy, level, etc.)
-    dg.graph.update(G_undirected.graph)
-
-    return dg
-
-
-def create_single_level_2d_mesh_graph(xy: np.ndarray, nx: int, ny: int):
+def create_single_level_2d_mesh_graph(xy: np.ndarray, nx: int, ny: int) -> networkx.DiGraph:
     """
     Create directed graph with nx * ny nodes representing a 2D grid with
     positions spanning the range of xy coordinate values (first dimension
@@ -234,7 +161,7 @@ def create_multirange_2d_mesh_primitives(
     xy: np.ndarray,
     mesh_node_spacing: float = 3,
     interlevel_refinement_factor: float = 3,
-):
+) -> List[networkx.Graph]:
     """
     Create a list of undirected mesh primitive graphs (nx.Graph) representing
     different levels of mesh resolution spanning the spatial domain of the
@@ -320,7 +247,7 @@ def create_multirange_2d_mesh_graphs(
     mesh_node_distance: float = 3,
     level_refinement_factor: float = 3,
     pattern: str = "8-star",
-):
+) -> List[networkx.DiGraph]:
     """
     Create a list of 2D grid mesh graphs representing different levels of edge-length
     scales spanning the spatial domain of the xy coordinates.

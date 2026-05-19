@@ -6,13 +6,14 @@ import scipy
 
 from ....networkx_utils import prepend_node_index
 from .. import coords as mesh_coords
+from .directed import create_directed_mesh_graph
 
 
 def create_hierarchical_from_coordinates(
     G_coords_list: List[networkx.Graph],
     intra_level: Dict[str, object] = {"pattern": "8-star"},
     inter_level: Dict[str, object] = {"pattern": "nearest", "k": 1},
-):
+) -> networkx.DiGraph:
     """
     Create a hierarchical multiscale mesh graph from a list of mesh primitive
     graphs.
@@ -64,7 +65,7 @@ def create_hierarchical_from_coordinates(
 
     # Convert each level's coordinate graph to directed graph with chosen pattern
     Gs_all_levels = [
-        mesh_coords.create_directed_mesh_graph(g_coords, pattern=intra_level_pattern)
+        create_directed_mesh_graph(g_coords, pattern=intra_level_pattern)
         for g_coords in G_coords_list
     ]
 
@@ -168,7 +169,7 @@ def create_hierarchical_multiscale_mesh_graph(
     max_num_levels: int,
     intra_level: Optional[Dict[str, object]] = None,
     inter_level: Optional[Dict[str, object]] = None,
-):
+) -> networkx.DiGraph:
     """
     Create a hierarchical multiscale mesh graph with nearest neighbour
     connections within each level (horizontally, vertically, and diagonally), and
