@@ -6,7 +6,7 @@ import scipy
 
 from ....networkx_utils import prepend_node_index
 from .. import coords as mesh_coords
-from .directed import create_directed_mesh_graph
+from .general import create_directed_mesh_graph
 
 
 def create_hierarchical_from_coordinates(

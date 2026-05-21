@@ -5,7 +5,7 @@ import numpy as np
 
 from ....networkx_utils import prepend_node_index
 from .. import coords as mesh_coords
-from .directed import create_directed_mesh_graph
+from .general import create_directed_mesh_graph
 
 
 def _check_required_graph_attributes(G: networkx.Graph, context: str) -> None:

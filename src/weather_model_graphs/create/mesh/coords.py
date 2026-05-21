@@ -4,7 +4,7 @@ import networkx
 import numpy as np
 from loguru import logger
 
-from .connectivity.directed import create_directed_mesh_graph  # noqa: F401
+from .connectivity.general import create_directed_mesh_graph
 
 
 def create_single_level_2d_mesh_primitive(
