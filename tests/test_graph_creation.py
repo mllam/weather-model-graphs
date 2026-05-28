@@ -1,4 +1,3 @@
-import os
 import tempfile
 
 import cartopy.crs as ccrs
@@ -22,12 +21,8 @@ def test_create_single_level_mesh_graph():
     ax.scatter(xy[0, ...], xy[1, ...], color="r")
     ax.axison = True
 
-    fd, tmp_path = tempfile.mkstemp(suffix=".png")
-    os.close(fd)
-    try:
-        fig.savefig(tmp_path)
-    finally:
-        os.remove(tmp_path)
+    with tempfile.NamedTemporaryFile(suffix=".png") as fh:
+        fig.savefig(fh)
 
 
 @pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
