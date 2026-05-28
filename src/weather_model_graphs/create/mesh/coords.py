@@ -115,7 +115,9 @@ def create_single_level_2d_mesh_primitive(
     return g
 
 
-def create_single_level_2d_mesh_graph(xy: np.ndarray, nx: int, ny: int) -> networkx.DiGraph:
+def create_single_level_2d_mesh_graph(
+    xy: np.ndarray, nx: int, ny: int
+) -> networkx.DiGraph:
     """
     Create directed graph with nx * ny nodes representing a 2D grid with
     positions spanning the range of xy coordinate values (first dimension

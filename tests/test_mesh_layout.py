@@ -1382,8 +1382,6 @@ class TestGraphAttributeValidation:
 
     def test_flat_singlescale_missing_pos_raises(self):
         """create_flat_singlescale_from_coordinates should raise on bad graph."""
-        import numpy as np
-
         G = nx.Graph()
         G.add_node((0, 0), type="mesh")  # missing pos
         with pytest.raises(ValueError, match="'pos' attribute"):
@@ -1457,9 +1455,7 @@ class TestDirectedMeshGraphAdditionalEdgeCases:
         G_4star = create_directed_mesh_graph(G_coords, pattern="4-star")
         for u, v, d in G_4star.edges(data=True):
             adj = d.get("adjacency_type")
-            assert adj != "diagonal", (
-                f"4-star graph has diagonal edge ({u},{v})"
-            )
+            assert adj != "diagonal", f"4-star graph has diagonal edge ({u},{v})"
 
     def test_node_count_preserved(self):
         """Directed graph should have same number of nodes as undirected."""
@@ -1496,4 +1492,3 @@ class TestDirectedMeshGraphAdditionalEdgeCases:
 
         assert set(G1.nodes) == set(G2.nodes)
         assert set(G1.edges) == set(G2.edges)
-

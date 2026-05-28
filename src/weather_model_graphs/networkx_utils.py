@@ -1,6 +1,6 @@
-import networkx
-
 from typing import Dict, Tuple
+
+import networkx
 
 
 def prepend_node_index(graph, new_index) -> networkx.Graph:

@@ -226,7 +226,9 @@ def create_flat_multiscale_mesh_graph(
     )
 
 
-def create_flat_singlescale_mesh_graph(xy, mesh_node_distance: float) -> networkx.DiGraph:
+def create_flat_singlescale_mesh_graph(
+    xy, mesh_node_distance: float
+) -> networkx.DiGraph:
     """
     Create flat mesh graph of single level
 

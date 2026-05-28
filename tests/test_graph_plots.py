@@ -1,3 +1,4 @@
+import os
 import tempfile
 
 import matplotlib.pyplot as plt
@@ -63,5 +64,9 @@ def test_plot():
                 else:
                     fn()
 
-    with tempfile.NamedTemporaryFile(suffix=".png") as f:
-        fig.savefig(f.name)
+    fd, tmp_path = tempfile.mkstemp(suffix=".png")
+    os.close(fd)
+    try:
+        fig.savefig(tmp_path)
+    finally:
+        os.remove(tmp_path)
