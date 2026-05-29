@@ -3,7 +3,7 @@ import networkx
 from ...networkx_utils import prepend_node_index
 
 
-def create_grid_graph_nodes(xy, level_id=-1):
+def create_grid_graph_nodes(xy, level_id=-1) -> networkx.Graph:
     """
     Create a networkx.Graph comprising only nodes for each (x,y)-point in the `xy` coordinate
     array (the attribute `pos` giving the (x,y)-coordinate value) and with
