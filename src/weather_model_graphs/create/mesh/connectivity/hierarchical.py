@@ -2,9 +2,9 @@ from typing import Dict, List, Optional
 
 import networkx
 import numpy as np
-import scipy
 
 from ....networkx_utils import prepend_node_index
+from ....spatial import SpatialCoordinateValuesSelector
 from .. import coords as mesh_coords
 from .general import create_directed_mesh_graph
 
@@ -13,6 +13,7 @@ def create_hierarchical_from_coordinates(
     G_coords_list: List[networkx.Graph],
     intra_level: Dict[str, object] = {"pattern": "8-star"},
     inter_level: Dict[str, object] = {"pattern": "nearest", "k": 1},
+    distance_metric: str = "euclidean",
 ) -> networkx.DiGraph:
     """
     Create a hierarchical multiscale mesh graph from a list of mesh primitive
@@ -109,29 +110,27 @@ def create_hierarchical_from_coordinates(
         # Add nodes of to level
         G_down.add_nodes_from(G_to.nodes(data=True))
 
-        # build kd tree for mesh point pos
+        # build spatial index for source (coarser) mesh node positions
         # order in vm should be same as in vm_xy
         v_to_list = list(G_to.nodes)
         v_from_list = list(G_from.nodes)
         v_from_xy = np.array([xy for _, xy in G_from.nodes.data("pos")])
-        kdt_m = scipy.spatial.KDTree(v_from_xy)
+        spatial_coord_selector = SpatialCoordinateValuesSelector(
+            distance_metric, v_from_xy
+        )
 
         # add edges from coarser to finer level
         for v in v_to_list:
             # find k nearest neighbours (index to vm_xy)
-            neigh_idx = kdt_m.query(G_down.nodes[v]["pos"], inter_level_k)[1]
-            if inter_level_k == 1:
-                neigh_idx = [neigh_idx]
-
-            for idx in neigh_idx:
-                u = v_from_list[idx]
+            neigh_idxs, neigh_dists = spatial_coord_selector.k_nearest_to(
+                G_down.nodes[v]["pos"], k=inter_level_k
+            )
+            for idx, d in zip(neigh_idxs, neigh_dists):
+                u = v_from_list[int(idx)]
 
                 # add edge from coarser to finer
                 G_down.add_edge(u, v)
-                d = np.sqrt(
-                    np.sum((G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]) ** 2)
-                )
-                G_down.edges[u, v]["len"] = d
+                G_down.edges[u, v]["len"] = float(d)
                 G_down.edges[u, v]["vdiff"] = (
                     G_down.nodes[u]["pos"] - G_down.nodes[v]["pos"]
                 )
@@ -169,6 +168,7 @@ def create_hierarchical_multiscale_mesh_graph(
     max_num_levels: int,
     intra_level: Optional[Dict[str, object]] = None,
     inter_level: Optional[Dict[str, object]] = None,
+    distance_metric: str = "euclidean",
 ) -> networkx.DiGraph:
     """
     Create a hierarchical multiscale mesh graph with nearest neighbour
@@ -222,5 +222,6 @@ def create_hierarchical_multiscale_mesh_graph(
 
     return create_hierarchical_from_coordinates(
         G_coords_list,
+        distance_metric=distance_metric,
         **kwargs,
     )
