@@ -4,7 +4,7 @@ from loguru import logger
 from scipy.spatial import ConvexHull, Delaunay
 
 
-def create_single_level_2d_mesh_graph(xy, nx, ny, crop_to_convex_hull=False):
+def create_single_level_2d_mesh_graph(xy, nx, ny, mesh_layout_kwargs=None):
     """
     Create directed graph with nx * ny nodes representing a 2D grid with
     positions spanning the range of xy coordinate values (first dimension
@@ -31,12 +31,21 @@ def create_single_level_2d_mesh_graph(xy, nx, ny, crop_to_convex_hull=False):
         Number of nodes in x direction
     ny : int
         Number of nodes in y direction
+    mesh_layout_kwargs : dict, optional
+        Dictionary of layout arguments. Can include 'crop_to_convex_hull' (bool) 
+        which computes the scipy.spatial.ConvexHull of the xy coordinates to 
+        remove mesh nodes outside the spatial boundary.
 
     Returns
     -------
     networkx.DiGraph
         Graph representing the 2D grid
     """
+    if mesh_layout_kwargs is None:
+        mesh_layout_kwargs = {}
+        
+    crop_to_convex_hull = mesh_layout_kwargs.get("crop_to_convex_hull", False)
+
     xm, xM = np.amin(xy[:, 0]), np.amax(xy[:, 0])
     ym, yM = np.amin(xy[:, 1]), np.amax(xy[:, 1])
 
@@ -100,7 +109,7 @@ def create_multirange_2d_mesh_graphs(
     xy,
     mesh_node_distance=3,
     level_refinement_factor=3,
-    crop_to_convex_hull=False,
+    mesh_layout_kwargs=None,
 ):
     """
     Create a list of 2D grid mesh graphs representing different levels of edge-length
@@ -121,6 +130,8 @@ def create_multirange_2d_mesh_graphs(
         in coordinate system of xy
     level_refinement_factor: float
         Refinement factor between grid points and bottom level of mesh hierarchy
+    mesh_layout_kwargs : dict, optional
+        Dictionary of layout arguments to pass to the single level graph creator.
 
     Returns
     -------
@@ -157,17 +168,4 @@ def create_multirange_2d_mesh_graphs(
     # multi resolution tree levels
     G_all_levels = []
     for lev in range(mesh_levels_to_create):  # 0-index mesh levels
-        # Compute number of nodes on level separate for each direction
-        nodes_x, nodes_y = (nleaf / (level_refinement_factor**lev)).astype(int)
-        g = create_single_level_2d_mesh_graph(
-            xy, nodes_x, nodes_y, crop_to_convex_hull=crop_to_convex_hull
-        )
-        # Add level information to nodes, edges and full graph
-        for node in g.nodes:
-            g.nodes[node]["level"] = lev
-        for edge in g.edges:
-            g.edges[edge]["level"] = lev
-        g.graph["level"] = lev
-        G_all_levels.append(g)
-
-    return G_all_levels
+        # Compute number of nodes

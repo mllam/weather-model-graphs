@@ -285,8 +285,10 @@ def test_convex_hull_cropping():
 
     # Create graph with cropping
     graph_crop = create_keisler_graph(
-        coords, mesh_node_distance=1, crop_to_convex_hull=True
-    )
+        coords, 
+        mesh_node_distance=1, 
+        mesh_layout_kwargs={"crop_to_convex_hull": True}
+        )
 
     # Count the mesh nodes in both graphs
     num_mesh_nodes_no_crop = len(
