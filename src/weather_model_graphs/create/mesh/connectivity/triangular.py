@@ -109,10 +109,12 @@ def create_single_level_2d_triangular_mesh_primitive(
     g = networkx.Graph()
     for node in g_raw.nodes():
         raw_pos = g_raw.nodes[node]["pos"]
-        pos = np.array([
-            offset_x + (raw_pos[0] - raw_xmin) * scale_x,
-            offset_y + (raw_pos[1] - raw_ymin) * scale_y,
-        ])
+        pos = np.array(
+            [
+                offset_x + (raw_pos[0] - raw_xmin) * scale_x,
+                offset_y + (raw_pos[1] - raw_ymin) * scale_y,
+            ]
+        )
         g.add_node(node, pos=pos, type="mesh")
 
     for u, v in g_raw.edges():
@@ -164,24 +166,18 @@ def create_multirange_2d_triangular_mesh_primitives(
         interlevel_refinement_factor
     )
     max_mesh_levels = max_mesh_levels_float.astype(int)
-    nleaf = interlevel_refinement_factor ** max_mesh_levels
+    nleaf = interlevel_refinement_factor**max_mesh_levels
 
     mesh_levels_to_create = max_mesh_levels.min()
     if max_num_levels:
         mesh_levels_to_create = min(mesh_levels_to_create, max_num_levels)
 
-    logger.debug(
-        f"triangular mesh_levels: {mesh_levels_to_create}, nleaf: {nleaf}"
-    )
+    logger.debug(f"triangular mesh_levels: {mesh_levels_to_create}, nleaf: {nleaf}")
 
     G_all_levels = []
     for lev in range(mesh_levels_to_create):
-        nodes_x, nodes_y = (
-            nleaf / (interlevel_refinement_factor ** lev)
-        ).astype(int)
-        g = create_single_level_2d_triangular_mesh_primitive(
-            xy, nodes_x, nodes_y
-        )
+        nodes_x, nodes_y = (nleaf / (interlevel_refinement_factor**lev)).astype(int)
+        g = create_single_level_2d_triangular_mesh_primitive(xy, nodes_x, nodes_y)
         for node in g.nodes:
             g.nodes[node]["level"] = lev
         for edge in g.edges:
@@ -289,15 +285,11 @@ def create_flat_multiscale_from_triangular_coordinates(
         Flat multiscale triangular mesh graph.
     """
     # Convert each level to directed graph
-    G_directed = [
-        create_directed_mesh_graph(g, pattern=pattern)
-        for g in G_coords_list
-    ]
+    G_directed = [create_directed_mesh_graph(g, pattern=pattern) for g in G_coords_list]
 
     # Prepend level index to make node labels unique across levels
     G_directed = [
-        prepend_node_index(g, level_i)
-        for level_i, g in enumerate(G_directed)
+        prepend_node_index(g, level_i) for level_i, g in enumerate(G_directed)
     ]
 
     # Build merged graph, starting from finest level
@@ -308,9 +300,7 @@ def create_flat_multiscale_from_triangular_coordinates(
 
         # KDTree of existing (finer) nodes for position matching
         fine_nodes = list(G_tot.nodes())
-        fine_positions = np.array(
-            [G_tot.nodes[n]["pos"] for n in fine_nodes]
-        )
+        fine_positions = np.array([G_tot.nodes[n]["pos"] for n in fine_nodes])
         kdt = scipy.spatial.KDTree(fine_positions)
 
         # Find which coarse nodes coincide with existing fine nodes

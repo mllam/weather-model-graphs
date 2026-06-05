@@ -33,7 +33,6 @@ from weather_model_graphs.create.mesh.connectivity.triangular import (
     create_single_level_2d_triangular_mesh_primitive,
 )
 
-
 # ===========================
 # Fixtures
 # ===========================
@@ -138,9 +137,7 @@ class TestTriangularPrimitive:
 
     def test_rectangular_domain(self, xy_rectangular):
         """Works with non-square domains."""
-        G = create_single_level_2d_triangular_mesh_primitive(
-            xy_rectangular, nx=8, ny=5
-        )
+        G = create_single_level_2d_triangular_mesh_primitive(xy_rectangular, nx=8, ny=5)
         assert G.number_of_nodes() > 0
         assert G.number_of_edges() > 0
 
@@ -234,9 +231,7 @@ class TestTriangularDirectedGraph:
         G = create_directed_mesh_graph(G_coords, pattern="4-star")
         for u, v in G.edges():
             if G.has_edge(v, u):
-                np.testing.assert_allclose(
-                    G[u][v]["len"], G[v][u]["len"], atol=1e-10
-                )
+                np.testing.assert_allclose(G[u][v]["len"], G[v][u]["len"], atol=1e-10)
 
     def test_vdiff_reciprocity(self, xy_small):
         """vdiff(uΓåÆv) should equal -vdiff(vΓåÆu)."""
@@ -325,7 +320,9 @@ class TestMultirangeTriangularPrimitives:
 
     def test_returns_list(self, xy_medium):
         G_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=3, xy=xy_medium, mesh_node_spacing=2,
+            max_num_levels=3,
+            xy=xy_medium,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=3,
         )
         assert isinstance(G_list, list)
@@ -333,7 +330,9 @@ class TestMultirangeTriangularPrimitives:
 
     def test_each_level_is_undirected(self, xy_medium):
         G_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=3, xy=xy_medium, mesh_node_spacing=2,
+            max_num_levels=3,
+            xy=xy_medium,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=3,
         )
         for G in G_list:
@@ -342,7 +341,9 @@ class TestMultirangeTriangularPrimitives:
 
     def test_level_attributes_set(self, xy_medium):
         G_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=3, xy=xy_medium, mesh_node_spacing=2,
+            max_num_levels=3,
+            xy=xy_medium,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=3,
         )
         for lev, G in enumerate(G_list):
@@ -354,7 +355,9 @@ class TestMultirangeTriangularPrimitives:
 
     def test_finer_level_has_more_nodes(self, xy_medium):
         G_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=3, xy=xy_medium, mesh_node_spacing=2,
+            max_num_levels=3,
+            xy=xy_medium,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=3,
         )
         if len(G_list) > 1:
@@ -362,7 +365,9 @@ class TestMultirangeTriangularPrimitives:
 
     def test_max_num_levels_respected(self, xy_medium):
         G_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=2, xy=xy_medium, mesh_node_spacing=2,
+            max_num_levels=2,
+            xy=xy_medium,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=3,
         )
         assert len(G_list) <= 2
@@ -370,7 +375,9 @@ class TestMultirangeTriangularPrimitives:
     def test_single_level(self, xy_medium):
         """max_num_levels=1 should produce exactly 1 level."""
         G_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=1, xy=xy_medium, mesh_node_spacing=2,
+            max_num_levels=1,
+            xy=xy_medium,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=3,
         )
         assert len(G_list) == 1
@@ -379,7 +386,9 @@ class TestMultirangeTriangularPrimitives:
     def test_refinement_factor_2(self, xy_medium):
         """Different refinement factor should still produce valid graphs."""
         G_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=3, xy=xy_medium, mesh_node_spacing=2,
+            max_num_levels=3,
+            xy=xy_medium,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=2,
         )
         assert len(G_list) >= 1
@@ -389,7 +398,9 @@ class TestMultirangeTriangularPrimitives:
     def test_all_levels_cover_same_domain(self, xy_medium):
         """All levels should span approximately the same coordinate domain."""
         G_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=3, xy=xy_medium, mesh_node_spacing=2,
+            max_num_levels=3,
+            xy=xy_medium,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=3,
         )
         if len(G_list) < 2:
@@ -405,7 +416,9 @@ class TestMultirangeTriangularPrimitives:
     def test_interlevel_refinement_factor_preserved(self, xy_medium):
         """Each level should have the refinement factor as a graph attribute."""
         G_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=3, xy=xy_medium, mesh_node_spacing=2,
+            max_num_levels=3,
+            xy=xy_medium,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=3,
         )
         for G in G_list:
@@ -414,7 +427,9 @@ class TestMultirangeTriangularPrimitives:
     def test_all_levels_have_edges(self, xy_medium):
         """Every level should have at least some edges."""
         G_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=3, xy=xy_medium, mesh_node_spacing=2,
+            max_num_levels=3,
+            xy=xy_medium,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=3,
         )
         for G in G_list:
@@ -466,11 +481,15 @@ class TestFlatSinglescaleTriangular:
     """Tests for create_flat_singlescale_triangular_mesh_graph."""
 
     def test_returns_digraph(self, xy_small):
-        G = create_flat_singlescale_triangular_mesh_graph(xy_small, mesh_node_distance=2.0)
+        G = create_flat_singlescale_triangular_mesh_graph(
+            xy_small, mesh_node_distance=2.0
+        )
         assert isinstance(G, nx.DiGraph)
 
     def test_nodes_have_pos(self, xy_small):
-        G = create_flat_singlescale_triangular_mesh_graph(xy_small, mesh_node_distance=2.0)
+        G = create_flat_singlescale_triangular_mesh_graph(
+            xy_small, mesh_node_distance=2.0
+        )
         for node in G.nodes:
             assert "pos" in G.nodes[node]
 
@@ -483,7 +502,9 @@ class TestFlatSinglescaleTriangular:
 
     def test_edges_are_bidirectional(self, xy_small):
         """All edges should have a reverse."""
-        G = create_flat_singlescale_triangular_mesh_graph(xy_small, mesh_node_distance=2.0)
+        G = create_flat_singlescale_triangular_mesh_graph(
+            xy_small, mesh_node_distance=2.0
+        )
         for u, v in G.edges():
             assert G.has_edge(v, u)
 
@@ -507,7 +528,9 @@ class TestFlatSinglescaleTriangular:
 
     def test_no_nan_positions(self, xy_small):
         """No node should have NaN or Inf positions."""
-        G = create_flat_singlescale_triangular_mesh_graph(xy_small, mesh_node_distance=2.0)
+        G = create_flat_singlescale_triangular_mesh_graph(
+            xy_small, mesh_node_distance=2.0
+        )
         for node in G.nodes:
             pos = G.nodes[node]["pos"]
             assert np.isfinite(pos).all()
@@ -529,22 +552,28 @@ class TestFlatMultiscaleTriangular:
 
     def test_returns_digraph(self, xy_medium):
         G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         assert isinstance(G, nx.DiGraph)
 
     def test_has_edges(self, xy_medium):
         G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         assert G.number_of_edges() > 0
 
     def test_edges_have_len_and_vdiff(self, xy_medium):
         G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         for u, v, d in G.edges(data=True):
             assert "len" in d
@@ -554,7 +583,9 @@ class TestFlatMultiscaleTriangular:
         """Position-based merging should produce fewer nodes than the raw
         sum of all levels (coincident nodes get merged)."""
         G_coords_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=3, xy=xy_medium, mesh_node_spacing=2,
+            max_num_levels=3,
+            xy=xy_medium,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=3,
         )
         total_raw = sum(g.number_of_nodes() for g in G_coords_list)
@@ -564,8 +595,10 @@ class TestFlatMultiscaleTriangular:
 
     def test_graph_has_dx_dy_dicts(self, xy_medium):
         G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         assert isinstance(G.graph.get("dx"), dict)
         assert isinstance(G.graph.get("dy"), dict)
@@ -573,8 +606,10 @@ class TestFlatMultiscaleTriangular:
     def test_bidirectional_edges(self, xy_medium):
         """All edges should have a reverse."""
         G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         for u, v in G.edges():
             assert G.has_edge(v, u), f"Edge ({u},{v}) no reverse"
@@ -582,8 +617,10 @@ class TestFlatMultiscaleTriangular:
     def test_nodes_have_pos(self, xy_medium):
         """All nodes should have pos attribute."""
         G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         for node in G.nodes:
             assert "pos" in G.nodes[node]
@@ -593,8 +630,10 @@ class TestFlatMultiscaleTriangular:
         """When domain only supports 1 level, flat_multiscale should still work."""
         xy = np.array([[0, 0], [3, 0], [0, 3], [3, 3]], dtype=float)
         G = create_flat_multiscale_triangular_mesh_graph(
-            xy, mesh_node_distance=1.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy,
+            mesh_node_distance=1.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         assert isinstance(G, nx.DiGraph)
         assert G.number_of_nodes() > 0
@@ -602,8 +641,10 @@ class TestFlatMultiscaleTriangular:
     def test_refinement_factor_2(self, xy_medium):
         """Refinement factor of 2 should work."""
         G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=2, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=2,
+            max_num_levels=3,
         )
         assert isinstance(G, nx.DiGraph)
         assert G.number_of_edges() > 0
@@ -611,8 +652,10 @@ class TestFlatMultiscaleTriangular:
     def test_no_self_loops(self, xy_medium):
         """No self-loops in flat multiscale graph."""
         G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         for u, v in G.edges():
             assert u != v
@@ -620,7 +663,9 @@ class TestFlatMultiscaleTriangular:
     def test_more_nodes_than_coarsest_level(self, xy_large):
         """Multiscale should have more nodes than the coarsest single level."""
         G_coords_list = create_multirange_2d_triangular_mesh_primitives(
-            max_num_levels=3, xy=xy_large, mesh_node_spacing=2,
+            max_num_levels=3,
+            xy=xy_large,
+            mesh_node_spacing=2,
             interlevel_refinement_factor=3,
         )
         if len(G_coords_list) < 2:
@@ -640,22 +685,28 @@ class TestHierarchicalTriangular:
 
     def test_returns_digraph(self, xy_medium):
         G = create_hierarchical_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         assert isinstance(G, nx.DiGraph)
 
     def test_has_edges(self, xy_medium):
         G = create_hierarchical_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         assert G.number_of_edges() > 0
 
     def test_edges_have_level_attribute(self, xy_medium):
         G = create_hierarchical_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         for u, v, d in G.edges(data=True):
             # Intra-level edges have 'level', inter-level have 'levels'
@@ -663,8 +714,10 @@ class TestHierarchicalTriangular:
 
     def test_multiple_levels_present(self, xy_medium):
         G = create_hierarchical_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         levels = set()
         for u, v, d in G.edges(data=True):
@@ -680,15 +733,19 @@ class TestHierarchicalTriangular:
         """Hierarchical requires ΓëÑ2 levels; too-coarse spacing should raise."""
         with pytest.raises(ValueError):
             create_hierarchical_triangular_mesh_graph(
-                xy_small, mesh_node_distance=20.0,
-                level_refinement_factor=3, max_num_levels=3,
+                xy_small,
+                mesh_node_distance=20.0,
+                level_refinement_factor=3,
+                max_num_levels=3,
             )
 
     def test_nodes_have_pos(self, xy_medium):
         """All nodes should have pos attribute."""
         G = create_hierarchical_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         for node in G.nodes:
             assert "pos" in G.nodes[node]
@@ -697,8 +754,10 @@ class TestHierarchicalTriangular:
     def test_custom_intra_level(self, xy_medium):
         """Custom intra_level pattern should be accepted."""
         G = create_hierarchical_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
             intra_level={"pattern": "8-star"},
         )
         assert isinstance(G, nx.DiGraph)
@@ -707,8 +766,10 @@ class TestHierarchicalTriangular:
     def test_custom_inter_level(self, xy_medium):
         """Custom inter_level config should be accepted."""
         G = create_hierarchical_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
             inter_level={"pattern": "nearest", "k": 3},
         )
         assert isinstance(G, nx.DiGraph)
@@ -717,8 +778,10 @@ class TestHierarchicalTriangular:
     def test_no_self_loops(self, xy_medium):
         """Hierarchical graph should have no self-loops."""
         G = create_hierarchical_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         for u, v in G.edges():
             assert u != v
@@ -726,19 +789,21 @@ class TestHierarchicalTriangular:
     def test_has_inter_level_edges(self, xy_medium):
         """Should have inter-level edges connecting different levels."""
         G = create_hierarchical_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
-        inter_level_count = sum(
-            1 for _, _, d in G.edges(data=True) if "levels" in d
-        )
+        inter_level_count = sum(1 for _, _, d in G.edges(data=True) if "levels" in d)
         assert inter_level_count > 0
 
     def test_inter_level_edges_have_direction(self, xy_medium):
         """Inter-level edges should have 'direction' attribute (up/down)."""
         G = create_hierarchical_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0,
-            level_refinement_factor=3, max_num_levels=3,
+            xy_medium,
+            mesh_node_distance=2.0,
+            level_refinement_factor=3,
+            max_num_levels=3,
         )
         for u, v, d in G.edges(data=True):
             if "levels" in d:
@@ -783,9 +848,7 @@ class TestIntegrationTriangular:
             coords=xy_medium,
             m2m_connectivity="hierarchical",
             mesh_layout="triangular",
-            mesh_layout_kwargs=dict(
-                mesh_node_spacing=2.0, max_num_refinement_levels=3
-            ),
+            mesh_layout_kwargs=dict(mesh_node_spacing=2.0, max_num_refinement_levels=3),
             **self.COMMON_KW,
         )
         m2m = comps["m2m"]
@@ -797,9 +860,7 @@ class TestIntegrationTriangular:
             coords=xy_medium,
             m2m_connectivity="flat_multiscale",
             mesh_layout="triangular",
-            mesh_layout_kwargs=dict(
-                mesh_node_spacing=2.0, max_num_refinement_levels=3
-            ),
+            mesh_layout_kwargs=dict(mesh_node_spacing=2.0, max_num_refinement_levels=3),
             **self.COMMON_KW,
         )
         m2m = comps["m2m"]
@@ -859,9 +920,7 @@ class TestIntegrationTriangular:
             coords=xy_medium,
             m2m_connectivity="flat_multiscale",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(
-                mesh_node_spacing=2.0, max_num_refinement_levels=3
-            ),
+            mesh_layout_kwargs=dict(mesh_node_spacing=2.0, max_num_refinement_levels=3),
             **self.COMMON_KW,
         )
         assert comps["m2m"].number_of_nodes() > 0
@@ -872,9 +931,7 @@ class TestIntegrationTriangular:
             coords=xy_medium,
             m2m_connectivity="hierarchical",
             mesh_layout="rectilinear",
-            mesh_layout_kwargs=dict(
-                mesh_node_spacing=2.0, max_num_refinement_levels=3
-            ),
+            mesh_layout_kwargs=dict(mesh_node_spacing=2.0, max_num_refinement_levels=3),
             **self.COMMON_KW,
         )
         assert comps["m2m"].number_of_nodes() > 0
