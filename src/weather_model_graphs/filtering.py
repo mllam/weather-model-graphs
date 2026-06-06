@@ -139,8 +139,12 @@ def _match(attrs: Dict[str, Any], key: str, value: Any) -> bool:
     if lookup not in LOOKUPS:
         raise ValueError(f"Unsupported lookup: {lookup}")
 
+    try:
     attr_val = _get_nested_attr_value(attrs, attr)
-    return LOOKUPS[lookup](attr_val, value)
+except KeyError:
+    return False
+
+return LOOKUPS[lookup](attr_val, value)
 
 
 class Q:
