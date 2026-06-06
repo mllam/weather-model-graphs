@@ -1,0 +1,27 @@
+name: Performance Regression
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/benchmarks/**'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          pip install -e .[dev]
+      - name: Run benchmark on fixed grid
+        run: |
+          python -m tests.benchmarks.graph_creation_scaling \
+            --min-N 200 --max-N 200 --num-steps 1 \
+            --track-memory --output-json baseline.json
+      - name: Compare against threshold
+        run: |
+          python tests/benchmarks/check_regression.py baseline.json 60.0 1500.0
