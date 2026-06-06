@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.3.0...HEAD)
 
+### Fixes
+
+- Fix duplicate `coords_crs` condition in `create_all_graph_components` that should check `graph_crs`
+  [\#69](https://github.com/mllam/weather-model-graphs/issues/69)
+
 ### Added
 
 - Add `mesh_layout` argument to mesh graph creation functions, with `rectilinear`
