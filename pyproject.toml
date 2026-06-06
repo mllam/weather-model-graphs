@@ -11,6 +11,8 @@ dependencies = [
     "networkx>=3.3",
     "scipy>=1.13.0",
     "pyproj>=3.7.0",
+    "matplotlib>=3.10.8",
+    "weather-model-graphs[pytorch]",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
