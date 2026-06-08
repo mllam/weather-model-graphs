@@ -168,4 +168,16 @@ def create_multirange_2d_mesh_graphs(
     # multi resolution tree levels
     G_all_levels = []
     for lev in range(mesh_levels_to_create):  # 0-index mesh levels
-        # Compute number of nodes
+        # Compute number of nodes on level separate for each direction
+        nodes_x, nodes_y = (nleaf / (level_refinement_factor**lev)).astype(int)
+        g = create_single_level_2d_mesh_graph(
+            xy, nodes_x, nodes_y, mesh_layout_kwargs=mesh_layout_kwargs
+        )
+        # Add level information to nodes, edges and full graph
+        for node in g.nodes:
+            g.nodes[node]["level"] = lev
+        for edge in g.edges:
+            g.edges[edge]["level"] = lev
+        g.graph["level"] = lev
+        G_all_levels.append(g)
+    return G_all_levels
