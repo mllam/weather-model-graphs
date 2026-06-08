@@ -8,11 +8,11 @@ xy = np.column_stack((r*np.cos(theta), r*np.sin(theta)))
 
 # 2. Create a standard (uncropped) mesh
 # This will build a massive 20x20 square grid covering the circle
-uncropped_graph = create_single_level_2d_mesh_graph(xy, nx=20, ny=20, crop_to_convex_hull=False)
+uncropped_graph = create_single_level_2d_mesh_graph(xy, nx=20, ny=20, mesh_layout_kwargs={"crop_to_convex_hull": False})
 uncropped_nodes = len(uncropped_graph.nodes)
 
 # 3. Create our cropped mesh
-cropped_graph = create_single_level_2d_mesh_graph(xy, nx=20, ny=20, crop_to_convex_hull=True)
+cropped_graph = create_single_level_2d_mesh_graph(xy, nx=20, ny=20, mesh_layout_kwargs={"crop_to_convex_hull": True})
 cropped_nodes = len(cropped_graph.nodes)
 
 print(f"Nodes in standard rectangular mesh: {uncropped_nodes}")
