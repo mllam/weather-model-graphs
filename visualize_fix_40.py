@@ -11,11 +11,11 @@ xy_data = np.column_stack((x, y))
 
 # 2. Generate Meshes
 # Standard rectangular mesh (Before)
-g_before = create_single_level_2d_mesh_graph(xy_data, nx=25, ny=25, crop_to_convex_hull=False)
+g_before = create_single_level_2d_mesh_graph(xy_data, nx=25, ny=25, mesh_layout_kwargs={"crop_to_convex_hull": False})
 pos_before = np.array([data["pos"] for _, data in g_before.nodes(data=True)])
 
 # Cropped mesh (After)
-g_after = create_single_level_2d_mesh_graph(xy_data, nx=25, ny=25, crop_to_convex_hull=True)
+g_after = create_single_level_2d_mesh_graph(xy_data, nx=25, ny=25, mesh_layout_kwargs={"crop_to_convex_hull": True})
 pos_after = np.array([data["pos"] for _, data in g_after.nodes(data=True)])
 
 # 3. Plotting
