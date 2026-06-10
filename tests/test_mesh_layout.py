@@ -34,7 +34,7 @@ from weather_model_graphs.create.mesh.connectivity.general import (
 from weather_model_graphs.create.mesh.connectivity.hierarchical import (
     create_hierarchical_from_coordinates,
 )
-from weather_model_graphs.create.mesh.coords import (
+from weather_model_graphs.create.mesh.layout.rectilinear import (
     create_multirange_2d_mesh_primitives,
     create_single_level_2d_mesh_primitive,
 )

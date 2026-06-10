@@ -4,7 +4,7 @@ import networkx
 import numpy as np
 
 from ....networkx_utils import prepend_node_index
-from .. import coords as mesh_coords
+from ..layout import rectilinear as mesh_layout
 from .general import create_directed_mesh_graph
 
 
@@ -213,7 +213,7 @@ def create_flat_multiscale_mesh_graph(
     G_tot : networkx.DiGraph
         The merged mesh graph
     """
-    G_coords_list = mesh_coords.create_multirange_2d_mesh_primitives(
+    G_coords_list = mesh_layout.create_multirange_2d_mesh_primitives(
         max_num_levels=max_num_levels,
         xy=xy,
         mesh_node_spacing=mesh_node_distance,
@@ -263,4 +263,4 @@ def create_flat_singlescale_mesh_graph(
             " so that the mesh nodes are spaced closer together?"
         )
 
-    return mesh_coords.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
+    return mesh_layout.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)

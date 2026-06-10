@@ -1,17 +1,16 @@
-﻿"""
+"""
 Tests for mesh_layout="triangular" support (Issue #80).
 
 Tests verify:
 1. Primitive creation (node count, positions, adjacency_type, type attrs)
 2. Single-level directed graph (bidirectional edges, len/vdiff attrs, 6-connectivity)
 3. Multirange primitive creation
-4. Flat single-scale mesh graph via wrapper + integration
-5. Flat multiscale mesh graph (position-based merging)
-6. Hierarchical mesh graph
-7. Integration through create_all_graph_components for all m2m_connectivity modes
-8. Edge cases (spacing too large, single-level hierarchical)
-9. Numerical correctness (len symmetry, vdiff reciprocity)
-10. Pattern equivalence (4-star == 8-star for triangular)
+4. Flat multiscale mesh graph (position-based merging via two-step API)
+5. Hierarchical mesh graph (triangular primitives + generic hierarchical connectivity)
+6. Integration through create_all_graph_components for all m2m_connectivity modes
+7. Edge cases (zero nodes, single-level hierarchical)
+8. Numerical correctness (len symmetry, vdiff reciprocity)
+9. Pattern equivalence (4-star == 8-star for triangular)
 """
 
 import networkx as nx
@@ -23,11 +22,13 @@ import weather_model_graphs as wmg
 from weather_model_graphs.create.mesh.connectivity.general import (
     create_directed_mesh_graph,
 )
+from weather_model_graphs.create.mesh.connectivity.hierarchical import (
+    create_hierarchical_from_coordinates,
+)
 from weather_model_graphs.create.mesh.connectivity.triangular import (
     create_flat_multiscale_from_triangular_coordinates,
-    create_flat_multiscale_triangular_mesh_graph,
-    create_flat_singlescale_triangular_mesh_graph,
-    create_hierarchical_triangular_mesh_graph,
+)
+from weather_model_graphs.create.mesh.layout.triangular import (
     create_multirange_2d_triangular_mesh_primitives,
     create_single_level_2d_triangular_mesh_graph,
     create_single_level_2d_triangular_mesh_primitive,
@@ -473,108 +474,44 @@ class TestSingleLevelTriangularGraph:
 
 
 # ===========================
-# Flat single-scale
-# ===========================
-
-
-class TestFlatSinglescaleTriangular:
-    """Tests for create_flat_singlescale_triangular_mesh_graph."""
-
-    def test_returns_digraph(self, xy_small):
-        G = create_flat_singlescale_triangular_mesh_graph(
-            xy_small, mesh_node_distance=2.0
-        )
-        assert isinstance(G, nx.DiGraph)
-
-    def test_nodes_have_pos(self, xy_small):
-        G = create_flat_singlescale_triangular_mesh_graph(
-            xy_small, mesh_node_distance=2.0
-        )
-        for node in G.nodes:
-            assert "pos" in G.nodes[node]
-
-    def test_raises_on_large_spacing(self, xy_small):
-        """Spacing larger than domain should raise."""
-        with pytest.raises(ValueError, match="too large"):
-            create_flat_singlescale_triangular_mesh_graph(
-                xy_small, mesh_node_distance=100.0
-            )
-
-    def test_edges_are_bidirectional(self, xy_small):
-        """All edges should have a reverse."""
-        G = create_flat_singlescale_triangular_mesh_graph(
-            xy_small, mesh_node_distance=2.0
-        )
-        for u, v in G.edges():
-            assert G.has_edge(v, u)
-
-    def test_smaller_spacing_more_nodes(self, xy_small):
-        """Smaller mesh_node_distance should produce more nodes."""
-        G_coarse = create_flat_singlescale_triangular_mesh_graph(
-            xy_small, mesh_node_distance=3.0
-        )
-        G_fine = create_flat_singlescale_triangular_mesh_graph(
-            xy_small, mesh_node_distance=1.5
-        )
-        assert G_fine.number_of_nodes() > G_coarse.number_of_nodes()
-
-    def test_rectangular_domain(self, xy_rectangular):
-        """Should work with non-square domains."""
-        G = create_flat_singlescale_triangular_mesh_graph(
-            xy_rectangular, mesh_node_distance=2.0
-        )
-        assert isinstance(G, nx.DiGraph)
-        assert G.number_of_nodes() > 0
-
-    def test_no_nan_positions(self, xy_small):
-        """No node should have NaN or Inf positions."""
-        G = create_flat_singlescale_triangular_mesh_graph(
-            xy_small, mesh_node_distance=2.0
-        )
-        for node in G.nodes:
-            pos = G.nodes[node]["pos"]
-            assert np.isfinite(pos).all()
-
-    def test_spacing_just_fits(self):
-        """Spacing that just fits one cell should work."""
-        xy = np.array([[0, 0], [5, 0], [0, 5], [5, 5]], dtype=float)
-        G = create_flat_singlescale_triangular_mesh_graph(xy, mesh_node_distance=4.0)
-        assert G.number_of_nodes() >= 2
-
-
-# ===========================
 # Flat multiscale (triangular-specific merging)
 # ===========================
 
 
 class TestFlatMultiscaleTriangular:
-    """Tests for the triangular flat multiscale graph and position-based merging."""
+    """Tests for flat multiscale triangular mesh graph using two-step API.
+
+    Uses ``create_multirange_2d_triangular_mesh_primitives`` (coordinate
+    creation) followed by ``create_flat_multiscale_from_triangular_coordinates``
+    (connectivity creation with position-based merging).
+    """
+
+    def _create_multiscale(
+        self,
+        xy,
+        mesh_node_spacing=2.0,
+        interlevel_refinement_factor=3,
+        max_num_levels=3,
+    ):
+        """Helper: create primitives then apply position-based merging."""
+        G_coords_list = create_multirange_2d_triangular_mesh_primitives(
+            max_num_levels=max_num_levels,
+            xy=xy,
+            mesh_node_spacing=mesh_node_spacing,
+            interlevel_refinement_factor=interlevel_refinement_factor,
+        )
+        return create_flat_multiscale_from_triangular_coordinates(G_coords_list)
 
     def test_returns_digraph(self, xy_medium):
-        G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_multiscale(xy_medium)
         assert isinstance(G, nx.DiGraph)
 
     def test_has_edges(self, xy_medium):
-        G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_multiscale(xy_medium)
         assert G.number_of_edges() > 0
 
     def test_edges_have_len_and_vdiff(self, xy_medium):
-        G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_multiscale(xy_medium)
         for u, v, d in G.edges(data=True):
             assert "len" in d
             assert "vdiff" in d
@@ -594,34 +531,19 @@ class TestFlatMultiscaleTriangular:
         assert G.number_of_nodes() <= total_raw
 
     def test_graph_has_dx_dy_dicts(self, xy_medium):
-        G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_multiscale(xy_medium)
         assert isinstance(G.graph.get("dx"), dict)
         assert isinstance(G.graph.get("dy"), dict)
 
     def test_bidirectional_edges(self, xy_medium):
         """All edges should have a reverse."""
-        G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_multiscale(xy_medium)
         for u, v in G.edges():
             assert G.has_edge(v, u), f"Edge ({u},{v}) no reverse"
 
     def test_nodes_have_pos(self, xy_medium):
         """All nodes should have pos attribute."""
-        G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_multiscale(xy_medium)
         for node in G.nodes:
             assert "pos" in G.nodes[node]
             assert np.isfinite(G.nodes[node]["pos"]).all()
@@ -629,34 +551,19 @@ class TestFlatMultiscaleTriangular:
     def test_single_level_multiscale(self):
         """When domain only supports 1 level, flat_multiscale should still work."""
         xy = np.array([[0, 0], [3, 0], [0, 3], [3, 3]], dtype=float)
-        G = create_flat_multiscale_triangular_mesh_graph(
-            xy,
-            mesh_node_distance=1.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_multiscale(xy, mesh_node_spacing=1.0)
         assert isinstance(G, nx.DiGraph)
         assert G.number_of_nodes() > 0
 
     def test_refinement_factor_2(self, xy_medium):
         """Refinement factor of 2 should work."""
-        G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=2,
-            max_num_levels=3,
-        )
+        G = self._create_multiscale(xy_medium, interlevel_refinement_factor=2)
         assert isinstance(G, nx.DiGraph)
         assert G.number_of_edges() > 0
 
     def test_no_self_loops(self, xy_medium):
         """No self-loops in flat multiscale graph."""
-        G = create_flat_multiscale_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_multiscale(xy_medium)
         for u, v in G.edges():
             assert u != v
 
@@ -681,44 +588,46 @@ class TestFlatMultiscaleTriangular:
 
 
 class TestHierarchicalTriangular:
-    """Tests for create_hierarchical_triangular_mesh_graph."""
+    """Tests for hierarchical mesh graph from triangular primitives.
+
+    Uses ``create_multirange_2d_triangular_mesh_primitives`` (coordinate
+    creation) followed by ``create_hierarchical_from_coordinates`` (generic
+    hierarchical connectivity creation).
+    """
+
+    def _create_hierarchical(
+        self,
+        xy,
+        mesh_node_spacing=2.0,
+        interlevel_refinement_factor=3,
+        max_num_levels=3,
+        **kwargs,
+    ):
+        """Helper: create primitives then apply hierarchical connectivity."""
+        G_coords_list = create_multirange_2d_triangular_mesh_primitives(
+            max_num_levels=max_num_levels,
+            xy=xy,
+            mesh_node_spacing=mesh_node_spacing,
+            interlevel_refinement_factor=interlevel_refinement_factor,
+        )
+        return create_hierarchical_from_coordinates(G_coords_list, **kwargs)
 
     def test_returns_digraph(self, xy_medium):
-        G = create_hierarchical_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_hierarchical(xy_medium)
         assert isinstance(G, nx.DiGraph)
 
     def test_has_edges(self, xy_medium):
-        G = create_hierarchical_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_hierarchical(xy_medium)
         assert G.number_of_edges() > 0
 
     def test_edges_have_level_attribute(self, xy_medium):
-        G = create_hierarchical_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_hierarchical(xy_medium)
         for u, v, d in G.edges(data=True):
             # Intra-level edges have 'level', inter-level have 'levels'
             assert "level" in d or "levels" in d
 
     def test_multiple_levels_present(self, xy_medium):
-        G = create_hierarchical_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_hierarchical(xy_medium)
         levels = set()
         for u, v, d in G.edges(data=True):
             if "level" in d:
@@ -730,81 +639,52 @@ class TestHierarchicalTriangular:
         assert len(levels) >= 2, "Expected multiple levels in hierarchical graph"
 
     def test_single_level_raises(self, xy_small):
-        """Hierarchical requires ΓëÑ2 levels; too-coarse spacing should raise."""
+        """Hierarchical requires >= 2 levels; single level should raise."""
+        G_coords_list = create_multirange_2d_triangular_mesh_primitives(
+            max_num_levels=1,
+            xy=xy_small,
+            mesh_node_spacing=2.0,
+            interlevel_refinement_factor=3,
+        )
         with pytest.raises(ValueError):
-            create_hierarchical_triangular_mesh_graph(
-                xy_small,
-                mesh_node_distance=20.0,
-                level_refinement_factor=3,
-                max_num_levels=3,
-            )
+            create_hierarchical_from_coordinates(G_coords_list)
 
     def test_nodes_have_pos(self, xy_medium):
         """All nodes should have pos attribute."""
-        G = create_hierarchical_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_hierarchical(xy_medium)
         for node in G.nodes:
             assert "pos" in G.nodes[node]
             assert np.isfinite(G.nodes[node]["pos"]).all()
 
     def test_custom_intra_level(self, xy_medium):
         """Custom intra_level pattern should be accepted."""
-        G = create_hierarchical_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-            intra_level={"pattern": "8-star"},
-        )
+        G = self._create_hierarchical(xy_medium, intra_level={"pattern": "8-star"})
         assert isinstance(G, nx.DiGraph)
         assert G.number_of_edges() > 0
 
     def test_custom_inter_level(self, xy_medium):
         """Custom inter_level config should be accepted."""
-        G = create_hierarchical_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-            inter_level={"pattern": "nearest", "k": 3},
+        G = self._create_hierarchical(
+            xy_medium, inter_level={"pattern": "nearest", "k": 3}
         )
         assert isinstance(G, nx.DiGraph)
         assert G.number_of_edges() > 0
 
     def test_no_self_loops(self, xy_medium):
         """Hierarchical graph should have no self-loops."""
-        G = create_hierarchical_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_hierarchical(xy_medium)
         for u, v in G.edges():
             assert u != v
 
     def test_has_inter_level_edges(self, xy_medium):
         """Should have inter-level edges connecting different levels."""
-        G = create_hierarchical_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_hierarchical(xy_medium)
         inter_level_count = sum(1 for _, _, d in G.edges(data=True) if "levels" in d)
         assert inter_level_count > 0
 
     def test_inter_level_edges_have_direction(self, xy_medium):
         """Inter-level edges should have 'direction' attribute (up/down)."""
-        G = create_hierarchical_triangular_mesh_graph(
-            xy_medium,
-            mesh_node_distance=2.0,
-            level_refinement_factor=3,
-            max_num_levels=3,
-        )
+        G = self._create_hierarchical(xy_medium)
         for u, v, d in G.edges(data=True):
             if "levels" in d:
                 assert "direction" in d
@@ -1034,9 +914,7 @@ class TestNumericalCorrectness:
     """Test numerical properties of the triangular mesh graph."""
 
     def test_edge_lengths_positive(self, xy_medium):
-        G = create_flat_singlescale_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0
-        )
+        G = create_single_level_2d_triangular_mesh_graph(xy_medium, nx=5, ny=5)
         for u, v, d in G.edges(data=True):
             assert d["len"] > 0
 
@@ -1096,9 +974,7 @@ class TestNumericalCorrectness:
 
     def test_no_nan_in_positions(self, xy_medium):
         """No node should have NaN in positions."""
-        G = create_flat_singlescale_triangular_mesh_graph(
-            xy_medium, mesh_node_distance=2.0
-        )
+        G = create_single_level_2d_triangular_mesh_graph(xy_medium, nx=5, ny=5)
         for node in G.nodes:
             pos = G.nodes[node]["pos"]
             assert isinstance(pos, np.ndarray)

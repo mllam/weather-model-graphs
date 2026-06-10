@@ -31,12 +31,14 @@ from .mesh.connectivity.flat import (
 from .mesh.connectivity.hierarchical import create_hierarchical_from_coordinates
 from .mesh.connectivity.triangular import (
     create_flat_multiscale_from_triangular_coordinates,
-    create_multirange_2d_triangular_mesh_primitives,
-    create_single_level_2d_triangular_mesh_primitive,
 )
-from .mesh.coords import (
+from .mesh.layout.rectilinear import (
     create_multirange_2d_mesh_primitives,
     create_single_level_2d_mesh_primitive,
+)
+from .mesh.layout.triangular import (
+    create_multirange_2d_triangular_mesh_primitives,
+    create_single_level_2d_triangular_mesh_primitive,
 )
 
 
@@ -395,10 +397,10 @@ def create_all_graph_components(
         if pattern is None:
             pattern = "4-star" if mesh_layout == "triangular" else "8-star"
         if mesh_layout == "triangular":
-            graph_components[
-                "m2m"
-            ] = create_flat_multiscale_from_triangular_coordinates(
-                G_mesh_coords, pattern=pattern
+            graph_components["m2m"] = (
+                create_flat_multiscale_from_triangular_coordinates(
+                    G_mesh_coords, pattern=pattern
+                )
             )
         else:
             graph_components["m2m"] = create_flat_multiscale_from_coordinates(
