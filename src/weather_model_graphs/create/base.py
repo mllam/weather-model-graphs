@@ -397,10 +397,10 @@ def create_all_graph_components(
         if pattern is None:
             pattern = "4-star" if mesh_layout == "triangular" else "8-star"
         if mesh_layout == "triangular":
-            graph_components["m2m"] = (
-                create_flat_multiscale_from_triangular_coordinates(
-                    G_mesh_coords, pattern=pattern
-                )
+            graph_components[
+                "m2m"
+            ] = create_flat_multiscale_from_triangular_coordinates(
+                G_mesh_coords, pattern=pattern
             )
         else:
             graph_components["m2m"] = create_flat_multiscale_from_coordinates(
