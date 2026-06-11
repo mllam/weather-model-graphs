@@ -55,6 +55,7 @@ CORE_FILES = [
     "m2m_edge_index.pt",
     "m2m_features.pt",
     "mesh_features.pt",
+    "metainfo.yaml",
 ]
 
 # Additional files for hierarchical graphs
@@ -158,13 +159,54 @@ class TestToTorchTensorsKeisler:
         # Edge count consistency
         assert m2m_ei[0].shape[1] == m2m_f[0].shape[0]
 
-    def test_mesh_features_normalized(self):
+    def test_mesh_features_are_raw_coordinates(self):
+        """Mesh node features must be raw (unnormalized) positions, matching
+        the mesh node positions in the m2m component (graph storage spec:
+        normalization happens inside neural-lam at load time)."""
+        _skip_if_no_pyg()
+        tmpdir, components = _create_and_save("keisler", hierarchical=False)
+        mesh_f = torch.load(Path(tmpdir) / "mesh_features.pt", weights_only=True)
+
+        m2m_graph = components["m2m"]
+        mesh_labels = sorted(
+            n for n, d in m2m_graph.nodes(data=True) if d.get("type") == "mesh"
+        )
+        expected = torch.tensor(
+            [m2m_graph.nodes[n]["pos"] for n in mesh_labels], dtype=torch.float32
+        )
+        assert len(mesh_f) == 1
+        assert torch.allclose(mesh_f[0], expected)
+
+    def test_metainfo_yaml_has_spec_version(self):
         _skip_if_no_pyg()
         tmpdir, _ = _create_and_save("keisler", hierarchical=False)
+        content = (Path(tmpdir) / "metainfo.yaml").read_text()
+        assert "spec_version" in content
+        assert "0.1.0" in content
+
+    def test_edge_indices_are_zero_based_per_node_set(self):
+        """Edge indices must use per-node-set zero-based numbering (graph
+        storage spec 3.1.1): g2m receivers and m2g senders are indices into
+        the mesh node set, not offset by the number of grid nodes."""
+        _skip_if_no_pyg()
+        tmpdir, _ = _create_and_save("keisler", hierarchical=False)
+        g2m_ei = torch.load(Path(tmpdir) / "g2m_edge_index.pt", weights_only=True)
+        m2g_ei = torch.load(Path(tmpdir) / "m2g_edge_index.pt", weights_only=True)
+        m2m_ei = torch.load(Path(tmpdir) / "m2m_edge_index.pt", weights_only=True)
         mesh_f = torch.load(Path(tmpdir) / "mesh_features.pt", weights_only=True)
-        # All values should be in [-1, 1] after normalization
-        for level_f in mesh_f:
-            assert torch.max(torch.abs(level_f)) <= 1.0 + 1e-6
+
+        n_mesh = mesh_f[0].shape[0]
+        n_grid = int(g2m_ei[0].max()) + 1  # senders cover the grid node set
+
+        # g2m: senders are grid indices, receivers are mesh indices
+        assert int(g2m_ei[1].max()) < n_mesh
+        assert int(g2m_ei[1].min()) >= 0
+        # m2g: senders are mesh indices, receivers are grid indices
+        assert int(m2g_ei[0].max()) < n_mesh
+        assert int(m2g_ei[0].min()) >= 0
+        assert int(m2g_ei[1].max()) < n_grid
+        # m2m: both within mesh node set
+        assert int(m2m_ei[0].max()) < n_mesh
 
     def test_edge_features_are_raw(self):
         """Edge features should NOT be normalized (neural-lam normalizes at load time)."""
@@ -197,9 +239,12 @@ class TestToTorchTensorsGraphcast:
         for fname in HIERARCHICAL_FILES:
             assert not (Path(tmpdir) / fname).exists(), f"Unexpected: {fname}"
 
-    def test_m2m_has_multiple_levels(self):
+    def test_m2m_is_single_level(self):
+        """Non-hierarchical graphs always have L == 1 per the graph storage
+        spec, so flat multiscale (graphcast) m2m edges are merged into a
+        single entry over the merged mesh node set."""
         _skip_if_no_pyg()
-        tmpdir, _ = _create_and_save("graphcast", hierarchical=False, N=64)
+        tmpdir, components = _create_and_save("graphcast", hierarchical=False, N=64)
         m2m_ei = torch.load(Path(tmpdir) / "m2m_edge_index.pt", weights_only=True)
         m2m_f = torch.load(Path(tmpdir) / "m2m_features.pt", weights_only=True)
         mesh_f = torch.load(Path(tmpdir) / "mesh_features.pt", weights_only=True)
@@ -208,15 +253,21 @@ class TestToTorchTensorsGraphcast:
         assert isinstance(m2m_f, list)
         assert isinstance(mesh_f, list)
 
-        # All list lengths must match
-        assert len(m2m_ei) == len(m2m_f) == len(mesh_f)
+        # Non-hierarchical: single level
+        assert len(m2m_ei) == len(m2m_f) == len(mesh_f) == 1
 
-        # Each level should have correct shapes
-        for i in range(len(m2m_ei)):
-            assert m2m_ei[i].shape[0] == 2
-            assert m2m_f[i].shape[1] == 3
-            assert mesh_f[i].shape[1] == 2
-            assert m2m_ei[i].shape[1] == m2m_f[i].shape[0]
+        # The single entry contains ALL m2m edges over the merged node set
+        assert m2m_ei[0].shape[1] == components["m2m"].number_of_edges()
+        assert mesh_f[0].shape[0] == components["m2m"].number_of_nodes()
+
+        # Shape checks
+        assert m2m_ei[0].shape[0] == 2
+        assert m2m_f[0].shape[1] == 3
+        assert mesh_f[0].shape[1] == 2
+        assert m2m_ei[0].shape[1] == m2m_f[0].shape[0]
+
+        # All indices within the merged mesh node set
+        assert int(m2m_ei[0].max()) < mesh_f[0].shape[0]
 
     def test_g2m_m2g_single_tensors(self):
         _skip_if_no_pyg()
@@ -293,12 +344,53 @@ class TestToTorchTensorsHierarchical:
             assert u.shape[1] > 0, f"up level {i} has no edges"
             assert d.shape[1] > 0, f"down level {i} has no edges"
 
-    def test_mesh_features_normalized(self):
+    def test_mesh_features_are_raw_coordinates(self):
+        """Mesh node features must be raw (unnormalized) positions per level,
+        matching the m2m component node positions (graph storage spec)."""
+        _skip_if_no_pyg()
+        tmpdir, components = _create_and_save("hierarchical", hierarchical=True)
+        mesh_f = torch.load(Path(tmpdir) / "mesh_features.pt", weights_only=True)
+
+        m2m_graph = components["m2m"]
+        labels_by_level = {}
+        for n, d in m2m_graph.nodes(data=True):
+            labels_by_level.setdefault(d["level"], []).append(n)
+
+        assert len(mesh_f) == len(labels_by_level)
+        for i, lvl in enumerate(sorted(labels_by_level.keys())):
+            expected = torch.tensor(
+                [m2m_graph.nodes[n]["pos"] for n in sorted(labels_by_level[lvl])],
+                dtype=torch.float32,
+            )
+            assert torch.allclose(mesh_f[i], expected)
+
+    def test_interlevel_indices_are_zero_based_per_level(self):
+        """mesh_up entry i goes level i -> i+1, mesh_down entry i goes
+        level i+1 -> i, with indices zero-based within each level's node
+        set (graph storage spec 3.1.1 / 3.2.1)."""
         _skip_if_no_pyg()
         tmpdir, _ = _create_and_save("hierarchical", hierarchical=True)
         mesh_f = torch.load(Path(tmpdir) / "mesh_features.pt", weights_only=True)
-        for level_f in mesh_f:
-            assert torch.max(torch.abs(level_f)) <= 1.0 + 1e-6
+        up_ei = torch.load(Path(tmpdir) / "mesh_up_edge_index.pt", weights_only=True)
+        down_ei = torch.load(
+            Path(tmpdir) / "mesh_down_edge_index.pt", weights_only=True
+        )
+        g2m_ei = torch.load(Path(tmpdir) / "g2m_edge_index.pt", weights_only=True)
+        m2g_ei = torch.load(Path(tmpdir) / "m2g_edge_index.pt", weights_only=True)
+
+        n_per_level = [f.shape[0] for f in mesh_f]
+
+        # g2m receivers / m2g senders index into the bottom mesh level
+        assert int(g2m_ei[1].max()) < n_per_level[0]
+        assert int(m2g_ei[0].max()) < n_per_level[0]
+
+        for i in range(len(n_per_level) - 1):
+            # up: sender level i, receiver level i+1
+            assert int(up_ei[i][0].max()) < n_per_level[i]
+            assert int(up_ei[i][1].max()) < n_per_level[i + 1]
+            # down: sender level i+1, receiver level i
+            assert int(down_ei[i][0].max()) < n_per_level[i + 1]
+            assert int(down_ei[i][1].max()) < n_per_level[i]
 
 
 class TestToTorchTensorsEdgeCases:
