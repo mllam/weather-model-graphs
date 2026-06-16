@@ -269,32 +269,37 @@ def test_edgeless_nodes_preservation_in_different_graphs(
     assert set(graph.nodes) == set(graph_source.nodes) | set(graph_target.nodes)
 
 
-def test_convex_hull_cropping():
+@pytest.mark.parametrize("kind", ["keisler", "oskarsson_hierarchical"])
+def test_convex_hull_cropping_supported_archetypes(kind):
     import numpy as np
 
-    from weather_model_graphs.create.archetype import create_keisler_graph
+    from weather_model_graphs.create.archetype import (
+        create_keisler_graph,
+        create_oskarsson_hierarchical_graph,
+    )
 
     # Create a large 'L' shape.
-    # Bounding box is [0, 10] x [0, 10], but the top-right quadrant (x>5, y>5) is completely empty.
     coords = []
     for x in range(11):
         for y in range(11):
-            # Only keep points where x <= 5 OR y <= 5 (This forms the L shape)
             if x <= 5 or y <= 5:
                 coords.append([x, y])
-
     coords = np.array(coords)
 
-    # Create graph without cropping
-    # With distance=1, it will try to place ~100 nodes in the 10x10 bounding box.
-    graph_no_crop = create_keisler_graph(coords, mesh_node_distance=1)
+    # Select the correct function based on the parameter
+    fn = (
+        create_keisler_graph
+        if kind == "keisler"
+        else create_oskarsson_hierarchical_graph
+    )
 
-    # Create graph with cropping
-    graph_crop = create_keisler_graph(
+    # Create graphs
+    graph_no_crop = fn(coords, mesh_node_distance=1)
+    graph_crop = fn(
         coords, mesh_node_distance=1, mesh_layout_kwargs={"crop_to_convex_hull": True}
     )
 
-    # Count the mesh nodes in both graphs
+    # Extract component
     num_mesh_nodes_no_crop = len(
         [n for n, d in graph_no_crop.nodes(data=True) if d.get("type") == "mesh"]
     )
@@ -302,6 +307,21 @@ def test_convex_hull_cropping():
         [n for n, d in graph_crop.nodes(data=True) if d.get("type") == "mesh"]
     )
 
-    # The uncropped graph will fill the empty top-right corner.
-    # The cropped graph will prune nodes in that empty top-right corner.
     assert num_mesh_nodes_crop < num_mesh_nodes_no_crop
+
+
+def test_convex_hull_cropping_graphcast_error():
+    import numpy as np
+    import pytest
+
+    from weather_model_graphs.create.archetype import create_graphcast_graph
+
+    coords = np.array([[0, 0], [1, 0], [0, 1]])
+
+    # Verify that attempting to crop a GraphCast architecture throws our specific ValueError
+    with pytest.raises(ValueError, match="not supported for 'flat_multiscale'"):
+        create_graphcast_graph(
+            coords,
+            mesh_node_distance=1,
+            mesh_layout_kwargs={"crop_to_convex_hull": True},
+        )
