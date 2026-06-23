@@ -7,8 +7,8 @@ then consumed by the connectivity modules to produce directed mesh graphs.
 
 Available layouts:
 
-- ``rectilinear``: Uniform rectangular grid (``grid_2d_graph``).
-- ``triangular``: Regular triangular lattice (``triangular_lattice_graph``).
+- ``rectilinear``: nodes placed on a uniform rectangular grid.
+- ``triangular``: nodes placed on a regular (equilateral) triangular lattice.
 """
 
 from . import rectilinear, triangular
