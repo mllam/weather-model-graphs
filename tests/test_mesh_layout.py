@@ -617,7 +617,7 @@ class TestErrorHandling:
             wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="flat",
-                mesh_layout="hexagonal",
+                mesh_layout="nonexistent_layout",
                 mesh_layout_kwargs=dict(mesh_node_spacing=3),
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",

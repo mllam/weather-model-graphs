@@ -19,20 +19,34 @@ import pytest
 
 import tests.utils as test_utils
 import weather_model_graphs as wmg
+from weather_model_graphs.create.mesh.connectivity.flat import (
+    create_flat_multiscale_from_coordinates,
+)
 from weather_model_graphs.create.mesh.connectivity.general import (
     create_directed_mesh_graph,
 )
 from weather_model_graphs.create.mesh.connectivity.hierarchical import (
     create_hierarchical_from_coordinates,
 )
-from weather_model_graphs.create.mesh.connectivity.triangular import (
-    create_flat_multiscale_from_triangular_coordinates,
-)
 from weather_model_graphs.create.mesh.layout.triangular import (
     create_multirange_2d_triangular_mesh_primitives,
-    create_single_level_2d_triangular_mesh_graph,
     create_single_level_2d_triangular_mesh_primitive,
 )
+
+
+# Test helpers exercising the equivalent generic two-step API after the
+# triangular-specific convenience functions were removed (PR #92 review).
+def create_single_level_2d_triangular_mesh_graph(xy, nx, ny):
+    """Directed triangular mesh graph via primitive + generic connectivity."""
+    return create_directed_mesh_graph(
+        create_single_level_2d_triangular_mesh_primitive(xy, nx, ny)
+    )
+
+
+def create_flat_multiscale_from_triangular_coordinates(G_coords_list, **kwargs):
+    """Triangular flat-multiscale graph via the generalized generic function."""
+    return create_flat_multiscale_from_coordinates(G_coords_list, **kwargs)
+
 
 # ===========================
 # Fixtures
@@ -752,7 +766,7 @@ class TestIntegrationTriangular:
             wmg.create.create_all_graph_components(
                 coords=xy_small,
                 m2m_connectivity="flat",
-                mesh_layout="hexagonal",
+                mesh_layout="nonexistent_layout",
                 mesh_layout_kwargs=dict(mesh_node_spacing=1.0),
                 **self.COMMON_KW,
             )

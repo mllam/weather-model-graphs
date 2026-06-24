@@ -2,6 +2,7 @@ from typing import List
 
 import networkx
 import numpy as np
+import scipy.spatial
 
 from ....networkx_utils import prepend_node_index
 from ..layout import rectilinear as mesh_layout
@@ -59,6 +60,12 @@ def create_flat_multiscale_from_coordinates(
     In a flat multiscale graph, coarser levels are merged into the finer level
     by coincident node positions (no separate inter-level connectivity needed).
 
+    This works for any mesh layout. When the mesh primitives carry the integer
+    ``(i, j)`` grid-index node labels of a complete rectangular lattice (the
+    rectilinear layout) the merge uses fast index arithmetic. Otherwise (e.g. a
+    triangular lattice, whose nodes do not form a full rectangle) it falls back
+    to layout-agnostic position-based matching with a KD-tree.
+
     Parameters
     ----------
     G_coords_list : list of networkx.Graph
@@ -67,7 +74,8 @@ def create_flat_multiscale_from_coordinates(
         - Node attributes: ``"pos"`` (np.ndarray of shape [2,]), ``"type"`` (str)
         - Edge attributes: ``"adjacency_type"`` (str, ``"cardinal"`` or ``"diagonal"``)
         - Graph attribute: ``"interlevel_refinement_factor"`` (int)
-        Created by ``create_multirange_2d_mesh_primitives``.
+        Created by ``create_multirange_2d_mesh_primitives`` (rectilinear) or
+        ``create_multirange_2d_triangular_mesh_primitives`` (triangular).
     **kwargs
         Additional keyword arguments passed to ``create_directed_mesh_graph``
         (e.g. ``pattern="8-star"``).
@@ -82,32 +90,69 @@ def create_flat_multiscale_from_coordinates(
         G_coords_list[0], "create_flat_multiscale_from_coordinates"
     )
 
-    # Assert interlevel_refinement_factor is set (no silent default)
-    if "interlevel_refinement_factor" not in G_coords_list[0].graph:
-        raise ValueError(
-            "The coordinate graphs must have an 'interlevel_refinement_factor' "
-            "graph attribute. This is set by create_multirange_2d_mesh_primitives."
-        )
-    interlevel_refinement_factor = G_coords_list[0].graph[
-        "interlevel_refinement_factor"
-    ]
-
-    # Check that interlevel_refinement_factor is an odd integer
-    if (
-        int(interlevel_refinement_factor) != interlevel_refinement_factor
-        or interlevel_refinement_factor % 2 != 1
-    ):
-        raise ValueError(
-            "The `interlevel_refinement_factor` must be an odd integer. "
-            f"Given value: {interlevel_refinement_factor}."
-        )
-
     # Convert each level's coordinate graph to directed graph with chosen pattern
     G_all_levels = [
         create_directed_mesh_graph(g_coords, **kwargs) for g_coords in G_coords_list
     ]
 
-    # combine all levels to one graph
+    # Decide how to merge coincident nodes across levels. The fast index path is
+    # only valid for the rectilinear ``grid_2d`` layout, where coarse-level grid
+    # indices coincide in *position* with finer nodes. Its structural signature
+    # is the presence of ``"diagonal"`` adjacency edges (8-star lattice). Other
+    # layouts -- e.g. the triangular lattice, which has only ``"cardinal"`` edges
+    # and offset rows -- fall back to layout-agnostic position matching (KD-tree).
+    # The check is done on the undirected coordinate graph so it is independent
+    # of the connectivity ``pattern`` (which may filter diagonals out later).
+    grid_indexed = any(
+        d.get("adjacency_type") == "diagonal"
+        for _, _, d in G_coords_list[0].edges(data=True)
+    )
+
+    if grid_indexed:
+        # The index-arithmetic merge relies on a known, odd refinement factor
+        # between levels; this requirement is specific to the grid-index path.
+        # The position-based fallback below works for any refinement factor.
+        if "interlevel_refinement_factor" not in G_coords_list[0].graph:
+            raise ValueError(
+                "The coordinate graphs must have an 'interlevel_refinement_factor' "
+                "graph attribute. This is set by create_multirange_2d_mesh_primitives."
+            )
+        interlevel_refinement_factor = G_coords_list[0].graph[
+            "interlevel_refinement_factor"
+        ]
+        # Check that interlevel_refinement_factor is an odd integer
+        if (
+            int(interlevel_refinement_factor) != interlevel_refinement_factor
+            or interlevel_refinement_factor % 2 != 1
+        ):
+            raise ValueError(
+                "The `interlevel_refinement_factor` must be an odd integer. "
+                f"Given value: {interlevel_refinement_factor}."
+            )
+        G_tot = _merge_levels_by_grid_index(G_all_levels, interlevel_refinement_factor)
+    else:
+        G_tot = _merge_levels_by_position(G_all_levels)
+
+    # Relabel mesh nodes to start with 0
+    G_tot = prepend_node_index(G_tot, 0)
+
+    # add dx and dy to graph
+    G_tot.graph["dx"] = {i: g.graph["dx"] for i, g in enumerate(G_all_levels)}
+    G_tot.graph["dy"] = {i: g.graph["dy"] for i, g in enumerate(G_all_levels)}
+
+    return G_tot
+
+
+def _merge_levels_by_grid_index(
+    G_all_levels: List[networkx.DiGraph], interlevel_refinement_factor: int
+) -> networkx.DiGraph:
+    """Merge multiscale levels using integer ``(i, j)`` grid-index arithmetic.
+
+    This is the original rectilinear merge: coarser-level nodes are matched to
+    their coincident finer-level nodes purely from the grid indices, so the
+    result is unchanged for the rectilinear layout.
+    """
+    G_all_levels = list(G_all_levels)
     G_tot = G_all_levels[0]
     # First node at level l+1 share position with node (offset, offset) at level l
     level_offset = interlevel_refinement_factor // 2
@@ -141,12 +186,46 @@ def create_flat_multiscale_from_coordinates(
         num_nodes_x //= interlevel_refinement_factor
         num_nodes_y //= interlevel_refinement_factor
 
-    # Relabel mesh nodes to start with 0
-    G_tot = prepend_node_index(G_tot, 0)
+    return G_tot
 
-    # add dx and dy to graph
-    G_tot.graph["dx"] = {i: g.graph["dx"] for i, g in enumerate(G_all_levels)}
-    G_tot.graph["dy"] = {i: g.graph["dy"] for i, g in enumerate(G_all_levels)}
+
+def _merge_levels_by_position(
+    G_all_levels: List[networkx.DiGraph],
+) -> networkx.DiGraph:
+    """Merge multiscale levels by coincident node positions (KD-tree).
+
+    Layout-agnostic fallback used when node labels do not form a complete
+    ``(i, j)`` grid (e.g. the triangular layout). For each coarser level, any
+    node whose position coincides (within floating-point tolerance) with an
+    existing finer-level node is merged with it, so multi-resolution edges
+    share the same node identity.
+    """
+    # Prepend level index so labels are unique across levels before merging
+    G_levels = [
+        prepend_node_index(g, level_i) for level_i, g in enumerate(G_all_levels)
+    ]
+
+    G_tot = G_levels[0]
+    for lev in range(1, len(G_levels)):
+        G_coarse = G_levels[lev]
+
+        # KDTree of existing (finer) nodes for position matching
+        fine_nodes = list(G_tot.nodes())
+        fine_positions = np.array([G_tot.nodes[n]["pos"] for n in fine_nodes])
+        kdt = scipy.spatial.KDTree(fine_positions)
+
+        # Find which coarse nodes coincide with existing fine nodes
+        relabel_map = {}
+        for node in G_coarse.nodes():
+            pos = G_coarse.nodes[node]["pos"]
+            dist, idx = kdt.query(pos)
+            if dist < 1e-8:
+                relabel_map[node] = fine_nodes[idx]
+
+        if relabel_map:
+            G_coarse = networkx.relabel_nodes(G_coarse, relabel_map)
+
+        G_tot = networkx.compose(G_tot, G_coarse)
 
     return G_tot
 

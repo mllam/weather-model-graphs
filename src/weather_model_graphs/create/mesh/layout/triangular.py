@@ -19,11 +19,13 @@ import networkx
 import numpy as np
 from loguru import logger
 
-from ..connectivity.general import create_directed_mesh_graph
-
 
 def create_single_level_2d_triangular_mesh_primitive(
-    xy: np.ndarray, nx: int, ny: int
+    xy: np.ndarray,
+    nx: int = None,
+    ny: int = None,
+    *,
+    mesh_node_spacing: float = None,
 ) -> networkx.Graph:
     """
     Create an undirected triangular mesh primitive graph (``nx.Graph``) with
@@ -42,16 +44,27 @@ def create_single_level_2d_triangular_mesh_primitive(
     so that the mesh spans the coordinate domain of *xy* (with nodes inset
     from the border by half a cell width in each direction).
 
+    Either provide ``nx`` and ``ny`` directly, or provide ``mesh_node_spacing``
+    to have them computed automatically from the coordinate extent of ``xy``
+    (mirroring ``create_single_level_2d_mesh_primitive``).
+
     Parameters
     ----------
     xy : np.ndarray
         Grid point coordinates, shaped ``[N_grid_points, 2]``.
-    nx : int
+    nx : int, optional
         Number of triangle columns (passed as *n* to
-        ``triangular_lattice_graph``).
-    ny : int
+        ``triangular_lattice_graph``). If not given, computed from
+        ``mesh_node_spacing``.
+    ny : int, optional
         Number of triangle rows (passed as *m* to
-        ``triangular_lattice_graph``).
+        ``triangular_lattice_graph``). If not given, computed from
+        ``mesh_node_spacing``.
+    mesh_node_spacing : float, optional
+        Distance between mesh nodes (in coordinate units). When provided,
+        ``nx`` and ``ny`` are computed from the coordinate extent of ``xy``
+        (``ny`` accounts for the ``sqrt(3)/2`` triangular row spacing) and
+        validated to be > 0.
 
     Returns
     -------
@@ -61,6 +74,23 @@ def create_single_level_2d_triangular_mesh_primitive(
         ``adjacency_type`` (always ``"cardinal"`` -- triangular lattices have
         only one class of edge).  Graph attributes: ``dx``, ``dy``.
     """
+    if mesh_node_spacing is not None:
+        range_x, range_y = np.ptp(xy, axis=0)
+        nx = int(range_x / mesh_node_spacing)
+        ny = int(range_y / (mesh_node_spacing * np.sqrt(3) / 2))
+        if nx == 0 or ny == 0:
+            raise ValueError(
+                "The given `mesh_node_spacing` is too large for the provided "
+                f"coordinates. Got mesh_node_spacing={mesh_node_spacing}, but the "
+                f"x-range is {range_x} and y-range is {range_y}. Maybe you "
+                "want to decrease the `mesh_node_spacing` so that the mesh nodes "
+                "are spaced closer together?"
+            )
+    elif nx is None or ny is None:
+        raise ValueError(
+            "Either provide both `nx` and `ny`, or provide "
+            "`mesh_node_spacing` to compute them automatically."
+        )
     xm, xM = np.amin(xy[:, 0]), np.amax(xy[:, 0])
     ym, yM = np.amin(xy[:, 1]), np.amax(xy[:, 1])
 
@@ -185,34 +215,3 @@ def create_multirange_2d_triangular_mesh_primitives(
         G_all_levels.append(g)
 
     return G_all_levels
-
-
-def create_single_level_2d_triangular_mesh_graph(
-    xy: np.ndarray, nx: int, ny: int
-) -> networkx.DiGraph:
-    """
-    Create a directed triangular mesh graph from coordinates.
-
-    Internally uses the two-step process:
-    1. ``create_single_level_2d_triangular_mesh_primitive`` (coordinate creation)
-    2. ``create_directed_mesh_graph`` (connectivity creation)
-
-    For triangular lattices, *all* edges are ``"cardinal"`` so patterns
-    ``"4-star"`` and ``"8-star"`` produce the same result (6-connectivity).
-
-    Parameters
-    ----------
-    xy : np.ndarray
-        Grid point coordinates, shaped ``[N_grid_points, 2]``.
-    nx : int
-        Number of triangle columns.
-    ny : int
-        Number of triangle rows.
-
-    Returns
-    -------
-    networkx.DiGraph
-        Directed triangular mesh graph.
-    """
-    G_coords = create_single_level_2d_triangular_mesh_primitive(xy, nx, ny)
-    return create_directed_mesh_graph(G_coords, pattern="4-star")

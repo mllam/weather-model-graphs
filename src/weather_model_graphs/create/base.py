@@ -29,9 +29,6 @@ from .mesh.connectivity.flat import (
     create_flat_singlescale_from_coordinates,
 )
 from .mesh.connectivity.hierarchical import create_hierarchical_from_coordinates
-from .mesh.connectivity.triangular import (
-    create_flat_multiscale_from_triangular_coordinates,
-)
 from .mesh.layout.rectilinear import (
     create_multirange_2d_mesh_primitives,
     create_single_level_2d_mesh_primitive,
@@ -281,91 +278,59 @@ def create_all_graph_components(
             stacklevel=2,
         )
 
-    if mesh_layout == "rectilinear":
-        mesh_node_spacing = mesh_layout_kwargs.get(
-            "mesh_node_spacing"
-        ) or mesh_layout_kwargs.get("grid_spacing")
-        if mesh_node_spacing is None:
-            raise ValueError(
-                "mesh_layout='rectilinear' requires 'mesh_node_spacing' in "
-                "mesh_layout_kwargs (or 'mesh_node_distance' in "
-                "m2m_connectivity_kwargs for backward compatibility)."
-            )
-
-        if m2m_connectivity == "flat":
-            # Single-level mesh
-            G_mesh_coords = create_single_level_2d_mesh_primitive(
-                xy, mesh_node_spacing=mesh_node_spacing
-            )
-        else:
-            # Multi-level mesh: build kwargs for create_multirange_2d_mesh_primitives
-            primitives_kwargs = dict(xy=xy, mesh_node_spacing=mesh_node_spacing)
-            if "refinement_factor" in mesh_layout_kwargs:
-                primitives_kwargs["interlevel_refinement_factor"] = mesh_layout_kwargs[
-                    "refinement_factor"
-                ]
-            if "max_num_refinement_levels" in mesh_layout_kwargs:
-                primitives_kwargs["max_num_levels"] = mesh_layout_kwargs[
-                    "max_num_refinement_levels"
-                ]
-            G_mesh_coords = create_multirange_2d_mesh_primitives(**primitives_kwargs)
-
-    elif mesh_layout == "triangular":
-        mesh_node_spacing = mesh_layout_kwargs.get(
-            "mesh_node_spacing"
-        ) or mesh_layout_kwargs.get("grid_spacing")
-        if mesh_node_spacing is None:
-            raise ValueError(
-                "mesh_layout='triangular' requires 'mesh_node_spacing' in "
-                "mesh_layout_kwargs (or 'mesh_node_distance' in "
-                "m2m_connectivity_kwargs for backward compatibility)."
-            )
-
-        if m2m_connectivity == "flat":
-            range_x, range_y = np.ptp(xy, axis=0)
-            nx_mesh = int(range_x / mesh_node_spacing)
-            ny_mesh = int(range_y / (mesh_node_spacing * np.sqrt(3) / 2))
-            if nx_mesh == 0 or ny_mesh == 0:
-                raise ValueError(
-                    "The given `mesh_node_spacing` is too large for the provided "
-                    f"coordinates. Got mesh_node_spacing={mesh_node_spacing}, but the "
-                    f"x-range is {range_x} and y-range is {range_y}. Maybe you "
-                    "want to decrease the `mesh_node_spacing` so that the mesh nodes "
-                    "are spaced closer together?"
-                )
-            G_mesh_coords = create_single_level_2d_triangular_mesh_primitive(
-                xy, nx_mesh, ny_mesh
-            )
-        else:
-            primitives_kwargs = dict(
-                xy=xy,
-                mesh_node_spacing=mesh_node_spacing,
-            )
-            if "refinement_factor" in mesh_layout_kwargs:
-                primitives_kwargs["interlevel_refinement_factor"] = mesh_layout_kwargs[
-                    "refinement_factor"
-                ]
-            if "max_num_refinement_levels" in mesh_layout_kwargs:
-                primitives_kwargs["max_num_levels"] = mesh_layout_kwargs[
-                    "max_num_refinement_levels"
-                ]
-            G_mesh_coords = create_multirange_2d_triangular_mesh_primitives(
-                **primitives_kwargs
-            )
-
-    else:
+    # Validate mesh_layout and resolve the requested mesh node spacing once
+    # (shared by all m2m_connectivity modes and both layouts).
+    if mesh_layout not in ("rectilinear", "triangular"):
         raise NotImplementedError(
             f"mesh_layout='{mesh_layout}' is not yet supported. "
             "Currently supported: 'rectilinear', 'triangular'."
         )
 
+    mesh_node_spacing = mesh_layout_kwargs.get(
+        "mesh_node_spacing"
+    ) or mesh_layout_kwargs.get("grid_spacing")
+    if mesh_node_spacing is None:
+        raise ValueError(
+            f"mesh_layout='{mesh_layout}' requires 'mesh_node_spacing' in "
+            "mesh_layout_kwargs (or 'mesh_node_distance' in "
+            "m2m_connectivity_kwargs for backward compatibility)."
+        )
+
+    # Pick the coordinate-creation function based on the mesh_layout value,
+    # nested inside the m2m_connectivity branch (single-level vs multi-level).
+    if m2m_connectivity == "flat":
+        # Single-level mesh primitive
+        if mesh_layout == "rectilinear":
+            G_mesh_coords = create_single_level_2d_mesh_primitive(
+                xy, mesh_node_spacing=mesh_node_spacing
+            )
+        else:  # triangular
+            G_mesh_coords = create_single_level_2d_triangular_mesh_primitive(
+                xy, mesh_node_spacing=mesh_node_spacing
+            )
+    else:
+        # Multi-level mesh primitives (flat_multiscale or hierarchical)
+        primitives_kwargs = dict(xy=xy, mesh_node_spacing=mesh_node_spacing)
+        if "refinement_factor" in mesh_layout_kwargs:
+            primitives_kwargs["interlevel_refinement_factor"] = mesh_layout_kwargs[
+                "refinement_factor"
+            ]
+        if "max_num_refinement_levels" in mesh_layout_kwargs:
+            primitives_kwargs["max_num_levels"] = mesh_layout_kwargs[
+                "max_num_refinement_levels"
+            ]
+        if mesh_layout == "rectilinear":
+            G_mesh_coords = create_multirange_2d_mesh_primitives(**primitives_kwargs)
+        else:  # triangular
+            G_mesh_coords = create_multirange_2d_triangular_mesh_primitives(
+                **primitives_kwargs
+            )
+
     # -----------------------------------------------------------------------
     # Step 2: Connectivity creation — converts mesh primitives to directed graph
     # -----------------------------------------------------------------------
     if m2m_connectivity == "flat":
-        pattern = m2m_connectivity_kwargs.get(
-            "pattern", "4-star" if mesh_layout == "triangular" else "8-star"
-        )
+        pattern = m2m_connectivity_kwargs.get("pattern", "8-star")
         graph_components["m2m"] = create_flat_singlescale_from_coordinates(
             G_mesh_coords, pattern=pattern
         )
@@ -375,10 +340,8 @@ def create_all_graph_components(
         # hierarchical mesh graph has three sub-graphs:
         # `m2m` (mesh-to-mesh), `mesh_up` (up edge connections) and
         # `mesh_down` (down edge connections)
-        intra_level = m2m_connectivity_kwargs.get("intra_level")
-        if intra_level is None and mesh_layout == "triangular":
-            intra_level = {"pattern": "4-star"}
         hierarchical_kwargs = {}
+        intra_level = m2m_connectivity_kwargs.get("intra_level")
         if intra_level is not None:
             hierarchical_kwargs["intra_level"] = intra_level
         inter_level = m2m_connectivity_kwargs.get("inter_level")
@@ -393,19 +356,10 @@ def create_all_graph_components(
         )[0]
 
     elif m2m_connectivity == "flat_multiscale":
-        pattern = m2m_connectivity_kwargs.get("pattern")
-        if pattern is None:
-            pattern = "4-star" if mesh_layout == "triangular" else "8-star"
-        if mesh_layout == "triangular":
-            graph_components[
-                "m2m"
-            ] = create_flat_multiscale_from_triangular_coordinates(
-                G_mesh_coords, pattern=pattern
-            )
-        else:
-            graph_components["m2m"] = create_flat_multiscale_from_coordinates(
-                G_mesh_coords, pattern=pattern
-            )
+        pattern = m2m_connectivity_kwargs.get("pattern", "8-star")
+        graph_components["m2m"] = create_flat_multiscale_from_coordinates(
+            G_mesh_coords, pattern=pattern
+        )
         grid_connect_graph = graph_components["m2m"]
 
     else:
