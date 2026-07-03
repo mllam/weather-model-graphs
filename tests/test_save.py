@@ -55,11 +55,10 @@ def test_save_to_pyg(list_from_attribute):
 # could silently drift from the real contract), these tests download that
 # exact script and run it against the output of ``to_torch_tensors_on_disk``.
 #
-# TODO: this points at the validator's feature branch while neural-lam #323 is
-# in review; switch to the mllam/neural-lam ``main`` URL once it is merged.
+# The graph storage spec + validator were merged into neural-lam via
+# mllam/neural-lam#323, so we pull the validator from ``main``.
 VALIDATOR_URL = (
-    "https://raw.githubusercontent.com/leifdenby/neural-lam/"
-    "refs/heads/feat/graph-on-disk-spec-and-validator/docs/validate_graph.py"
+    "https://raw.githubusercontent.com/mllam/neural-lam/main/docs/validate_graph.py"
 )
 
 # Files expected for all graph types (used by the function-behaviour tests

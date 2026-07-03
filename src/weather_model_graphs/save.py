@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import pickle
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import networkx
 import numpy as np
@@ -20,6 +22,15 @@ try:
     HAS_PYG = True
 except ImportError:
     HAS_PYG = False
+
+# Version of the neural-lam graph storage spec that the tensor-on-disk output
+# conforms to. Written into metainfo.yaml by ``to_torch_tensors_on_disk``.
+GRAPH_STORAGE_SPEC_VERSION = "0.1.0"
+
+# Default edge/node attributes serialised for each component. Kept as tuples
+# (immutable) so they can safely be used as function argument defaults.
+DEFAULT_EDGE_FEATURES = ("len", "vdiff")
+DEFAULT_NODE_FEATURES = ("pos",)
 
 
 def to_pyg(
@@ -159,7 +170,12 @@ def to_pyg(
     logger.info(f"Saved node features {node_features} to {fp_node_features}.")
 
 
-def _graph_to_edge_tensors(graph, sender_map, receiver_map, edge_features=None):
+def _graph_to_edge_tensors(
+    graph: networkx.DiGraph,
+    sender_map: Dict[int, int],
+    receiver_map: Dict[int, int],
+    edge_features: Tuple[str, ...] = DEFAULT_EDGE_FEATURES,
+) -> Tuple["torch.Tensor", "torch.Tensor"]:
     """Convert a networkx DiGraph to edge_index and edge_features tensors.
 
     Edge indices are expressed in the per-node-set zero-based index spaces
@@ -177,8 +193,9 @@ def _graph_to_edge_tensors(graph, sender_map, receiver_map, edge_features=None):
     receiver_map : dict
         Mapping from global node label to zero-based index within the
         receiver node set.
-    edge_features : list of str, optional
-        Edge attribute names to include. Default: ["len", "vdiff"].
+    edge_features : tuple of str, optional
+        Edge attribute names to include, concatenated (in order) into the
+        feature columns. Default: ``("len", "vdiff")``.
 
     Returns
     -------
@@ -193,16 +210,24 @@ def _graph_to_edge_tensors(graph, sender_map, receiver_map, edge_features=None):
             "install weather-model-graphs[pytorch] to enable writing to torch files"
         )
 
-    if edge_features is None:
-        edge_features = ["len", "vdiff"]
-
-    # Deterministic edge ordering: sort by (sender index, receiver index)
+    # Sort edges by (sender index, receiver index) so the on-disk edge order
+    # is deterministic and independent of networkx's internal iteration
+    # order. Without this the same graph could serialise to different (but
+    # equivalent) edge_index/feature orderings between runs or machines,
+    # which breaks byte-for-byte reproducibility and makes diffing graphs
+    # harder.
     edges = sorted(
         graph.edges(data=True),
         key=lambda e: (sender_map[e[0]], receiver_map[e[1]]),
     )
 
+    # A component/subgraph may legitimately contain no edges (e.g. an
+    # inter-level up/down direction that has no connections for a given level
+    # pair). np.stack below would raise on an empty list, so return the
+    # correctly-shaped empty tensors explicitly instead.
     if len(edges) == 0:
+        # 3 feature columns for 2D graphs: [len, vdiff_x, vdiff_y]. The exact
+        # width is immaterial for a zero-row tensor but keeps the shape valid.
         return (
             torch.zeros((2, 0), dtype=torch.int64),
             torch.zeros((0, 3), dtype=torch.float32),
@@ -218,6 +243,9 @@ def _graph_to_edge_tensors(graph, sender_map, receiver_map, edge_features=None):
 
     rows = []
     for _, _, data in edges:
+        # np.atleast_1d normalises scalar and vector attributes to a common
+        # shape so they concatenate into one row: "len" is a scalar while
+        # "vdiff" is a 2-/3-vector, and np.concatenate requires 1-D inputs.
         vals = [
             np.atleast_1d(np.asarray(data[f], dtype=np.float64)) for f in edge_features
         ]
@@ -227,7 +255,11 @@ def _graph_to_edge_tensors(graph, sender_map, receiver_map, edge_features=None):
     return edge_index, features
 
 
-def _node_features_from_labels(graph, labels, node_features=None):
+def _node_features_from_labels(
+    graph: networkx.DiGraph,
+    labels: List[int],
+    node_features: Tuple[str, ...] = DEFAULT_NODE_FEATURES,
+) -> "torch.Tensor":
     """Extract node feature tensor for the given node labels, in order.
 
     Parameters
@@ -238,8 +270,9 @@ def _node_features_from_labels(graph, labels, node_features=None):
         Node labels defining the row order of the output tensor. This MUST
         be the same ordering used to build the corresponding node index map
         so that edge indices and node features stay consistent.
-    node_features : list of str, optional
-        Node attribute names to include. Default: ["pos"].
+    node_features : tuple of str, optional
+        Node attribute names to include, concatenated (in order) into the
+        feature columns. Default: ``("pos",)``.
 
     Returns
     -------
@@ -252,9 +285,6 @@ def _node_features_from_labels(graph, labels, node_features=None):
             "install weather-model-graphs[pytorch] to enable writing to torch files"
         )
 
-    if node_features is None:
-        node_features = ["pos"]
-
     rows = []
     for n in labels:
         data = graph.nodes[n]
@@ -265,9 +295,6 @@ def _node_features_from_labels(graph, labels, node_features=None):
     return torch.tensor(np.stack(rows), dtype=torch.float32)
 
 
-GRAPH_STORAGE_SPEC_VERSION = "0.1.0"
-
-
 def to_torch_tensors_on_disk(
     graph_components: Dict[str, networkx.DiGraph],
     output_directory: str,
@@ -276,25 +303,44 @@ def to_torch_tensors_on_disk(
     """
     Save graph components to the neural-lam tensor-on-disk format.
 
-    Takes graph components as returned by
-    ``wmg.create.archetype.*(..., return_components=True)`` and writes
-    ``.pt`` files conforming to the neural-lam graph storage specification
-    (version 0.1.0), as expected by ``neural_lam.utils.load_graph()``.
+    A "graph component" is one of the message-passing subgraphs that make up
+    a neural-lam graph: ``g2m`` (grid-to-mesh, the encoder edges), ``m2m``
+    (mesh-to-mesh, the processor edges) and ``m2g`` (mesh-to-grid, the
+    decoder edges). Each is a ``networkx.DiGraph`` whose nodes carry
+    ``"type"`` ("grid"/"mesh"), ``"pos"`` and (for hierarchical graphs)
+    ``"level"`` attributes, exactly as returned by
+    ``wmg.create.archetype.*(..., return_components=True)``. This function
+    turns those graphs into the ``.pt`` files that
+    ``neural_lam.utils.load_graph()`` expects, conforming to the neural-lam
+    graph storage specification (version ``0.1.0``).
 
-    Both edge features and mesh node features (positions) are written
-    **raw** (unnormalized) — neural-lam normalizes at load time. Edge
-    indices use per-node-set zero-based numbering: the grid node set and
-    each mesh-level node set are each numbered independently from ``0``
-    to ``N-1`` (in sorted global-node-label order).
+    Steps performed:
+
+    1. Validate that ``graph_components`` contains the required ``g2m``,
+       ``m2m`` and ``m2g`` keys.
+    2. Build per-node-set zero-based index maps: the grid node set is
+       numbered ``0..N_grid-1`` and each mesh level is numbered
+       ``0..N_level-1`` independently (in sorted global-node-label order),
+       as required by the spec's per-node-set index space.
+    3. Match the mesh nodes referenced by ``g2m``/``m2g`` to the bottom mesh
+       level by position, since those components label mesh nodes
+       differently from ``m2m``.
+    4. Convert ``g2m`` and ``m2g`` to single ``edge_index``/``features``
+       tensors and save them.
+    5. Convert ``m2m``: for hierarchical graphs, split by ``"direction"``
+       into intra-level (``m2m``) plus inter-level (``mesh_up``/
+       ``mesh_down``) tensors; for non-hierarchical graphs, write a single
+       merged ``m2m`` level (``L == 1``).
+    6. Write ``mesh_features.pt`` — the raw per-level mesh node positions.
+    7. Write ``metainfo.yaml`` recording the graph storage spec version.
+
+    Edge features and mesh node features are written **raw** (unnormalized);
+    neural-lam applies normalization at load time.
 
     Parameters
     ----------
     graph_components : dict of networkx.DiGraph
-        Dictionary with keys ``"g2m"``, ``"m2m"``, and ``"m2g"``, each mapping
-        to a directed graph. This is the output of
-        ``wmg.create.archetype.*(..., return_components=True)``. Nodes must
-        carry ``"type"`` ("grid"/"mesh"), ``"pos"`` and (for hierarchical
-        graphs) ``"level"`` attributes.
+        Dictionary with keys ``"g2m"``, ``"m2m"``, and ``"m2g"`` (see above).
     output_directory : str
         Directory where the ``.pt`` files will be saved.
     hierarchical : bool, optional
