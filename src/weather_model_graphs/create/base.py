@@ -30,12 +30,16 @@ from .mesh.connectivity.flat import (
 )
 from .mesh.connectivity.hierarchical import create_hierarchical_from_coordinates
 from .mesh.layout.rectilinear import (
-    create_multirange_2d_mesh_primitives,
-    create_single_level_2d_mesh_primitive,
+    create_multirange_2d_mesh_primitives as create_multirange_2d_rectilinear_mesh_primitives,
+)
+from .mesh.layout.rectilinear import (
+    create_single_level_2d_mesh_primitive as create_single_level_2d_rectilinear_mesh_primitive,
 )
 from .mesh.layout.triangular import (
-    create_multirange_2d_triangular_mesh_primitives,
-    create_single_level_2d_triangular_mesh_primitive,
+    create_multirange_2d_mesh_primitives as create_multirange_2d_triangular_mesh_primitives,
+)
+from .mesh.layout.triangular import (
+    create_single_level_2d_mesh_primitive as create_single_level_2d_triangular_mesh_primitive,
 )
 
 
@@ -301,12 +305,17 @@ def create_all_graph_components(
     if m2m_connectivity == "flat":
         # Single-level mesh primitive
         if mesh_layout == "rectilinear":
-            G_mesh_coords = create_single_level_2d_mesh_primitive(
+            G_mesh_coords = create_single_level_2d_rectilinear_mesh_primitive(
                 xy, mesh_node_spacing=mesh_node_spacing
             )
-        else:  # triangular
+        elif mesh_layout == "triangular":
             G_mesh_coords = create_single_level_2d_triangular_mesh_primitive(
                 xy, mesh_node_spacing=mesh_node_spacing
+            )
+        else:
+            raise NotImplementedError(
+                f"mesh_layout='{mesh_layout}' is not implemented. "
+                "Supported layouts: 'rectilinear', 'triangular'."
             )
     else:
         # Multi-level mesh primitives (flat_multiscale or hierarchical)
@@ -320,10 +329,17 @@ def create_all_graph_components(
                 "max_num_refinement_levels"
             ]
         if mesh_layout == "rectilinear":
-            G_mesh_coords = create_multirange_2d_mesh_primitives(**primitives_kwargs)
-        else:  # triangular
+            G_mesh_coords = create_multirange_2d_rectilinear_mesh_primitives(
+                **primitives_kwargs
+            )
+        elif mesh_layout == "triangular":
             G_mesh_coords = create_multirange_2d_triangular_mesh_primitives(
                 **primitives_kwargs
+            )
+        else:
+            raise NotImplementedError(
+                f"mesh_layout='{mesh_layout}' is not implemented. "
+                "Supported layouts: 'rectilinear', 'triangular'."
             )
 
     # -----------------------------------------------------------------------

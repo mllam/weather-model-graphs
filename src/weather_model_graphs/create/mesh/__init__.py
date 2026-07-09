@@ -7,6 +7,8 @@ from .layout.rectilinear import (
     create_single_level_2d_mesh_primitive,
 )
 from .layout.triangular import (
-    create_multirange_2d_triangular_mesh_primitives,
-    create_single_level_2d_triangular_mesh_primitive,
+    create_multirange_2d_mesh_primitives as create_multirange_2d_triangular_mesh_primitives,
+)
+from .layout.triangular import (
+    create_single_level_2d_mesh_primitive as create_single_level_2d_triangular_mesh_primitive,
 )

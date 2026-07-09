@@ -29,24 +29,11 @@ from weather_model_graphs.create.mesh.connectivity.hierarchical import (
     create_hierarchical_from_coordinates,
 )
 from weather_model_graphs.create.mesh.layout.triangular import (
-    create_multirange_2d_triangular_mesh_primitives,
-    create_single_level_2d_triangular_mesh_primitive,
+    create_multirange_2d_mesh_primitives as create_multirange_2d_triangular_mesh_primitives,
 )
-
-
-# Test helpers exercising the equivalent generic two-step API after the
-# triangular-specific convenience functions were removed (PR #92 review).
-def create_single_level_2d_triangular_mesh_graph(xy, nx, ny):
-    """Directed triangular mesh graph via primitive + generic connectivity."""
-    return create_directed_mesh_graph(
-        create_single_level_2d_triangular_mesh_primitive(xy, nx, ny)
-    )
-
-
-def create_flat_multiscale_from_triangular_coordinates(G_coords_list, **kwargs):
-    """Triangular flat-multiscale graph via the generalized generic function."""
-    return create_flat_multiscale_from_coordinates(G_coords_list, **kwargs)
-
+from weather_model_graphs.create.mesh.layout.triangular import (
+    create_single_level_2d_mesh_primitive as create_single_level_2d_triangular_mesh_primitive,
+)
 
 # ===========================
 # Fixtures
@@ -249,7 +236,7 @@ class TestTriangularDirectedGraph:
                 np.testing.assert_allclose(G[u][v]["len"], G[v][u]["len"], atol=1e-10)
 
     def test_vdiff_reciprocity(self, xy_small):
-        """vdiff(uΓåÆv) should equal -vdiff(vΓåÆu)."""
+        """vdiff(u->v) should equal -vdiff(v->u)."""
         G_coords = create_single_level_2d_triangular_mesh_primitive(
             xy_small, nx=5, ny=5
         )
@@ -261,8 +248,13 @@ class TestTriangularDirectedGraph:
                 )
 
     def test_pattern_4star_equals_8star(self, xy_small):
-        """For triangular lattice, 4-star and 8-star should produce identical
-        graphs since all edges are 'cardinal'."""
+        """The ``pattern`` argument selects edges by ``adjacency_type``:
+        ``4-star`` keeps cardinal edges, ``8-star`` keeps cardinal + diagonal.
+        A triangular lattice has only a single edge class (all ``cardinal``),
+        so ``4-star`` and ``8-star`` yield identical graphs here. (The "6" of a
+        triangular mesh refers to the node degree -- 6 neighbours per interior
+        node -- not to the ``pattern`` name, which describes rectilinear edge
+        classes.)"""
         G_coords = create_single_level_2d_triangular_mesh_primitive(
             xy_small, nx=5, ny=5
         )
@@ -319,7 +311,9 @@ class TestTriangularDirectedGraph:
 
     def test_minimal_lattice_directed(self, xy_small):
         """Minimal lattice (nx=1, ny=1) should still produce a valid directed graph."""
-        G = create_single_level_2d_triangular_mesh_graph(xy_small, nx=1, ny=1)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_small, nx=1, ny=1)
+        )
         assert isinstance(G, nx.DiGraph)
         assert G.number_of_nodes() >= 2
         assert G.number_of_edges() >= 2  # at least one bidirectional edge
@@ -457,33 +451,43 @@ class TestMultirangeTriangularPrimitives:
 
 
 class TestSingleLevelTriangularGraph:
-    """Tests for create_single_level_2d_triangular_mesh_graph."""
+    """Tests for the triangular single-level directed mesh graph."""
 
     def test_returns_digraph(self, xy_small):
-        G = create_single_level_2d_triangular_mesh_graph(xy_small, nx=5, ny=5)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_small, nx=5, ny=5)
+        )
         assert isinstance(G, nx.DiGraph)
 
     def test_has_bidirectional_edges(self, xy_small):
-        G = create_single_level_2d_triangular_mesh_graph(xy_small, nx=5, ny=5)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_small, nx=5, ny=5)
+        )
         for u, v in G.edges():
             assert G.has_edge(v, u)
 
     def test_edges_have_attributes(self, xy_small):
         """Directed graph edges should have len and vdiff."""
-        G = create_single_level_2d_triangular_mesh_graph(xy_small, nx=5, ny=5)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_small, nx=5, ny=5)
+        )
         for u, v, d in G.edges(data=True):
             assert "len" in d
             assert "vdiff" in d
 
     def test_with_rectangular_domain(self, xy_rectangular):
         """Should work correctly on non-square domains."""
-        G = create_single_level_2d_triangular_mesh_graph(xy_rectangular, nx=8, ny=5)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_rectangular, nx=8, ny=5)
+        )
         assert isinstance(G, nx.DiGraph)
         assert G.number_of_edges() > 0
 
     def test_minimal_grid(self, xy_small):
         """Minimal grid (nx=1, ny=1) should produce a valid graph."""
-        G = create_single_level_2d_triangular_mesh_graph(xy_small, nx=1, ny=1)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_small, nx=1, ny=1)
+        )
         assert G.number_of_nodes() >= 2
 
 
@@ -496,7 +500,7 @@ class TestFlatMultiscaleTriangular:
     """Tests for flat multiscale triangular mesh graph using two-step API.
 
     Uses ``create_multirange_2d_triangular_mesh_primitives`` (coordinate
-    creation) followed by ``create_flat_multiscale_from_triangular_coordinates``
+    creation) followed by ``create_flat_multiscale_from_coordinates``
     (connectivity creation with position-based merging).
     """
 
@@ -514,7 +518,7 @@ class TestFlatMultiscaleTriangular:
             mesh_node_spacing=mesh_node_spacing,
             interlevel_refinement_factor=interlevel_refinement_factor,
         )
-        return create_flat_multiscale_from_triangular_coordinates(G_coords_list)
+        return create_flat_multiscale_from_coordinates(G_coords_list)
 
     def test_returns_digraph(self, xy_medium):
         G = self._create_multiscale(xy_medium)
@@ -540,7 +544,7 @@ class TestFlatMultiscaleTriangular:
             interlevel_refinement_factor=3,
         )
         total_raw = sum(g.number_of_nodes() for g in G_coords_list)
-        G = create_flat_multiscale_from_triangular_coordinates(G_coords_list)
+        G = create_flat_multiscale_from_coordinates(G_coords_list)
         # Merged graph has at most as many nodes (usually fewer)
         assert G.number_of_nodes() <= total_raw
 
@@ -592,7 +596,7 @@ class TestFlatMultiscaleTriangular:
         if len(G_coords_list) < 2:
             pytest.skip("Only one level created")
         coarsest_nodes = G_coords_list[-1].number_of_nodes()
-        G_multi = create_flat_multiscale_from_triangular_coordinates(G_coords_list)
+        G_multi = create_flat_multiscale_from_coordinates(G_coords_list)
         assert G_multi.number_of_nodes() > coarsest_nodes
 
 
@@ -928,13 +932,17 @@ class TestNumericalCorrectness:
     """Test numerical properties of the triangular mesh graph."""
 
     def test_edge_lengths_positive(self, xy_medium):
-        G = create_single_level_2d_triangular_mesh_graph(xy_medium, nx=5, ny=5)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_medium, nx=5, ny=5)
+        )
         for u, v, d in G.edges(data=True):
             assert d["len"] > 0
 
     def test_vdiff_consistent_with_pos(self, xy_small):
         """vdiff should equal pos(u) - pos(v)."""
-        G = create_single_level_2d_triangular_mesh_graph(xy_small, nx=5, ny=5)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_small, nx=5, ny=5)
+        )
         for u, v, d in G.edges(data=True):
             pos_u = G.nodes[u]["pos"]
             pos_v = G.nodes[v]["pos"]
@@ -943,28 +951,36 @@ class TestNumericalCorrectness:
 
     def test_len_consistent_with_vdiff(self, xy_small):
         """len should equal the L2 norm of vdiff."""
-        G = create_single_level_2d_triangular_mesh_graph(xy_small, nx=5, ny=5)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_small, nx=5, ny=5)
+        )
         for u, v, d in G.edges(data=True):
             expected_len = np.linalg.norm(d["vdiff"])
             np.testing.assert_allclose(d["len"], expected_len, atol=1e-10)
 
     def test_no_nan_in_edge_attrs(self, xy_small):
         """Edge attributes should contain no NaN or Inf."""
-        G = create_single_level_2d_triangular_mesh_graph(xy_small, nx=6, ny=6)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_small, nx=6, ny=6)
+        )
         for u, v, d in G.edges(data=True):
             assert np.isfinite(d["len"])
             assert np.isfinite(d["vdiff"]).all()
 
     def test_no_zero_length_edges(self, xy_small):
         """All edges should have strictly positive length."""
-        G = create_single_level_2d_triangular_mesh_graph(xy_small, nx=6, ny=6)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_small, nx=6, ny=6)
+        )
         for u, v, d in G.edges(data=True):
             assert d["len"] > 1e-12
 
     def test_edge_lengths_roughly_uniform_for_interior(self, xy_small):
         """For a uniform triangular lattice, all edges should have similar
         length (within a narrow tolerance, accounting for scaling)."""
-        G = create_single_level_2d_triangular_mesh_graph(xy_small, nx=8, ny=8)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_small, nx=8, ny=8)
+        )
         lengths = [d["len"] for _, _, d in G.edges(data=True)]
         # In a uniformly scaled equilateral mesh, all edges should be
         # within ~50% of each other (accounting for aspect ratio scaling)
@@ -980,15 +996,21 @@ class TestNumericalCorrectness:
         """Doubling the domain should roughly double edge lengths."""
         xy1 = np.array([[0, 0], [10, 0], [0, 10], [10, 10]], dtype=float)
         xy2 = np.array([[0, 0], [20, 0], [0, 20], [20, 20]], dtype=float)
-        G1 = create_single_level_2d_triangular_mesh_graph(xy1, nx=5, ny=5)
-        G2 = create_single_level_2d_triangular_mesh_graph(xy2, nx=5, ny=5)
+        G1 = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy1, nx=5, ny=5)
+        )
+        G2 = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy2, nx=5, ny=5)
+        )
         avg_len1 = np.mean([d["len"] for _, _, d in G1.edges(data=True)])
         avg_len2 = np.mean([d["len"] for _, _, d in G2.edges(data=True)])
         np.testing.assert_allclose(avg_len2 / avg_len1, 2.0, rtol=0.1)
 
     def test_no_nan_in_positions(self, xy_medium):
         """No node should have NaN in positions."""
-        G = create_single_level_2d_triangular_mesh_graph(xy_medium, nx=5, ny=5)
+        G = create_directed_mesh_graph(
+            create_single_level_2d_triangular_mesh_primitive(xy_medium, nx=5, ny=5)
+        )
         for node in G.nodes:
             pos = G.nodes[node]["pos"]
             assert isinstance(pos, np.ndarray)

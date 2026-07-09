@@ -20,7 +20,7 @@ import numpy as np
 from loguru import logger
 
 
-def create_single_level_2d_triangular_mesh_primitive(
+def create_single_level_2d_mesh_primitive(
     xy: np.ndarray,
     nx: int = None,
     ny: int = None,
@@ -154,7 +154,7 @@ def create_single_level_2d_triangular_mesh_primitive(
     return g
 
 
-def create_multirange_2d_triangular_mesh_primitives(
+def create_multirange_2d_mesh_primitives(
     max_num_levels,
     xy: np.ndarray,
     mesh_node_spacing: float = 3,
@@ -205,7 +205,7 @@ def create_multirange_2d_triangular_mesh_primitives(
     G_all_levels = []
     for lev in range(mesh_levels_to_create):
         nodes_x, nodes_y = (nleaf / (interlevel_refinement_factor**lev)).astype(int)
-        g = create_single_level_2d_triangular_mesh_primitive(xy, nodes_x, nodes_y)
+        g = create_single_level_2d_mesh_primitive(xy, nodes_x, nodes_y)
         for node in g.nodes:
             g.nodes[node]["level"] = lev
         for edge in g.edges:

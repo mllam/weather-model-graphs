@@ -75,7 +75,7 @@ def create_flat_multiscale_from_coordinates(
         - Edge attributes: ``"adjacency_type"`` (str, ``"cardinal"`` or ``"diagonal"``)
         - Graph attribute: ``"interlevel_refinement_factor"`` (int)
         Created by ``create_multirange_2d_mesh_primitives`` (rectilinear) or
-        ``create_multirange_2d_triangular_mesh_primitives`` (triangular).
+        ``create_multirange_2d_mesh_primitives`` (triangular).
     **kwargs
         Additional keyword arguments passed to ``create_directed_mesh_graph``
         (e.g. ``pattern="8-star"``).
