@@ -98,13 +98,14 @@ def create_flat_icosahedral_mesh_graph(
         Directed graph with mesh nodes and edges.
     """
     vertices, faces = generate_icosahedral_mesh(subdivisions, radius)
-    lat_lon = cartesian_to_lat_lon(vertices)
+    # WMG stores node positions as xy = [lon, lat]
+    lon_lat = cartesian_to_lat_lon(vertices)[:, ::-1]
 
     g = nx.Graph()
     for i in range(len(vertices)):
         g.add_node(
             i,
-            pos=lat_lon[i],
+            pos=lon_lat[i],
             type="mesh",
             level=None,
         )
@@ -182,14 +183,15 @@ def create_hierarchical_icosahedral_mesh_graph(
         vertices, faces = mesh_list[level]
         vertices_by_level.append(vertices)
         faces_by_level.append(faces)
-        lat_lon = cartesian_to_lat_lon(vertices)
+        # WMG stores node positions as xy = [lon, lat]
+        lon_lat = cartesian_to_lat_lon(vertices)[:, ::-1]
         offset = level_offsets[level]
 
         for i in range(len(vertices)):
             node_id = offset + i
             dg.add_node(
                 node_id,
-                pos=lat_lon[i],
+                pos=lon_lat[i],
                 type="mesh",
                 level=level,
             )

@@ -31,7 +31,7 @@ def sample_grid_1deg():
     lats = np.arange(-90, 91, 1)
     lons = np.arange(-180, 181, 1)
     grid_lat, grid_lon = np.meshgrid(lats, lons, indexing="ij")
-    return np.column_stack([grid_lat.ravel(), grid_lon.ravel()])
+    return np.column_stack([grid_lon.ravel(), grid_lat.ravel()])
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def sample_grid_5deg():
     lats = np.arange(-90, 91, 5)
     lons = np.arange(-180, 181, 5)
     grid_lat, grid_lon = np.meshgrid(lats, lons, indexing="ij")
-    return np.column_stack([grid_lat.ravel(), grid_lon.ravel()])
+    return np.column_stack([grid_lon.ravel(), grid_lat.ravel()])
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def sample_grid_10deg():
     lats = np.arange(-90, 91, 10)
     lons = np.arange(-180, 181, 10)
     grid_lat, grid_lon = np.meshgrid(lats, lons, indexing="ij")
-    return np.column_stack([grid_lat.ravel(), grid_lon.ravel()])
+    return np.column_stack([grid_lon.ravel(), grid_lat.ravel()])
 
 
 @pytest.fixture
@@ -103,8 +103,8 @@ class TestIcosahedralMeshGraphs:
             assert data["level"] is None
             pos = data["pos"]
             assert pos.shape == (2,)
-            assert -90 <= pos[0] <= 90
-            assert -180 <= pos[1] <= 180
+            assert -180 <= pos[0] <= 180
+            assert -90 <= pos[1] <= 90
         for u, v, data in G.edges(data=True):
             assert "len" in data
             assert "vdiff" in data

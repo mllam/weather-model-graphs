@@ -9,7 +9,7 @@ function uses `connect_nodes_across_graphs` to connect nodes across the componen
 """
 
 import warnings
-from typing import Dict, Iterable, List, Tuple, Union
+from typing import Dict, Iterable, Tuple, Union
 
 import networkx
 import numpy as np
@@ -31,6 +31,30 @@ from .mesh.coords import (
     create_multirange_2d_mesh_primitives,
     create_single_level_2d_mesh_primitive,
 )
+
+
+def _is_geographic_crs(crs) -> bool:
+    """Check if a CRS is geographic. Returns True if geographic or unknown."""
+    if crs is None:
+        return True
+
+    # Normalise to a pyproj CRS object so .is_geographic is a reliable scalar.
+    try:
+        parsed = pyproj.CRS.from_user_input(crs)
+        val = parsed.is_geographic
+        # Guard against unusual pyproj builds that return array-like values
+        if hasattr(val, "__iter__"):
+            return bool(int(np.asarray(val).flat[0]))
+        return bool(int(val))
+    except Exception:
+        pass
+
+    # String heuristic fallback
+    try:
+        crs_str = str(crs).upper()
+        return any(k in crs_str for k in ("4326", "WGS84", "GEOGRAPHIC", "LATLONG"))
+    except Exception:
+        return True  # Can't determine → assume geographic, suppress warning
 
 
 def _migrate_deprecated_kwargs(
@@ -302,35 +326,6 @@ def create_all_graph_components(
             refinement_level_from_grid_spacing,
         )
 
-        def _is_geographic_crs(crs):
-            """Check if a CRS is geographic. Returns True if geographic or unknown."""
-            if crs is None:
-                return True
-
-            # Normalise to a pyproj CRS object so .is_geographic is a reliable scalar.
-            try:
-                parsed = pyproj.CRS.from_user_input(crs)
-                val = parsed.is_geographic
-                # Guard against unusual pyproj builds that return array-like values
-                if hasattr(val, "__iter__"):
-                    import numpy as _np
-
-                    return bool(int(_np.asarray(val).flat[0]))
-                return bool(int(val))
-            except Exception:
-                pass
-
-            # String heuristic fallback
-            try:
-                crs_str = str(crs).upper()
-                if any(
-                    k in crs_str for k in ("4326", "WGS84", "GEOGRAPHIC", "LATLONG")
-                ):
-                    return True
-                return False
-            except Exception:
-                return True  # Can't determine → assume geographic, suppress warning
-
         if graph_crs is not None:
             is_geographic = _is_geographic_crs(graph_crs)
             if not is_geographic:
@@ -581,34 +576,37 @@ def connect_nodes_across_graphs(
     )
     use_spherical = source_is_icosahedral or target_is_icosahedral
 
+    # Node positions follow the WMG xy convention: pos = [lon, lat] in degrees for
+    # geographic coordinates. Longitude wrapping (±360) is only meaningful for such
+    # grids, so gate it on the graph CRS being geographic; for projected/plane
+    # coordinates wrapping would corrupt distances.
+    crs = G_source.graph.get("crs") or G_target.graph.get("crs")
+    wrap_longitude = not use_spherical and crs is not None and _is_geographic_crs(crs)
+
     if use_spherical:
         from weather_model_graphs.create.mesh.layouts.icosahedral import (
             lat_lon_to_cartesian,
             tangential_plane_vdiff,
         )
 
-    if source_is_icosahedral:
-        source_lats = np.array([G_source.nodes[n]["pos"][0] for n in source_nodes_list])
-        source_lons = np.array([G_source.nodes[n]["pos"][1] for n in source_nodes_list])
-        xy_source = lat_lon_to_cartesian(source_lats, source_lons)
-        use_3d = True
-    elif target_is_icosahedral:
-        source_lats = np.array([G_source.nodes[n]["pos"][0] for n in source_nodes_list])
-        source_lons = np.array([G_source.nodes[n]["pos"][1] for n in source_nodes_list])
+        def _pos_to_cartesian(pos):
+            # pos is xy = [lon, lat] in degrees; return unit-sphere Cartesian
+            return lat_lon_to_cartesian(np.array([pos[1]]), np.array([pos[0]]))[0]
+
+    if use_spherical:
+        source_lons = np.array([G_source.nodes[n]["pos"][0] for n in source_nodes_list])
+        source_lats = np.array([G_source.nodes[n]["pos"][1] for n in source_nodes_list])
         xy_source = lat_lon_to_cartesian(source_lats, source_lons)
         use_3d = True
     else:
-        source_lat_lon = np.array([G_source.nodes[n]["pos"] for n in source_nodes_list])
-        source_positions = []
-        for offset in [-360, 0, 360]:
-            shifted = source_lat_lon.copy()
-            shifted[:, 1] += offset
-            source_positions.append(shifted)
-        xy_source = np.vstack(source_positions)
-        source_node_mapping = []
-        for offset_idx, offset in enumerate([-360, 0, 360]):
-            for orig_idx, node in enumerate(source_nodes_list):
-                source_node_mapping.append((node, offset, orig_idx))
+        source_lon_lat = np.array([G_source.nodes[n]["pos"] for n in source_nodes_list])
+        offsets = [-360, 0, 360] if wrap_longitude else [0]
+        xy_source = np.vstack([source_lon_lat + [offset, 0] for offset in offsets])
+        source_node_mapping = [
+            (node, offset, orig_idx)
+            for offset in offsets
+            for orig_idx, node in enumerate(source_nodes_list)
+        ]
         use_3d = False
 
     kdt_s = scipy.spatial.KDTree(xy_source)
@@ -762,7 +760,9 @@ def connect_nodes_across_graphs(
                 "to be passed to connect_nodes_across_graphs."
             )
 
-        grid_lat_lon = np.array([G_target.nodes[n]["pos"] for n in target_nodes_list])
+        # Grid pos is xy = [lon, lat]; connect_mesh_to_grid expects [lat, lon]
+        grid_lon_lat = np.array([G_target.nodes[n]["pos"] for n in target_nodes_list])
+        grid_lat_lon = grid_lon_lat[:, ::-1]
         fallback_to_nearest = kwargs.get("fallback_to_nearest", True)
 
         edge_index, weights = connect_mesh_to_grid(
@@ -807,29 +807,10 @@ def connect_nodes_across_graphs(
             source_pos_2d = G_connect.nodes[source_node]["pos"]
             target_pos_2d = G_connect.nodes[target_node]["pos"]
 
-            if source_is_icosahedral:
-                source_pos_3d = lat_lon_to_cartesian(
-                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
-                )[0]
-                target_pos_3d = lat_lon_to_cartesian(
-                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
-                )[0]
-                d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
-                vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
-            elif target_is_icosahedral:
-                source_pos_3d = lat_lon_to_cartesian(
-                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
-                )[0]
-                target_pos_3d = lat_lon_to_cartesian(
-                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
-                )[0]
-                d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
-                vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
-            else:
-                dlat = source_pos_2d[0] - target_pos_2d[0]
-                dlon = (source_pos_2d[1] - target_pos_2d[1] + 180) % 360 - 180
-                d = np.sqrt(dlat**2 + dlon**2)
-                vdiff = np.array([dlat, dlon])
+            source_pos_3d = _pos_to_cartesian(source_pos_2d)
+            target_pos_3d = _pos_to_cartesian(target_pos_2d)
+            d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
+            vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
 
             if G_connect.has_edge(source_node, target_node):
                 # Duplicate edge (same mesh vertex connected to same grid point by
@@ -874,18 +855,14 @@ def connect_nodes_across_graphs(
         target_pos_2d = G_target.nodes[target_node]["pos"]
 
         if use_3d:
-            query_point = lat_lon_to_cartesian(
-                np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
-            )[0]
-            query_points_for_kdt = query_point
-        else:
+            query_points_for_kdt = _pos_to_cartesian(target_pos_2d)
+        elif wrap_longitude:
+            lon, lat = target_pos_2d[0], target_pos_2d[1]
             query_points_for_kdt = np.array(
-                [
-                    [target_pos_2d[0], target_pos_2d[1] - 360],
-                    [target_pos_2d[0], target_pos_2d[1]],
-                    [target_pos_2d[0], target_pos_2d[1] + 360],
-                ]
+                [[lon - 360, lat], [lon, lat], [lon + 360, lat]]
             )
+        else:
+            query_points_for_kdt = np.array([[target_pos_2d[0], target_pos_2d[1]]])
 
         neigh_idxs = _find_neighbour_node_idxs_in_source_mesh(query_points_for_kdt)
 
@@ -893,51 +870,21 @@ def connect_nodes_across_graphs(
             source_node = source_nodes_list[i]
             source_pos_2d = G_connect.nodes[source_node]["pos"]
 
-            if source_is_icosahedral:
-                source_pos_3d = lat_lon_to_cartesian(
-                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
-                )[0]
-                target_pos_3d = lat_lon_to_cartesian(
-                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
-                )[0]
+            if use_spherical:
+                source_pos_3d = _pos_to_cartesian(source_pos_2d)
+                target_pos_3d = _pos_to_cartesian(target_pos_2d)
                 d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
-            elif target_is_icosahedral:
-                source_pos_3d = lat_lon_to_cartesian(
-                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
-                )[0]
-                target_pos_3d = lat_lon_to_cartesian(
-                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
-                )[0]
-                d = np.sqrt(np.sum((source_pos_3d - target_pos_3d) ** 2))
+                vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
             else:
-                dlat = source_pos_2d[0] - target_pos_2d[0]
-                dlon = source_pos_2d[1] - target_pos_2d[1]
-                dlon = (dlon + 180) % 360 - 180
-                d = np.sqrt(dlat**2 + dlon**2)
+                dlon = source_pos_2d[0] - target_pos_2d[0]
+                dlat = source_pos_2d[1] - target_pos_2d[1]
+                if wrap_longitude:
+                    dlon = (dlon + 180) % 360 - 180
+                d = np.sqrt(dlon**2 + dlat**2)
+                vdiff = np.array([dlon, dlat])
 
             G_connect.add_edge(source_node, target_node)
             G_connect.edges[source_node, target_node]["len"] = d
-
-            if source_is_icosahedral:
-                source_pos_3d = lat_lon_to_cartesian(
-                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
-                )[0]
-                target_pos_3d = lat_lon_to_cartesian(
-                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
-                )[0]
-                vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
-            elif target_is_icosahedral:
-                source_pos_3d = lat_lon_to_cartesian(
-                    np.array([source_pos_2d[0]]), np.array([source_pos_2d[1]])
-                )[0]
-                target_pos_3d = lat_lon_to_cartesian(
-                    np.array([target_pos_2d[0]]), np.array([target_pos_2d[1]])
-                )[0]
-                vdiff = tangential_plane_vdiff(source_pos_3d, target_pos_3d)
-            else:
-                dlat = source_pos_2d[0] - target_pos_2d[0]
-                dlon = (source_pos_2d[1] - target_pos_2d[1] + 180) % 360 - 180
-                vdiff = np.array([dlat, dlon])
             G_connect.edges[source_node, target_node]["vdiff"] = vdiff
 
     return G_connect
