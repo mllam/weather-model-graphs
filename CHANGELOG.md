@@ -5,11 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.3.0...HEAD)
 
 ### Added
 
-- Added a standalone graph consistency checking tool (`wmg.diagnostics.check_graph_consistency`) to ensure structural health, such as verifying all grid nodes successfully connect to the mesh (#42).
+- Add `mesh_layout` argument to mesh graph creation functions, with `rectilinear`
+  as the first supported layout. Uses a two-step architecture separating coordinate
+  creation from connectivity creation, enabling future alternative layouts (e.g. triangular).
+  [\#78](https://github.com/mllam/weather-model-graphs/issues/78), @prajwal-tech07
+- Add a standalone graph consistency checking tool (`wmg.diagnostics.check_graph_consistency`) to ensure structural health, such as verifying all grid nodes successfully connect to the mesh (#42).
 - Add Django-style graph filtering via `filter_graph`, for example to select
   nodes by type (`node__type="mesh"`), edges by component
   (`edge__component="g2m"`), long edges (`edge__len__gt=...`), and spatial

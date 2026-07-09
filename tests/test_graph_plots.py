@@ -14,6 +14,7 @@ def test_plot():
     graph = wmg.create.create_all_graph_components(
         m2m_connectivity="flat_multiscale",
         coords=xy,
+        mesh_layout="rectilinear",
         m2m_connectivity_kwargs=dict(
             max_num_levels=3,
             mesh_node_distance=2,
@@ -62,5 +63,5 @@ def test_plot():
                 else:
                     fn()
 
-    with tempfile.NamedTemporaryFile(suffix=".png") as f:
-        fig.savefig(f.name)
+    with tempfile.NamedTemporaryFile(suffix=".png") as fh:
+        fig.savefig(fh)
