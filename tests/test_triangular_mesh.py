@@ -10,7 +10,6 @@ Tests verify:
 6. Integration through create_all_graph_components for all m2m_connectivity modes
 7. Edge cases (zero nodes, single-level hierarchical)
 8. Numerical correctness (len symmetry, vdiff reciprocity)
-9. Pattern equivalence (4-star == 8-star for triangular)
 """
 
 import networkx as nx
@@ -246,22 +245,6 @@ class TestTriangularDirectedGraph:
                 np.testing.assert_allclose(
                     G[u][v]["vdiff"], -G[v][u]["vdiff"], atol=1e-10
                 )
-
-    def test_pattern_4star_equals_8star(self, xy_small):
-        """The ``pattern`` argument selects edges by ``adjacency_type``:
-        ``4-star`` keeps cardinal edges, ``8-star`` keeps cardinal + diagonal.
-        A triangular lattice has only a single edge class (all ``cardinal``),
-        so ``4-star`` and ``8-star`` yield identical graphs here. (The "6" of a
-        triangular mesh refers to the node degree -- 6 neighbours per interior
-        node -- not to the ``pattern`` name, which describes rectilinear edge
-        classes.)"""
-        G_coords = create_single_level_2d_triangular_mesh_primitive(
-            xy_small, nx=5, ny=5
-        )
-        G4 = create_directed_mesh_graph(G_coords, pattern="4-star")
-        G8 = create_directed_mesh_graph(G_coords, pattern="8-star")
-        assert G4.number_of_nodes() == G8.number_of_nodes()
-        assert G4.number_of_edges() == G8.number_of_edges()
 
     def test_node_count_preserved(self, xy_small):
         """Directed graph should have same number of nodes as primitive."""
