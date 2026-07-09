@@ -1,7 +1,9 @@
+from typing import Dict, Tuple
+
 import networkx
 
 
-def prepend_node_index(graph, new_index):
+def prepend_node_index(graph, new_index) -> networkx.Graph:
     """
     Prepend node index to node tuple in graph, i.e. (i, j) -> (new_index, i, j)
 
@@ -22,7 +24,7 @@ def prepend_node_index(graph, new_index):
     return networkx.relabel_nodes(graph, to_mapping, copy=True)
 
 
-def sort_nodes_internally(nx_graph, node_attr=None, edge_attr=None):
+def sort_nodes_internally(nx_graph, node_attr=None, edge_attr=None) -> networkx.DiGraph:
     # For some reason the networkx .nodes() return list can not be sorted,
     # but this is the ordering used by pyg when converting.
     # This function fixes this.
@@ -47,7 +49,7 @@ class MissingEdgeAttributeError(Exception):
     pass
 
 
-def split_graph_by_edge_attribute(graph, attr):
+def split_graph_by_edge_attribute(graph, attr) -> Dict[str, networkx.Graph]:
     """
     Split a graph into subgraphs based on an edge attribute, returning
     a dictionary of subgraphs keyed by the edge attribute value.
@@ -101,7 +103,7 @@ def split_graph_by_edge_attribute(graph, attr):
     return subgraphs
 
 
-def sort_nodes_in_graph(graph):
+def sort_nodes_in_graph(graph) -> networkx.DiGraph:
     """
     Creates a new networkx.DiGraph that is a copy of input, but with nodes
     sorted according to their label value
@@ -123,7 +125,7 @@ def sort_nodes_in_graph(graph):
     return sorted_graph
 
 
-def replace_node_labels_with_unique_ids(graph):
+def replace_node_labels_with_unique_ids(graph) -> networkx.Graph:
     """
     Rename node labels with unique id.
 
@@ -144,7 +146,9 @@ def replace_node_labels_with_unique_ids(graph):
     )
 
 
-def split_on_edge_attribute_existance(graph, attr):
+def split_on_edge_attribute_existance(
+    graph, attr
+) -> Tuple[networkx.Graph, networkx.Graph]:
     """
     Split up graph based on if edges have specific attribute.
 

@@ -550,7 +550,7 @@ class TestEdgeCases:
         assert edges.shape[1] > 0
 
     def test_unknown_mesh_layout_error(self, sample_grid_5deg, geographic_crs):
-        with pytest.raises(ValueError, match="Unknown mesh_layout 'invalid'"):
+        with pytest.raises(NotImplementedError, match="not yet supported"):
             create_all_graph_components(
                 coords=sample_grid_5deg,
                 mesh_layout="invalid",
