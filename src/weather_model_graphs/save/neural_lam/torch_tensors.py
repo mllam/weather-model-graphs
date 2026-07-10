@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pickle
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -8,166 +7,15 @@ import networkx
 import numpy as np
 from loguru import logger
 
-from .networkx_utils import (
-    MissingEdgeAttributeError,
-    sort_nodes_in_graph,
-    split_graph_by_edge_attribute,
-)
+from ...networkx_utils import MissingEdgeAttributeError, split_graph_by_edge_attribute
+from ..base import DEFAULT_EDGE_FEATURES, DEFAULT_NODE_FEATURES, HAS_PYG
 
-try:
+if HAS_PYG:
     import torch
-    import torch_geometric as pyg
-    import torch_geometric.utils.convert as pyg_convert
-
-    HAS_PYG = True
-except ImportError:
-    HAS_PYG = False
 
 # Version of the neural-lam graph storage spec that the tensor-on-disk output
 # conforms to. Written into metainfo.yaml by ``to_torch_tensors_on_disk``.
 GRAPH_STORAGE_SPEC_VERSION = "0.1.0"
-
-# Default edge/node attributes serialised for each component. Kept as tuples
-# (immutable) so they can safely be used as function argument defaults.
-DEFAULT_EDGE_FEATURES = ("len", "vdiff")
-DEFAULT_NODE_FEATURES = ("pos",)
-
-
-def to_pyg(
-    graph: networkx.DiGraph,
-    output_directory: str,
-    name: str,
-    edge_features: List[str] | None = None,
-    node_features: List[str] | None = None,
-    list_from_attribute=None,
-):
-    """
-    Save the networkx graph to PyTorch Geometric format that matches what the
-    neural-lam model expects as input
-
-    Parameters
-    ----------
-    graph : networkx.DiGraph
-        Graph to save.
-    output_directory : str
-        Directory to save the graph to.
-    name : str
-        Name of the graph, this is used to name the files. The edge index and features
-        are saved to {output_directory}/{name}_edge_index.pt and
-        {output_directory}/{name}_features.pt respectively.
-    list_from_attribute : str, optional
-        If provided, the graph is split by the attribute value of the edges. The
-        stored edge index and features are then the concatenation of the split graphs,
-        so that a separate pyg.Data object can be created for each subgraph
-        (e.g. one for each level in a multi-level graph). Default is None.
-    edge_features: List[str]
-        list of edge attributes to include in `{name}_edge_features.pt` file
-    node_features: List[str]
-        list of node attributes to include in `{name}_node_features.pt` file
-
-    Returns
-    -------
-    None
-    """
-    if name is None:
-        raise ValueError("Name must be provided.")
-
-    if not HAS_PYG:
-        raise Exception(
-            "install weather-mode-graphs[pytorch] to enable writing to torch files"
-        )
-
-    # Default values for arguments
-    if edge_features is None:
-        edge_features = ["len", "vdiff"]
-
-    if node_features is None:
-        node_features = ["pos"]
-
-    # check that the node labels are integers and unique so that they can be used as indices
-    if not all(isinstance(node, int) for node in graph.nodes):
-        node_types = set([type(node) for node in graph.nodes])
-        raise ValueError(
-            f"Node labels must be integers. Instead they are of types {node_types}."
-        )
-    if len(set(graph.nodes)) != len(graph.nodes):
-        raise ValueError("Node labels must be unique.")
-
-    # remove all node attributes but the ones we want to keep
-    for node in graph.nodes:
-        for attr in list(graph.nodes[node].keys()):
-            if attr not in node_features:
-                del graph.nodes[node][attr]
-
-    def _get_edge_indecies(pyg_g):
-        return pyg_g.edge_index
-
-    def _concat_pyg_features(
-        pyg_g: "pyg.data.Data", features: List[str]
-    ) -> torch.Tensor:
-        """Convert features from pyg.Data object to torch.Tensor.
-        Each feature should be column in the resulting 2D tensor (n_edges or n_nodes, n_features).
-        Note, this function can handle node AND edge features.
-        """
-        v_concat = []
-        for f in features:
-            v = pyg_g[f]
-            # Convert 1D features into 1xN tensor
-            if v.ndim == 1:
-                v = v.unsqueeze(1)
-            v_concat.append(v)
-
-        return torch.cat(v_concat, dim=1).to(torch.float32)
-
-    if list_from_attribute is not None:
-        # create a list of graph objects by splitting the graph by the list_from_attribute
-        try:
-            sub_graphs = [
-                value
-                for key, value in sorted(
-                    split_graph_by_edge_attribute(
-                        graph=graph, attr=list_from_attribute
-                    ).items()
-                )
-            ]
-        except MissingEdgeAttributeError:
-            # neural-lam still expects a list of graphs, so if the attribute is missing
-            # we just return the original graph as a list
-            sub_graphs = [graph]
-        # Nodes must be sorted if we want to preserve the ordering in node
-        # labels when we convert to a pyg object. This conversion does not care
-        # about node labels inherently.
-        pyg_graphs = [
-            pyg_convert.from_networkx(sort_nodes_in_graph(g)) for g in sub_graphs
-        ]
-    else:
-        pyg_graphs = [pyg_convert.from_networkx(sort_nodes_in_graph(graph))]
-
-    edge_features_values = [
-        _concat_pyg_features(pyg_g, features=edge_features) for pyg_g in pyg_graphs
-    ]
-    edge_indecies = [_get_edge_indecies(pyg_g) for pyg_g in pyg_graphs]
-    node_features_values = [
-        _concat_pyg_features(pyg_g, features=node_features) for pyg_g in pyg_graphs
-    ]
-
-    if list_from_attribute is None:
-        edge_features_values = edge_features_values[0]
-        edge_indecies = edge_indecies[0]
-
-    Path(output_directory).mkdir(exist_ok=True, parents=True)
-    fp_edge_index = Path(output_directory) / f"{name}_edge_index.pt"
-    fp_features = Path(output_directory) / f"{name}_features.pt"
-    torch.save(edge_indecies, fp_edge_index)
-    torch.save(edge_features_values, fp_features)
-    logger.info(
-        f"Saved edge index to {fp_edge_index} and features {edge_features} to {fp_features}."
-    )
-
-    # save node features
-    fp_node_features = Path(output_directory) / f"{name}_node_features.pt"
-    torch.save(node_features_values, fp_node_features)
-    logger.info(f"Saved node features {node_features} to {fp_node_features}.")
 
 
 def _graph_to_edge_tensors(
@@ -204,6 +52,12 @@ def _graph_to_edge_tensors(
     features : torch.Tensor
         Shape (num_edges, num_feature_cols), dtype float32. With default
         features this is (num_edges, 3) for [len, vdiff_x, vdiff_y].
+
+    Raises
+    ------
+    ValueError
+        If the graph contains no edges. Every graph component is expected to
+        have at least one edge.
     """
     if not HAS_PYG:
         raise RuntimeError(
@@ -221,16 +75,15 @@ def _graph_to_edge_tensors(
         key=lambda e: (sender_map[e[0]], receiver_map[e[1]]),
     )
 
-    # A component/subgraph may legitimately contain no edges (e.g. an
-    # inter-level up/down direction that has no connections for a given level
-    # pair). np.stack below would raise on an empty list, so return the
-    # correctly-shaped empty tensors explicitly instead.
+    # Every graph component is expected to contain at least one edge. An
+    # empty edge set indicates a malformed graph (e.g. mesh nodes left
+    # completely unconnected), so fail loudly instead of silently writing an
+    # empty tensor.
     if len(edges) == 0:
-        # 3 feature columns for 2D graphs: [len, vdiff_x, vdiff_y]. The exact
-        # width is immaterial for a zero-row tensor but keeps the shape valid.
-        return (
-            torch.zeros((2, 0), dtype=torch.int64),
-            torch.zeros((0, 3), dtype=torch.float32),
+        raise ValueError(
+            "Cannot serialise an empty edge set: the (sub)graph passed to "
+            "_graph_to_edge_tensors has no edges. Every graph component must "
+            "contain at least one edge."
         )
 
     edge_index = torch.tensor(
@@ -295,11 +148,126 @@ def _node_features_from_labels(
     return torch.tensor(np.stack(rows), dtype=torch.float32)
 
 
+def _mesh_map_by_position(
+    graph: networkx.DiGraph,
+    pos_to_idx: Dict[Tuple[float, ...], int],
+    component_name: str,
+) -> Dict[int, int]:
+    """Map a component's mesh node labels to mesh indices by node position.
+
+    The g2m/m2g component graphs label their mesh nodes differently from
+    the m2m component, so the only reliable cross-component key is the node
+    position. Positions originate from the same coordinate arrays in
+    ``create_all_graph_components`` so exact float equality holds.
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        Component graph (g2m or m2g) whose mesh nodes are mapped.
+    pos_to_idx : dict
+        Mapping from a mesh node position (tuple of coordinates) to its
+        zero-based index in the bottom-level mesh node set.
+    component_name : str
+        Name of the component ("g2m"/"m2g"), used only in error messages.
+
+    Returns
+    -------
+    dict
+        Mapping from each mesh node label in ``graph`` to its bottom-level
+        mesh index.
+
+    Raises
+    ------
+    ValueError
+        If a mesh node's position has no match in ``pos_to_idx`` (i.e. the
+        component connects to a mesh node outside the bottom level).
+    """
+    mesh_map = {}
+    for n, d in graph.nodes(data=True):
+        if d.get("type") != "mesh":
+            continue
+        key = tuple(d["pos"])
+        if key not in pos_to_idx:
+            raise ValueError(
+                f"{component_name} mesh node {n} at position {key} has no "
+                f"matching node in the bottom-level mesh node set of the m2m "
+                f"component. g2m/m2g must connect to the bottom mesh level "
+                f"only."
+            )
+        mesh_map[n] = pos_to_idx[key]
+    return mesh_map
+
+
+def _interlevel_edge_tensors(
+    graph: networkx.DiGraph,
+    sorted_levels: List,
+    level_maps: List[Dict[int, int]],
+    direction: str,
+) -> Tuple[List["torch.Tensor"], List["torch.Tensor"]]:
+    """Build per-level-pair edge tensors for hierarchical up/down edges.
+
+    Entry ``i`` connects mesh level ``i`` and level ``i+1``: for
+    ``direction="up"`` the sender is level ``i`` and receiver level ``i+1``,
+    for ``direction="down"`` the sender is level ``i+1`` and receiver level
+    ``i``. Sender and receiver levels are determined from the ``"level"``
+    node attribute of each edge's endpoints, so this does not depend on the
+    format of the ``"levels"`` edge attribute.
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        Sub-graph containing only the inter-level edges of one direction.
+    sorted_levels : list
+        Mesh level identifiers in ascending order (bottom level first).
+    level_maps : list of dict
+        Per-level mapping from global node label to zero-based index within
+        that level, indexed by level position.
+    direction : str
+        Either ``"up"`` or ``"down"``; selects the sender/receiver ordering.
+
+    Returns
+    -------
+    edge_indices : list of torch.Tensor
+        One ``(2, E_i)`` int64 tensor per level pair.
+    features_list : list of torch.Tensor
+        One ``(E_i, N_f)`` float32 tensor per level pair.
+    """
+    level_index = {lvl: i for i, lvl in enumerate(sorted_levels)}
+
+    # Group edges by the index of the lower level of the pair they connect
+    pair_edges = {}
+    for u, v, data in graph.edges(data=True):
+        u_level = level_index[graph.nodes[u]["level"]]
+        v_level = level_index[graph.nodes[v]["level"]]
+        lower = min(u_level, v_level)
+        pair_edges.setdefault(lower, []).append((u, v, data))
+
+    edge_indices = []
+    features_list = []
+    for lower in range(len(sorted_levels) - 1):
+        edges = pair_edges.get(lower, [])
+        if direction == "up":
+            sender_map, receiver_map = level_maps[lower], level_maps[lower + 1]
+        else:
+            sender_map, receiver_map = level_maps[lower + 1], level_maps[lower]
+
+        sub = networkx.DiGraph()
+        for u, v, data in edges:
+            sub.add_edge(u, v, **data)
+        ei, ef = _graph_to_edge_tensors(
+            sub, sender_map=sender_map, receiver_map=receiver_map
+        )
+        edge_indices.append(ei)
+        features_list.append(ef)
+
+    return edge_indices, features_list
+
+
 def to_torch_tensors_on_disk(
     graph_components: Dict[str, networkx.DiGraph],
     output_directory: str,
     hierarchical: bool = False,
-):
+) -> None:
     """
     Save graph components to the neural-lam tensor-on-disk format.
 
@@ -532,78 +500,3 @@ def to_torch_tensors_on_disk(
         f"spec_version: {GRAPH_STORAGE_SPEC_VERSION}\n"
     )
     logger.info(f"Saved metainfo.yaml (spec_version: {GRAPH_STORAGE_SPEC_VERSION})")
-
-
-def _mesh_map_by_position(graph, pos_to_idx, component_name):
-    """Map a component's mesh node labels to mesh indices by node position.
-
-    The g2m/m2g component graphs label their mesh nodes differently from
-    the m2m component, so the only reliable cross-component key is the node
-    position. Positions originate from the same coordinate arrays in
-    ``create_all_graph_components`` so exact float equality holds.
-    """
-    mesh_map = {}
-    for n, d in graph.nodes(data=True):
-        if d.get("type") != "mesh":
-            continue
-        key = tuple(d["pos"])
-        if key not in pos_to_idx:
-            raise ValueError(
-                f"{component_name} mesh node {n} at position {key} has no "
-                f"matching node in the bottom-level mesh node set of the m2m "
-                f"component. g2m/m2g must connect to the bottom mesh level "
-                f"only."
-            )
-        mesh_map[n] = pos_to_idx[key]
-    return mesh_map
-
-
-def _interlevel_edge_tensors(graph, sorted_levels, level_maps, direction):
-    """Build per-level-pair edge tensors for hierarchical up/down edges.
-
-    Entry ``i`` connects mesh level ``i`` and level ``i+1``: for
-    ``direction="up"`` the sender is level ``i`` and receiver level ``i+1``,
-    for ``direction="down"`` the sender is level ``i+1`` and receiver level
-    ``i``. Sender and receiver levels are determined from the ``"level"``
-    node attribute of each edge's endpoints, so this does not depend on the
-    format of the ``"levels"`` edge attribute.
-    """
-    level_index = {lvl: i for i, lvl in enumerate(sorted_levels)}
-
-    # Group edges by the index of the lower level of the pair they connect
-    pair_edges = {}
-    for u, v, data in graph.edges(data=True):
-        u_level = level_index[graph.nodes[u]["level"]]
-        v_level = level_index[graph.nodes[v]["level"]]
-        lower = min(u_level, v_level)
-        pair_edges.setdefault(lower, []).append((u, v, data))
-
-    edge_indices = []
-    features_list = []
-    for lower in range(len(sorted_levels) - 1):
-        edges = pair_edges.get(lower, [])
-        if direction == "up":
-            sender_map, receiver_map = level_maps[lower], level_maps[lower + 1]
-        else:
-            sender_map, receiver_map = level_maps[lower + 1], level_maps[lower]
-
-        sub = networkx.DiGraph()
-        for u, v, data in edges:
-            sub.add_edge(u, v, **data)
-        ei, ef = _graph_to_edge_tensors(
-            sub, sender_map=sender_map, receiver_map=receiver_map
-        )
-        edge_indices.append(ei)
-        features_list.append(ef)
-
-    return edge_indices, features_list
-
-
-def to_pickle(graph: networkx.DiGraph, output_directory: str, name: str):
-    """
-    Save the networkx graph to a pickle file.
-    """
-    fp = Path(output_directory) / f"{name}.pickle"
-    with open(fp, "wb") as f:
-        pickle.dump(graph, f)
-    logger.info(f"Saved graph to {fp}.")

@@ -4,6 +4,7 @@ import tempfile
 import urllib.request
 from pathlib import Path
 
+import networkx
 import pytest
 import torch
 from loguru import logger
@@ -11,6 +12,8 @@ from loguru import logger
 import tests.utils as test_utils
 import weather_model_graphs as wmg
 from weather_model_graphs.save import HAS_PYG
+from weather_model_graphs.save.neural_lam import torch_tensors as nl_torch_tensors
+from weather_model_graphs.save.neural_lam.torch_tensors import _graph_to_edge_tensors
 
 
 @pytest.mark.parametrize("list_from_attribute", [None, "level"])
@@ -335,3 +338,148 @@ def test_mesh_features_are_raw_coordinates_hierarchical():
             dtype=torch.float32,
         )
         assert torch.allclose(mesh_f[i], expected)
+
+
+# ─── Unit tests for _graph_to_edge_tensors ───
+# _graph_to_edge_tensors has several branches (dtype/shape handling, sorting,
+# the empty-edge guard), so it is worth testing directly with hand-built
+# graphs rather than only through the archetype-level tests above.
+
+
+def _edge_graph(edges):
+    """Build a tiny DiGraph from (u, v, attrs) tuples for edge-tensor tests."""
+    graph = networkx.DiGraph()
+    for u, v, attrs in edges:
+        graph.add_edge(u, v, **attrs)
+    return graph
+
+
+_IDENTITY_MAP = {0: 0, 1: 1, 2: 2, 3: 3}
+
+
+def test_graph_to_edge_tensors_raises_without_pyg(monkeypatch):
+    """Without the pytorch extra installed the function must fail fast."""
+    monkeypatch.setattr(nl_torch_tensors, "HAS_PYG", False)
+    with pytest.raises(RuntimeError, match=r"weather-model-graphs\[pytorch\]"):
+        _graph_to_edge_tensors(
+            _edge_graph([(0, 1, {"len": 1.0, "vdiff": [1.0, 0.0]})]),
+            sender_map=_IDENTITY_MAP,
+            receiver_map=_IDENTITY_MAP,
+        )
+
+
+def test_graph_to_edge_tensors_empty_raises():
+    """An empty edge set must raise rather than emit an empty tensor."""
+    _skip_if_no_pyg()
+    with pytest.raises(ValueError, match="empty edge set"):
+        _graph_to_edge_tensors(
+            networkx.DiGraph(), sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+        )
+
+
+def test_graph_to_edge_tensors_shapes_and_dtypes():
+    """Default (len, vdiff) features give a (2, E) int64 index and (E, 3) f32."""
+    _skip_if_no_pyg()
+    graph = _edge_graph(
+        [
+            (0, 1, {"len": 1.0, "vdiff": [1.0, 0.0]}),
+            (1, 2, {"len": 2.0, "vdiff": [0.0, 2.0]}),
+        ]
+    )
+    edge_index, features = _graph_to_edge_tensors(
+        graph, sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+    )
+    assert edge_index.shape == (2, 2)
+    assert edge_index.dtype == torch.int64
+    assert features.shape == (2, 3)  # [len, vdiff_x, vdiff_y]
+    assert features.dtype == torch.float32
+
+
+def test_graph_to_edge_tensors_single_edge():
+    """The non-empty path works with the minimal input of a single edge."""
+    _skip_if_no_pyg()
+    edge_index, features = _graph_to_edge_tensors(
+        _edge_graph([(0, 1, {"len": 1.0, "vdiff": [2.0, 3.0]})]),
+        sender_map=_IDENTITY_MAP,
+        receiver_map=_IDENTITY_MAP,
+    )
+    assert edge_index.shape == (2, 1)
+    assert features.shape == (1, 3)
+    assert torch.allclose(features[0], torch.tensor([1.0, 2.0, 3.0]))
+
+
+def test_graph_to_edge_tensors_deterministic_ordering():
+    """Output order follows (sender_idx, receiver_idx), not insertion order."""
+    _skip_if_no_pyg()
+    edges = [
+        (2, 0, {"len": 1.0, "vdiff": [0.0, 0.0]}),
+        (0, 1, {"len": 1.0, "vdiff": [0.0, 0.0]}),
+        (1, 3, {"len": 1.0, "vdiff": [0.0, 0.0]}),
+    ]
+    forward = _graph_to_edge_tensors(
+        _edge_graph(edges), sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+    )[0]
+    reversed_ = _graph_to_edge_tensors(
+        _edge_graph(list(reversed(edges))),
+        sender_map=_IDENTITY_MAP,
+        receiver_map=_IDENTITY_MAP,
+    )[0]
+    # Same edges in a different insertion order must serialise identically...
+    assert torch.equal(forward, reversed_)
+    # ...and sorted by (sender, receiver): senders are non-decreasing.
+    assert list(forward[0]) == sorted(forward[0].tolist())
+
+
+def test_graph_to_edge_tensors_missing_node_raises():
+    """A node absent from sender/receiver map raises KeyError during sorting."""
+    _skip_if_no_pyg()
+    graph = _edge_graph([(0, 9, {"len": 1.0, "vdiff": [1.0, 0.0]})])
+    with pytest.raises(KeyError):
+        _graph_to_edge_tensors(
+            graph, sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+        )
+
+
+def test_graph_to_edge_tensors_missing_attribute_raises():
+    """A missing requested edge attribute raises KeyError."""
+    _skip_if_no_pyg()
+    graph = _edge_graph([(0, 1, {"len": 1.0})])  # no "vdiff"
+    with pytest.raises(KeyError):
+        _graph_to_edge_tensors(
+            graph, sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+        )
+
+
+def test_graph_to_edge_tensors_inconsistent_vdiff_shape_raises():
+    """Mismatched vector attribute lengths across edges must fail loudly."""
+    _skip_if_no_pyg()
+    graph = _edge_graph(
+        [
+            (0, 1, {"len": 1.0, "vdiff": [1.0, 0.0]}),
+            (1, 2, {"len": 1.0, "vdiff": [1.0, 0.0, 0.0]}),
+        ]
+    )
+    with pytest.raises(ValueError):
+        _graph_to_edge_tensors(
+            graph, sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+        )
+
+
+def test_graph_to_edge_tensors_non_numeric_attribute_raises():
+    """A non-numeric edge attribute cannot be cast to float and must raise."""
+    _skip_if_no_pyg()
+    graph = _edge_graph([(0, 1, {"len": "x", "vdiff": [1.0, 0.0]})])
+    with pytest.raises(ValueError):
+        _graph_to_edge_tensors(
+            graph, sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+        )
+
+
+def test_to_pyg_emits_deprecation_warning():
+    """to_pyg is retained for back-compat but must warn that it is deprecated."""
+    _skip_if_no_pyg()
+    xy = test_utils.create_fake_xy(N=64)
+    graph = wmg.create.archetype.create_keisler_graph(coords=xy)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.warns(DeprecationWarning, match="to_torch_tensors_on_disk"):
+            wmg.save.to_pyg(graph=graph, output_directory=tmpdir, name="g2m")
