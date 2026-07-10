@@ -480,6 +480,7 @@ def test_to_pyg_emits_deprecation_warning():
     _skip_if_no_pyg()
     xy = test_utils.create_fake_xy(N=64)
     graph = wmg.create.archetype.create_keisler_graph(coords=xy)
+    g2m_graph = wmg.split_graph_by_edge_attribute(graph=graph, attr="component")["g2m"]
     with tempfile.TemporaryDirectory() as tmpdir:
         with pytest.warns(DeprecationWarning, match="to_torch_tensors_on_disk"):
-            wmg.save.to_pyg(graph=graph, output_directory=tmpdir, name="g2m")
+            wmg.save.to_pyg(graph=g2m_graph, output_directory=tmpdir, name="g2m")
