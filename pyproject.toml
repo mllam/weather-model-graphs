@@ -50,4 +50,5 @@ dev = [
     # required by neural-lam's validate_graph.py, which the save tests
     # download and run against the on-disk graph output
     "pyyaml>=6.0",
+    "pyinstrument>=5.1.2",
 ]
