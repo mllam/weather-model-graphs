@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [\#46](https://github.com/mllam/weather-model-graphs/pull/46), @leifdenby & @Joltsy10
 - Add `__version__` attribute to the package init
   [\#56](https://github.com/mllam/weather-model-graphs/pull/56) @AdMub
+- Added `crop_to_grid_nodes_convex_hull` option to `mesh_layout_kwargs` to prune mesh nodes outside the spatial boundary of grid coordinates using Delaunay triangulation (#58) @AdMub
 
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
 
