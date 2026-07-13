@@ -298,7 +298,7 @@ def test_convex_hull_cropping_supported_archetypes(kind):
     graph_crop = fn(
         coords,
         mesh_node_distance=1,
-        mesh_layout_kwargs={"crop_to_grid_nodes_convex_hull": True},
+        crop_to_grid_nodes_convex_hull=True,
     )
 
     # Extract component
@@ -325,5 +325,5 @@ def test_convex_hull_cropping_graphcast_error():
         create_graphcast_graph(
             coords,
             mesh_node_distance=1,
-            mesh_layout_kwargs={"crop_to_grid_nodes_convex_hull": True},
+            crop_to_grid_nodes_convex_hull=True,
         )
