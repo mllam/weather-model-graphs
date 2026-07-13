@@ -64,12 +64,21 @@ def _graph_to_edge_tensors(
             "install weather-model-graphs[pytorch] to enable writing to torch files"
         )
 
-    # Sort edges by (sender index, receiver index) so the on-disk edge order
-    # is deterministic and independent of networkx's internal iteration
-    # order. Without this the same graph could serialise to different (but
-    # equivalent) edge_index/feature orderings between runs or machines,
-    # which breaks byte-for-byte reproducibility and makes diffing graphs
-    # harder.
+    # networkx iterates nodes and edges in *insertion order*, which carries
+    # two distinct risks when serialising a graph:
+    #
+    # 1. Node index values: converters that number nodes by iteration order
+    #    (e.g. pyg's ``from_networkx``, whose node-to-index mapping is
+    #    ``zip(G.nodes(), range(N))``) produce edge indices that mean
+    #    insertion positions rather than node labels. This function is immune
+    #    to that by construction: the index values come from the explicit
+    #    ``sender_map``/``receiver_map`` built from *sorted node labels*,
+    #    never from iteration order.
+    # 2. Edge column order: ``graph.edges()`` yields edges in insertion
+    #    order, so two graphs with identical edges added in a different order
+    #    would serialise to different (but equivalent) column orderings.
+    #    Sorting by (sender index, receiver index) here makes the on-disk
+    #    output deterministic and byte-for-byte reproducible.
     edges = sorted(
         graph.edges(data=True),
         key=lambda e: (sender_map[e[0]], receiver_map[e[1]]),
