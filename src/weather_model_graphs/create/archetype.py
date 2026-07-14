@@ -4,7 +4,7 @@ import pyproj
 
 from .base import create_all_graph_components
 
-def create_egu2026_graph(
+def create_mike_mesh_graph(
     coords,
     mesh_node_distance=3,
     coords_crs: pyproj.crs.CRS | None = None,
