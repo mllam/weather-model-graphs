@@ -4,15 +4,15 @@ import pytest
 from loguru import logger
 
 import tests.utils as test_utils
-import weather_model_graphs as wmg
-from weather_model_graphs.save import HAS_PYG
+import poseidon_graphs as wmg
+from poseidon_graphs.save import HAS_PYG
 
 
 @pytest.mark.parametrize("list_from_attribute", [None, "level"])
 def test_save_to_pyg(list_from_attribute):
     if not HAS_PYG:
         logger.warning(
-            "Skipping test_save_to_pyg because weather-model-graphs[pytorch] is not installed."
+            "Skipping test_save_to_pyg because poseidon-graphs[pytorch] is not installed."
         )
         return
 

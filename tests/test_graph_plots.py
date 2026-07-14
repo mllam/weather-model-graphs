@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 import tests.utils as test_utils
-import weather_model_graphs as wmg
+import poseidon_graphs as wmg
 
 
 def test_plot():

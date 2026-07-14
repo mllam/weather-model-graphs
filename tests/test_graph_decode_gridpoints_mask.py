@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-import weather_model_graphs as wmg
+import poseidon_graphs as wmg
 from tests import utils as test_utils
 
 
