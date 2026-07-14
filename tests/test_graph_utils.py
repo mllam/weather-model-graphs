@@ -1,5 +1,5 @@
 import tests.utils as test_utils
-import poseidon_graphs as wmg
+import poseidon_graphprep as wmg
 
 
 def test_graph_splitting():

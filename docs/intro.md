@@ -1,11 +1,11 @@
 # Intro
 
-> *`poseidon-graphs`: "Graphs for data-driven weather models"*
+> *`poseidon-graphprep`: "Graphs for data-driven weather models"*
 
-You are currently looking at a Jupyter Book for the [poseidon-graphs](https://github.com/mllam/weather-model-graphs) package.
+You are currently looking at a Jupyter Book for the [poseidon-graphprep](https://github.com/mllam/weather-model-graphs) package.
 This package aims to be a tool for constructing, visualizing and storing graphs for data-driven weather models.
 
-To get started you can have a look at the [background material](background) to get an overview of the concepts of graph-based data-driven weather models, check the [design principles](design) of `poseidon-graphs` or jump right into learning [how to create the graph](creating_the_graph).
+To get started you can have a look at the [background material](background) to get an overview of the concepts of graph-based data-driven weather models, check the [design principles](design) of `poseidon-graphprep` or jump right into learning [how to create the graph](creating_the_graph).
 
 ## Table of Contents
 

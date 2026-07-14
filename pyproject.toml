@@ -1,5 +1,5 @@
 [project]
-name = "poseidon-graphs"
+name = "poseidon-graphprep"
 version = "0.3.0"
 description = "Tools for creating and visualising data-driven weather model graphs"
 authors = [
@@ -7,7 +7,7 @@ authors = [
 ]
 
 [tool.setuptools]
-packages = ["poseidon_graphs"]
+packages = ["poseidon_graphprep"]
 
 dependencies = [
     "numpy>=1.26.4",

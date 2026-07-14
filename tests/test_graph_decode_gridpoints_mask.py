@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-import poseidon_graphs as wmg
+import poseidon_graphprep as wmg
 from tests import utils as test_utils
 
 
