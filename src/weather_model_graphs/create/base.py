@@ -18,11 +18,6 @@ import pyproj
 import scipy.spatial
 from loguru import logger
 
-from ..networkx_utils import (
-    replace_node_labels_with_unique_ids,
-    split_graph_by_edge_attribute,
-    split_on_edge_attribute_existance,
-)
 from .grid import create_grid_graph_nodes
 from .mesh.kinds.flat import (
     create_flat_multiscale_mesh_graph,
@@ -31,18 +26,98 @@ from .mesh.kinds.flat import (
 from .mesh.kinds.hierarchical import create_hierarchical_multiscale_mesh_graph
 
 
+def _remove_zero_degree_mesh_nodes(G_g2m, G_grid, m2m_graph, grid_connect_graph):
+    """
+    Safely remove mesh nodes that have zero degree in g2m, as long as removing
+    them does not disconnect the mesh. A node is removed only if ALL of its
+    m2m neighbors also have zero g2m degree. The check is applied iteratively
+    so that cascading removals from the boundary of dead zones are handled.
+
+    The functino is not tested, so it could be that it does not safely prohibit 
+    unconnceted islands
+
+    Returns updated (G_g2m, m2m_graph, grid_connect_graph).
+    """
+    grid_nodes_set = set(G_grid.nodes())
+    g2m_degrees = dict(G_g2m.degree())
+
+    zero_degree_mesh_nodes = set(
+        node for node, deg in g2m_degrees.items()
+        if deg == 0 and node not in grid_nodes_set
+    )
+
+    if not zero_degree_mesh_nodes:
+        return G_g2m, m2m_graph, grid_connect_graph
+
+    # Build undirected m2m view restricted to mesh nodes
+    m2m_undirected = m2m_graph.to_undirected()
+    mesh_nodes_in_m2m = [n for n in m2m_undirected.nodes() if n not in grid_nodes_set]
+    m2m_mesh_only = m2m_undirected.subgraph(mesh_nodes_in_m2m)
+
+    # Iteratively mark nodes for removal
+    nodes_to_remove = set()
+    changed = True
+    while changed:
+        changed = False
+        for node in list(zero_degree_mesh_nodes - nodes_to_remove):
+            active_neighbors = [
+                n for n in m2m_mesh_only.neighbors(node)
+                if n not in nodes_to_remove
+            ]
+            if len(active_neighbors) == 0 or all(
+                g2m_degrees.get(n, 0) == 0 for n in active_neighbors
+            ):
+                nodes_to_remove.add(node)
+                changed = True
+
+    if nodes_to_remove:
+        logger.warning(
+            f"Removing {len(nodes_to_remove)} zero-degree mesh nodes "
+            f"from g2m/m2m (out of {len(zero_degree_mesh_nodes)} candidates)"
+        )
+        # Rebuild graphs without removed nodes (handles frozen graphs)
+        keep = lambda graph: [n for n in graph.nodes() if n not in nodes_to_remove]
+        m2m_graph = m2m_graph.subgraph(keep(m2m_graph)).copy()
+        grid_connect_graph = grid_connect_graph.subgraph(keep(grid_connect_graph)).copy()
+        G_g2m = G_g2m.subgraph(keep(G_g2m)).copy()
+
+    kept = len(zero_degree_mesh_nodes) - len(nodes_to_remove)
+    if kept > 0:
+        logger.info(
+            f"Kept {kept} zero-degree mesh nodes in g2m "
+            f"(at least one m2m neighbor is connected to the grid)"
+        )
+
+    # Log remaining zero-degree grid nodes
+    remaining_zero = [
+        node for node, deg in dict(G_g2m.degree()).items() if deg == 0
+    ]
+    remaining_grid = [n for n in remaining_zero if n in grid_nodes_set]
+    if remaining_grid:
+        logger.warning(
+            f"{len(remaining_grid)} grid nodes have zero degree in g2m "
+            f"(kept): {remaining_grid[:10]}..."
+        )
+
+    return G_g2m, m2m_graph, grid_connect_graph
+
+
 def create_all_graph_components(
     coords: np.ndarray,
     m2m_connectivity: str,
     m2g_connectivity: str,
     g2m_connectivity: str,
+    non_decode_g2m_connectivity: str = None,
     m2m_connectivity_kwargs={},
     m2g_connectivity_kwargs={},
     g2m_connectivity_kwargs={},
+    non_decode_g2m_connectivity_kwargs={},
     coords_crs: pyproj.crs.CRS | None = None,
     graph_crs: pyproj.crs.CRS | None = None,
-    decode_mask: Iterable[bool] | None = None,
+    decode_mask: Iterable | None = None,
     return_components: bool = False,
+    allow_zero_degree: bool = True,
+    remove_zero_degree_mesh: bool = False,
 ):
     """
     Create all graph components used in creating the message-passing graph,
@@ -71,7 +146,7 @@ def create_all_graph_components(
     - "hierarchical": Create a hierarchical mesh graph with `max_num_levels`,
         `mesh_node_distance` and `level_refinement_factor`,
         similar to Oskarsson et al. (2023)
-
+ 
     m2g_connectivity:
     - "nearest_neighbour": Find the nearest neighbour in mesh for each node in grid
     - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in mesh for each node in grid
@@ -94,8 +169,17 @@ def create_all_graph_components(
 
     `return_components` is a boolean flag, if True the function returns a dict with
     m2g, m2m and g2m as separate graphs. If false returns one combined graph.
+
+    `remove_zero_degree_mesh` (bool): If True, safely removes mesh nodes that have zero degree
+    in the g2m graph (not connected to any grid node), as long as removing them does not create
+    disconnected islands in the m2m mesh graph. Grid nodes with zero degree are always kept.
     """
     graph_components: dict[networkx.DiGraph] = {}
+
+    from ..networkx_utils import (
+        replace_node_labels_with_unique_ids,
+        split_graph_by_edge_attribute,
+    )
 
     assert (
         len(coords.shape) == 2 and coords.shape[1] == 2
@@ -153,23 +237,64 @@ def create_all_graph_components(
 
     G_grid = create_grid_graph_nodes(xy=xy)
 
-    G_g2m = connect_nodes_across_graphs(
-        G_source=G_grid,
-        G_target=grid_connect_graph,
-        method=g2m_connectivity,
-        **g2m_connectivity_kwargs,
-    )
-    graph_components["g2m"] = G_g2m
-
     if decode_mask is None:
         # decode to all grid nodes
         decode_grid = G_grid
+
+        # Same g2m method for all grid nodes
+        G_g2m = connect_nodes_across_graphs(
+            G_source=G_grid,
+            G_target=grid_connect_graph,
+            method=g2m_connectivity,
+            **g2m_connectivity_kwargs,
+        )
     else:
         # Select subset of grid nodes to decode to, where m2g should connect
-        filter_nodes = [
+        decode_filter_nodes = [
             n for n, include in zip(G_grid.nodes, decode_mask, strict=True) if include
         ]
-        decode_grid = G_grid.subgraph(filter_nodes)
+        decode_grid = G_grid.subgraph(decode_filter_nodes)
+
+        non_decode_filter_nodes = [
+            n for n, decode in zip(G_grid.nodes, decode_mask, strict=True) if not decode
+        ]
+        non_decode_grid = G_grid.subgraph(non_decode_filter_nodes)
+
+        # Different g2m connectivity methods
+        g2m_decode = connect_nodes_across_graphs(
+            G_source=decode_grid,
+            G_target=grid_connect_graph,
+            method=g2m_connectivity,
+            **g2m_connectivity_kwargs,
+        )
+        assert non_decode_g2m_connectivity is not None
+        g2m_non_decode = connect_nodes_across_graphs(
+            G_source=non_decode_grid,
+            G_target=grid_connect_graph,
+            method=non_decode_g2m_connectivity,
+            **non_decode_g2m_connectivity_kwargs,
+        )
+
+        # Take union of graphs
+        G_g2m = nx.compose(g2m_decode, g2m_non_decode)
+
+    graph_components["g2m"] = G_g2m
+
+    if not allow_zero_degree:
+        # Find all nodes in g2m with degree == 0
+        zero_degree_nodes = [
+            node for node, degree in dict(G_g2m.degree()).items() if degree == 0
+        ]
+
+        if remove_zero_degree_mesh and len(zero_degree_nodes) > 0:
+            G_g2m, graph_components["m2m"], grid_connect_graph = (
+                _remove_zero_degree_mesh_nodes(
+                    G_g2m, G_grid, graph_components["m2m"], grid_connect_graph
+                )
+            )
+            graph_components["g2m"] = G_g2m
+        elif len(zero_degree_nodes) > 0:
+            assert False, f"Zero-degree nodes in g2m: {zero_degree_nodes}"
 
     G_m2g = connect_nodes_across_graphs(
         G_source=grid_connect_graph,
@@ -185,7 +310,6 @@ def create_all_graph_components(
             graph.edges[edge]["component"] = name
 
     if return_components:
-        # Because merging to a single graph and then splitting again leads to changes in node indexing when converting to `pyg.Data` objects (this in part is due to the to `m2g` and `g2m` having a different set of grid nodes) the ability to return the graph components (`g2m`, `m2m` and `m2g`) has been added here. See https://github.com/mllam/weather-model-graphs/pull/34#issuecomment-2507980752 for details
         # Give each component unique ids
         graph_components = {
             comp_name: replace_node_labels_with_unique_ids(subgraph)
@@ -256,11 +380,18 @@ def connect_nodes_across_graphs(
         Graph containing the nodes in `G_source` and `G_target` and directed edges
         from nodes in `G_source` to nodes in `G_target`
     """
+    from ..networkx_utils import (
+        split_graph_by_edge_attribute,
+        split_on_edge_attribute_existance,
+    )
     source_nodes_list = list(G_source.nodes)
     target_nodes_list = list(G_target.nodes)
 
     # build kd tree for source nodes (e.g. the mesh nodes when constructing m2g)
-    xy_source = np.array([G_source.nodes[node]["pos"] for node in G_source.nodes])
+    # TODO: Why do we keep sorting nodes in this method?
+    xy_source = np.array(
+        [G_source.nodes[node]["pos"] for node in sorted(G_source.nodes)]
+    )
     kdt_s = scipy.spatial.KDTree(xy_source)
 
     # Determine method and perform checks once
@@ -384,6 +515,7 @@ def connect_nodes_across_graphs(
                         key=lambda x: x[2].get("len", 0),
                     )[2]["len"]
                     longest_edge = max(longest_edge, longest_graph_edge)
+            logger.debug(f"Longest distance in bottom mesh graph: {longest_edge}")
             query_dist = longest_edge * rel_max_dist
         else:
             raise Exception(
