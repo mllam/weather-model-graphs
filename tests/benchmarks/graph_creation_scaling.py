@@ -6,6 +6,7 @@ from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
+from loguru import logger
 
 import tests.utils as test_utils
 import weather_model_graphs as wmg
@@ -32,7 +33,7 @@ def run_benchmark(
 
     for n in Ns:
         num_nodes = int(n * n)  # convert to Python int
-        print(f"Testing N={n:4d} ({num_nodes:7d} nodes)...", end="", flush=True)
+        logger.info(f"Testing N={n:4d} ({num_nodes:7d} nodes)...")
 
         xy = test_utils.create_fake_xy(N=n)
 
@@ -50,11 +51,9 @@ def run_benchmark(
             peak_mb = float(peak) / (1024 * 1024)  # convert to float
             tracemalloc.stop()
 
-        print(f" {duration:.3f} seconds.", end="")
+        logger.info(f" {duration:.3f} seconds.")
         if peak_mb is not None:
-            print(f" Peak memory: {peak_mb:.1f} MB")
-        else:
-            print()
+            logger.info(f" Peak memory: {peak_mb:.1f} MB")
 
         results.append(
             {
@@ -161,7 +160,7 @@ def main():
     if args.output_json:
         with open(args.output_json, "w") as f:
             json.dump(results, f, indent=2)
-        print(f"Raw results saved to {args.output_json}")
+        logger.info(f"Raw results saved to {args.output_json}")
 
     # Always plot runtime (if we have results)
     if results:
@@ -170,8 +169,8 @@ def main():
     if args.output_plot_memory:
         plot_memory_scaling(results, args.archetype, args.output_plot_memory)
 
-    plt.savefig(args.output)
-    print(f"\nPlot saved to {args.output}")
+    plt.savefig(args.output_plot_runtime)
+    logger.info(f"Runtime plot saved to {args.output_plot_runtime}")
 
     if args.show:
         plt.show()
