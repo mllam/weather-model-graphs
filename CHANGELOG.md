@@ -21,6 +21,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [\#46](https://github.com/mllam/weather-model-graphs/pull/46), @leifdenby & @Joltsy10
 - Add `__version__` attribute to the package init
   [\#56](https://github.com/mllam/weather-model-graphs/pull/56) @AdMub
+- Add runtime and scaling benchmarks with CLI,
+  [\#117](https://github.com/mllam/weather-model-graphs/pull/117), @leifdenby
+- Add `wmg.save.to_torch_tensors_on_disk` to save graphs in the neural-lam
+  tensor-on-disk format (graph storage spec v0.1.0), tested against
+  neural-lam's own graph validator. `wmg.save` is restructured into a package
+  (`save.base`, `save.neural_lam.torch_tensors`, `save.neural_lam.deprecated`)
+  with all existing entrypoints re-exported unchanged.
+  [\#123](https://github.com/mllam/weather-model-graphs/pull/123), @prajwal-tech07
+
+### Deprecated
+
+- `wmg.save.to_pyg` now emits a `DeprecationWarning` and will not be
+  maintained going forward; use `wmg.save.to_torch_tensors_on_disk` instead.
+  [\#123](https://github.com/mllam/weather-model-graphs/pull/123), @prajwal-tech07
+
+### Maintenance
+
+- add `nb-clean` to `pre-commit` config to ensure that committed jupyter
+  notebooks have empty output cells (to keep notebook filesizes at minimum),
+  [\#146](https://github.com/mllam/weather-model-graphs/pull/146), @leifdenby
 
 ### Changed
 
