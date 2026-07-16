@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`save.base`, `save.neural_lam.torch_tensors`, `save.neural_lam.deprecated`)
   with all existing entrypoints re-exported unchanged.
   [\#123](https://github.com/mllam/weather-model-graphs/pull/123), @prajwal-tech07
+- Add support for writing benchmarking results to json,
+  [\#140](https://github.com/mllam/weather-model-graphs/pull/140),
+  @yuvraajnarula & @leifdenby
 
 ### Deprecated
 
