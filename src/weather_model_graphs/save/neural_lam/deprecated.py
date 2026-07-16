@@ -1,37 +1,39 @@
-import pickle
+from __future__ import annotations
+
+import warnings
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Tuple
 
 import networkx
 from loguru import logger
 
-from .networkx_utils import (
+from ...networkx_utils import (
     MissingEdgeAttributeError,
     sort_nodes_in_graph,
     split_graph_by_edge_attribute,
 )
+from ..base import DEFAULT_EDGE_FEATURES, DEFAULT_NODE_FEATURES, HAS_PYG
 
-try:
+if HAS_PYG:
     import torch
     import torch_geometric as pyg
     import torch_geometric.utils.convert as pyg_convert
-
-    HAS_PYG = True
-except ImportError:
-    HAS_PYG = False
 
 
 def to_pyg(
     graph: networkx.DiGraph,
     output_directory: str,
     name: str,
-    edge_features: List[str] | None = None,
-    node_features: List[str] | None = None,
-    list_from_attribute=None,
-):
-    """
-    Save the networkx graph to PyTorch Geometric format that matches what the
-    neural-lam model expects as input
+    edge_features: Tuple[str, ...] = DEFAULT_EDGE_FEATURES,
+    node_features: Tuple[str, ...] = DEFAULT_NODE_FEATURES,
+    list_from_attribute: Optional[str] = None,
+) -> None:
+    """Save the networkx graph to a PyTorch Geometric format on disk.
+
+    .. deprecated::
+        This function is deprecated and will no longer be maintained. Use
+        :func:`weather_model_graphs.save.to_torch_tensors_on_disk` instead,
+        which writes graphs in the neural-lam graph storage format.
 
     Parameters
     ----------
@@ -40,23 +42,33 @@ def to_pyg(
     output_directory : str
         Directory to save the graph to.
     name : str
-        Name of the graph, this is used to name the files. The edge index and features
-        are saved to {output_directory}/{name}_edge_index.pt and
-        {output_directory}/{name}_features.pt respectively.
+        Name of the graph, used to name the files. The edge index and
+        features are saved to ``{output_directory}/{name}_edge_index.pt`` and
+        ``{output_directory}/{name}_features.pt`` respectively.
+    edge_features : tuple of str, optional
+        Edge attributes to include in the ``{name}_features.pt`` file.
+        Default: ``DEFAULT_EDGE_FEATURES``.
+    node_features : tuple of str, optional
+        Node attributes to include in the ``{name}_node_features.pt`` file.
+        Default: ``DEFAULT_NODE_FEATURES``.
     list_from_attribute : str, optional
-        If provided, the graph is split by the attribute value of the edges. The
-        stored edge index and features are then the concatenation of the split graphs,
-        so that a separate pyg.Data object can be created for each subgraph
-        (e.g. one for each level in a multi-level graph). Default is None.
-    edge_features: List[str]
-        list of edge attributes to include in `{name}_edge_features.pt` file
-    node_features: List[str]
-        list of node attributes to include in `{name}_node_features.pt` file
+        If provided, the graph is split by this edge attribute value. The
+        stored edge index and features are then the concatenation of the
+        split graphs, so a separate pyg.Data object can be created for each
+        subgraph (e.g. one per level in a multi-level graph). Default: None.
 
     Returns
     -------
     None
     """
+    warnings.warn(
+        "weather_model_graphs.save.to_pyg is deprecated and will no longer be "
+        "maintained. Use weather_model_graphs.save.to_torch_tensors_on_disk "
+        "instead, which writes graphs in the neural-lam graph storage format.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     if name is None:
         raise ValueError("Name must be provided.")
 
@@ -64,13 +76,6 @@ def to_pyg(
         raise Exception(
             "install weather-mode-graphs[pytorch] to enable writing to torch files"
         )
-
-    # Default values for arguments
-    if edge_features is None:
-        edge_features = ["len", "vdiff"]
-
-    if node_features is None:
-        node_features = ["pos"]
 
     # check that the node labels are integers and unique so that they can be used as indices
     if not all(isinstance(node, int) for node in graph.nodes):
@@ -87,15 +92,41 @@ def to_pyg(
             if attr not in node_features:
                 del graph.nodes[node][attr]
 
-    def _get_edge_indecies(pyg_g):
+    def _get_edge_indecies(pyg_g: "pyg.data.Data") -> "torch.Tensor":
+        """Return the edge-index tensor of a pyg.Data object.
+
+        Parameters
+        ----------
+        pyg_g : torch_geometric.data.Data
+            Graph to read the edge index from.
+
+        Returns
+        -------
+        torch.Tensor
+            The ``edge_index`` tensor of shape ``(2, num_edges)``.
+        """
         return pyg_g.edge_index
 
     def _concat_pyg_features(
         pyg_g: "pyg.data.Data", features: List[str]
-    ) -> torch.Tensor:
-        """Convert features from pyg.Data object to torch.Tensor.
-        Each feature should be column in the resulting 2D tensor (n_edges or n_nodes, n_features).
-        Note, this function can handle node AND edge features.
+    ) -> "torch.Tensor":
+        """Concatenate named features from a pyg.Data object into a 2D tensor.
+
+        Handles both node and edge features. Each named feature becomes one
+        or more columns of the resulting 2D tensor of shape
+        ``(n_edges_or_nodes, n_feature_columns)``.
+
+        Parameters
+        ----------
+        pyg_g : torch_geometric.data.Data
+            Graph to read the features from.
+        features : list of str
+            Names of the attributes to concatenate, in order.
+
+        Returns
+        -------
+        torch.Tensor
+            The concatenated features as a float32 tensor.
         """
         v_concat = []
         for f in features:
@@ -156,13 +187,3 @@ def to_pyg(
     fp_node_features = Path(output_directory) / f"{name}_node_features.pt"
     torch.save(node_features_values, fp_node_features)
     logger.info(f"Saved node features {node_features} to {fp_node_features}.")
-
-
-def to_pickle(graph: networkx.DiGraph, output_directory: str, name: str):
-    """
-    Save the networkx graph to a pickle file.
-    """
-    fp = Path(output_directory) / f"{name}.pickle"
-    with open(fp, "wb") as f:
-        pickle.dump(graph, f)
-    logger.info(f"Saved graph to {fp}.")
