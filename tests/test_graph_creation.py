@@ -21,8 +21,8 @@ def test_create_single_level_mesh_graph():
     ax.scatter(xy[0, ...], xy[1, ...], color="r")
     ax.axison = True
 
-    with tempfile.NamedTemporaryFile(suffix=".png") as f:
-        fig.savefig(f.name)
+    with tempfile.NamedTemporaryFile(suffix=".png") as fh:
+        fig.savefig(fh)
 
 
 @pytest.mark.parametrize("kind", ["graphcast", "keisler", "oskarsson_hierarchical"])
@@ -75,6 +75,7 @@ def test_create_graph_generic(m2g_connectivity, g2m_connectivity, m2m_connectivi
                 graph = wmg.create.create_all_graph_components(
                     coords=xy,
                     m2m_connectivity=m2m_connectivity,
+                    mesh_layout="rectilinear",
                     m2m_connectivity_kwargs=m2m_kwargs,
                     g2m_connectivity=g2m_connectivity,
                     g2m_connectivity_kwargs=g2m_kwargs,

@@ -40,7 +40,7 @@ def run_benchmark(
             tracemalloc.start()
 
         t0 = time.time()
-        graph = create_fn(coords=xy)
+        _ = create_fn(coords=xy)
         t1 = time.time()
         duration = t1 - t0
 
@@ -56,11 +56,13 @@ def run_benchmark(
         else:
             print()
 
-        results.append({
-            "grid_points": num_nodes,
-            "runtime_s": duration,
-            "peak_memory_mb": peak_mb,
-        })
+        results.append(
+            {
+                "grid_points": num_nodes,
+                "runtime_s": duration,
+                "peak_memory_mb": peak_mb,
+            }
+        )
 
     return results
 
@@ -83,12 +85,6 @@ def plot_runtime_scaling(
 
     plt.title(f"Graph Creation Runtime Scaling: {archetype}")
     plt.xlabel("Number of Input Grid Nodes")
-    plt.ylabel("Execution Time (seconds)")
-    plt.grid(True, which="both", ls="--", alpha=0.7)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(output_path)
-    print(f"Runtime scaling plot saved to {output_path}")
 
 
 def plot_memory_scaling(
@@ -113,8 +109,6 @@ def plot_memory_scaling(
     plt.ylabel("Peak Memory Usage (MB)")
     plt.grid(True, which="both", ls="--", alpha=0.7)
     plt.tight_layout()
-    plt.savefig(output_path)
-    print(f"Memory scaling plot saved to {output_path}")
 
 
 def main():
@@ -175,6 +169,9 @@ def main():
 
     if args.output_plot_memory:
         plot_memory_scaling(results, args.archetype, args.output_plot_memory)
+
+    plt.savefig(args.output)
+    print(f"\nPlot saved to {args.output}")
 
     if args.show:
         plt.show()

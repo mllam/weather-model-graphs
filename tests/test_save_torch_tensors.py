@@ -1,0 +1,496 @@
+"""Tests for the wmg to neural-lam bridge (``to_torch_tensors_on_disk``).
+
+The neural-lam graph storage spec is defined and enforced by a single
+standalone validator script (``docs/validate_graph.py``) that lives in
+neural-lam. Rather than re-implement those spec checks here (where they
+could silently drift from the real contract), these tests download that
+exact script and run it against the output of ``to_torch_tensors_on_disk``.
+
+The graph storage spec + validator were merged into neural-lam via
+mllam/neural-lam#323, so we pull the validator from ``main``.
+"""
+
+import importlib.util
+import sys
+import tempfile
+import urllib.request
+from pathlib import Path
+
+import networkx
+import pytest
+import torch
+
+import tests.utils as test_utils
+import weather_model_graphs as wmg
+from weather_model_graphs.save import HAS_PYG
+from weather_model_graphs.save.neural_lam import torch_tensors as nl_torch_tensors
+from weather_model_graphs.save.neural_lam.torch_tensors import _graph_to_edge_tensors
+
+VALIDATOR_URL = (
+    "https://raw.githubusercontent.com/mllam/neural-lam/main/docs/validate_graph.py"
+)
+
+# Files expected for all graph types (used by the function-behaviour tests
+# below, which the validator cannot exercise — see their docstrings).
+CORE_FILES = [
+    "g2m_edge_index.pt",
+    "g2m_features.pt",
+    "m2g_edge_index.pt",
+    "m2g_features.pt",
+    "m2m_edge_index.pt",
+    "m2m_features.pt",
+    "mesh_features.pt",
+    "metainfo.yaml",
+]
+
+
+@pytest.fixture(scope="session")
+def graph_validator():
+    """Download neural-lam's ``validate_graph.py`` and load it as a module.
+
+    The validator is the single source of truth for the on-disk graph format,
+    so we run WMG's output through the *actual* neural-lam script (loaded
+    inline via ``importlib``, the same pattern as neural-lam's
+    ``tests/test_validate_graph_script.py``) instead of re-implementing the
+    spec checks here.
+
+    A download failure is a hard error rather than a skip: if the validator
+    cannot be fetched we must not let the suite go green, otherwise a missing
+    validator could be mistaken for a passing test.
+    """
+    dest = Path(tempfile.mkdtemp(prefix="nl-validator-")) / "validate_graph.py"
+    try:
+        with urllib.request.urlopen(VALIDATOR_URL, timeout=60) as response:
+            dest.write_bytes(response.read())
+    except Exception as exc:  # noqa: BLE001 — any failure must fail the test
+        raise RuntimeError(
+            f"Could not download the neural-lam graph validator from "
+            f"{VALIDATOR_URL!r}: {exc}. The graph-format validation tests "
+            f"cannot run without it."
+        ) from exc
+
+    spec = importlib.util.spec_from_file_location("validate_graph_script", dest)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["validate_graph_script"] = module
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def _skip_if_no_pyg():
+    if not HAS_PYG:
+        pytest.skip("weather-model-graphs[pytorch] not installed")
+
+
+def _create_and_save(archetype, hierarchical, N=64):
+    """Helper: create graph components and save to temp dir, return path."""
+    xy = test_utils.create_fake_xy(N=N)
+
+    if archetype == "keisler":
+        components = wmg.create.archetype.create_keisler_graph(
+            coords=xy, return_components=True
+        )
+    elif archetype == "graphcast":
+        components = wmg.create.archetype.create_graphcast_graph(
+            coords=xy, return_components=True
+        )
+    elif archetype == "hierarchical":
+        components = wmg.create.archetype.create_oskarsson_hierarchical_graph(
+            coords=xy, return_components=True
+        )
+    else:
+        raise ValueError(f"Unknown archetype: {archetype}")
+
+    tmpdir = tempfile.mkdtemp()
+    wmg.save.to_torch_tensors_on_disk(
+        graph_components=components,
+        output_directory=tmpdir,
+        hierarchical=hierarchical,
+    )
+    return tmpdir, components
+
+
+def _fail_details(report):
+    """Collect the detail strings of any failing checks for assert messages."""
+    return "\n".join(r.detail for r in report.results if r.status == "FAIL")
+
+
+# ─── Validator-backed spec conformance ───
+# These replace all the hand-rolled spec assertions (file presence, shapes,
+# int64/float32 dtypes, per-node-set zero-based indexing, index ranges, finite
+# values, metainfo/spec_version): every one of those is checked by the
+# neural-lam validator, so they cannot diverge from the real contract.
+
+
+@pytest.mark.parametrize(
+    "archetype, hierarchical",
+    [
+        ("keisler", False),  # flat single-scale
+        ("graphcast", False),  # flat multiscale
+        ("hierarchical", True),  # multi-level hierarchical
+    ],
+)
+def test_output_passes_neural_lam_validator(graph_validator, archetype, hierarchical):
+    """A saved graph must pass neural-lam's own on-disk format validator.
+
+    Covers keisler (flat), graphcast (flat multiscale) and oskarsson
+    (hierarchical) archetypes — the validator checks required files, tensor
+    shapes, int64 edge-index / float32 feature dtypes, per-node-set index
+    ranges, finite values and the metainfo spec version.
+    """
+    _skip_if_no_pyg()
+    tmpdir, _ = _create_and_save(archetype, hierarchical=hierarchical)
+    report, _spec, _props = graph_validator.validate_graph_directory(tmpdir)
+    assert not report.has_fails(), _fail_details(report)
+
+
+def test_rectangular_grid_passes_validator(graph_validator):
+    """Non-square grids must also produce a spec-conformant graph.
+
+    Guards against assumptions that the grid is square in the index/shape
+    bookkeeping; validated end-to-end with the neural-lam validator.
+    """
+    _skip_if_no_pyg()
+    xy = test_utils.create_rectangular_fake_xy(Nx=40, Ny=80)
+    components = wmg.create.archetype.create_keisler_graph(
+        coords=xy, return_components=True
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        wmg.save.to_torch_tensors_on_disk(
+            graph_components=components,
+            output_directory=tmpdir,
+            hierarchical=False,
+        )
+        report, _spec, _props = graph_validator.validate_graph_directory(tmpdir)
+        assert not report.has_fails(), _fail_details(report)
+
+
+# ─── Tests the validator cannot cover ───
+# Kept deliberately because the neural-lam validator only inspects an
+# already-written directory and has no reference to the source graph. The
+# docstrings record *why* each one is not (and cannot be) covered there.
+
+
+def test_missing_component_raises():
+    """The validator cannot test input rejection.
+
+    ``to_torch_tensors_on_disk`` must refuse incomplete ``graph_components``
+    up front, before anything is written. There is no output directory for
+    the validator to inspect in this case, so this contract is WMG-side only.
+    """
+    _skip_if_no_pyg()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.raises(ValueError, match="missing required keys"):
+            wmg.save.to_torch_tensors_on_disk(
+                graph_components={"g2m": None, "m2m": None},
+                output_directory=tmpdir,
+            )
+
+
+def test_empty_components_dict_raises():
+    """The validator cannot test input rejection.
+
+    An empty ``graph_components`` mapping must raise rather than write a
+    partial/empty directory. Like ``test_missing_component_raises``, there is
+    no artifact for the validator to look at, so this is WMG-side only.
+    """
+    _skip_if_no_pyg()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.raises(ValueError, match="missing required keys"):
+            wmg.save.to_torch_tensors_on_disk(
+                graph_components={},
+                output_directory=tmpdir,
+            )
+
+
+def test_output_dir_created_if_missing():
+    """The validator cannot test filesystem side-effects.
+
+    ``to_torch_tensors_on_disk`` must create a missing (nested) output
+    directory itself. The validator only reads an existing directory, so it
+    can never verify that the writer created one — this is WMG-side only.
+    """
+    _skip_if_no_pyg()
+    xy = test_utils.create_fake_xy(N=64)
+    components = wmg.create.archetype.create_keisler_graph(
+        coords=xy, return_components=True
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        nested_dir = Path(tmpdir) / "deeply" / "nested" / "dir"
+        assert not nested_dir.exists()
+        wmg.save.to_torch_tensors_on_disk(
+            graph_components=components,
+            output_directory=str(nested_dir),
+            hierarchical=False,
+        )
+        assert nested_dir.exists()
+        for fname in CORE_FILES:
+            assert (nested_dir / fname).exists()
+
+
+def test_overwrite_existing_files():
+    """The validator cannot test write behaviour across repeated calls.
+
+    Saving twice into the same directory must overwrite cleanly without
+    error. The validator only inspects the final state of a directory, so it
+    cannot exercise idempotent re-saving — this is WMG-side only.
+    """
+    _skip_if_no_pyg()
+    xy = test_utils.create_fake_xy(N=64)
+    components = wmg.create.archetype.create_keisler_graph(
+        coords=xy, return_components=True
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        wmg.save.to_torch_tensors_on_disk(
+            graph_components=components,
+            output_directory=tmpdir,
+            hierarchical=False,
+        )
+        # Save again — should not raise
+        wmg.save.to_torch_tensors_on_disk(
+            graph_components=components,
+            output_directory=tmpdir,
+            hierarchical=False,
+        )
+        for fname in CORE_FILES:
+            assert (Path(tmpdir) / fname).exists()
+
+
+def test_mesh_features_are_raw_coordinates_keisler():
+    """The validator cannot check feature *values* against the source graph.
+
+    It confirms ``mesh_features`` are float32/finite/2-column, but has no
+    reference to the originating graph, so it cannot tell whether the written
+    values are the correct raw (unnormalized) node positions or were
+    accidentally normalized. That semantic correctness — the bug this format
+    work fixed — is verifiable only WMG-side, where the source graph exists.
+    """
+    _skip_if_no_pyg()
+    tmpdir, components = _create_and_save("keisler", hierarchical=False)
+    mesh_f = torch.load(Path(tmpdir) / "mesh_features.pt", weights_only=True)
+
+    m2m_graph = components["m2m"]
+    mesh_labels = sorted(
+        n for n, d in m2m_graph.nodes(data=True) if d.get("type") == "mesh"
+    )
+    expected = torch.tensor(
+        [m2m_graph.nodes[n]["pos"] for n in mesh_labels], dtype=torch.float32
+    )
+    assert len(mesh_f) == 1
+    assert torch.allclose(mesh_f[0], expected)
+
+
+def test_mesh_features_are_raw_coordinates_hierarchical():
+    """The validator cannot check per-level feature *values* against the source.
+
+    As with the keisler case, the validator confirms shape/dtype but cannot
+    verify that each level's ``mesh_features`` are the correct raw node
+    positions (it has no source graph to compare against). This checks every
+    hierarchical level, so it is WMG-side only.
+    """
+    _skip_if_no_pyg()
+    tmpdir, components = _create_and_save("hierarchical", hierarchical=True)
+    mesh_f = torch.load(Path(tmpdir) / "mesh_features.pt", weights_only=True)
+
+    m2m_graph = components["m2m"]
+    labels_by_level = {}
+    for n, d in m2m_graph.nodes(data=True):
+        labels_by_level.setdefault(d["level"], []).append(n)
+
+    assert len(mesh_f) == len(labels_by_level)
+    for i, lvl in enumerate(sorted(labels_by_level.keys())):
+        expected = torch.tensor(
+            [m2m_graph.nodes[n]["pos"] for n in sorted(labels_by_level[lvl])],
+            dtype=torch.float32,
+        )
+        assert torch.allclose(mesh_f[i], expected)
+
+
+# ─── Unit tests for _graph_to_edge_tensors ───
+# _graph_to_edge_tensors has several branches (dtype/shape handling, sorting,
+# the empty-edge guard), so it is worth testing directly with hand-built
+# graphs rather than only through the archetype-level tests above.
+
+
+def _edge_graph(edges):
+    """Build a tiny DiGraph from (u, v, attrs) tuples for edge-tensor tests."""
+    graph = networkx.DiGraph()
+    for u, v, attrs in edges:
+        graph.add_edge(u, v, **attrs)
+    return graph
+
+
+_IDENTITY_MAP = {0: 0, 1: 1, 2: 2, 3: 3}
+
+
+def test_graph_to_edge_tensors_raises_without_pyg(monkeypatch):
+    """Without the pytorch extra installed the function must fail fast."""
+    monkeypatch.setattr(nl_torch_tensors, "HAS_PYG", False)
+    with pytest.raises(RuntimeError, match=r"weather-model-graphs\[pytorch\]"):
+        _graph_to_edge_tensors(
+            _edge_graph([(0, 1, {"len": 1.0, "vdiff": [1.0, 0.0]})]),
+            sender_map=_IDENTITY_MAP,
+            receiver_map=_IDENTITY_MAP,
+        )
+
+
+def test_graph_to_edge_tensors_empty_raises():
+    """An empty edge set must raise rather than emit an empty tensor."""
+    _skip_if_no_pyg()
+    with pytest.raises(ValueError, match="empty edge set"):
+        _graph_to_edge_tensors(
+            networkx.DiGraph(), sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+        )
+
+
+def test_graph_to_edge_tensors_shapes_and_dtypes():
+    """Default (len, vdiff) features give a (2, E) int64 index and (E, 3) f32."""
+    _skip_if_no_pyg()
+    graph = _edge_graph(
+        [
+            (0, 1, {"len": 1.0, "vdiff": [1.0, 0.0]}),
+            (1, 2, {"len": 2.0, "vdiff": [0.0, 2.0]}),
+        ]
+    )
+    edge_index, features = _graph_to_edge_tensors(
+        graph, sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+    )
+    assert edge_index.shape == (2, 2)
+    assert edge_index.dtype == torch.int64
+    assert features.shape == (2, 3)  # [len, vdiff_x, vdiff_y]
+    assert features.dtype == torch.float32
+
+
+def test_graph_to_edge_tensors_single_edge():
+    """The non-empty path works with the minimal input of a single edge."""
+    _skip_if_no_pyg()
+    edge_index, features = _graph_to_edge_tensors(
+        _edge_graph([(0, 1, {"len": 1.0, "vdiff": [2.0, 3.0]})]),
+        sender_map=_IDENTITY_MAP,
+        receiver_map=_IDENTITY_MAP,
+    )
+    assert edge_index.shape == (2, 1)
+    assert features.shape == (1, 3)
+    assert torch.allclose(features[0], torch.tensor([1.0, 2.0, 3.0]))
+
+
+def test_graph_to_edge_tensors_deterministic_ordering():
+    """Output order follows (sender_idx, receiver_idx), not insertion order."""
+    _skip_if_no_pyg()
+    edges = [
+        (2, 0, {"len": 1.0, "vdiff": [0.0, 0.0]}),
+        (0, 1, {"len": 1.0, "vdiff": [0.0, 0.0]}),
+        (1, 3, {"len": 1.0, "vdiff": [0.0, 0.0]}),
+    ]
+    forward = _graph_to_edge_tensors(
+        _edge_graph(edges), sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+    )[0]
+    reversed_ = _graph_to_edge_tensors(
+        _edge_graph(list(reversed(edges))),
+        sender_map=_IDENTITY_MAP,
+        receiver_map=_IDENTITY_MAP,
+    )[0]
+    # Same edges in a different insertion order must serialise identically...
+    assert torch.equal(forward, reversed_)
+    # ...and sorted by (sender, receiver): senders are non-decreasing.
+    assert list(forward[0]) == sorted(forward[0].tolist())
+
+
+def test_graph_to_edge_tensors_missing_node_raises():
+    """A node absent from sender/receiver map raises KeyError during sorting."""
+    _skip_if_no_pyg()
+    graph = _edge_graph([(0, 9, {"len": 1.0, "vdiff": [1.0, 0.0]})])
+    with pytest.raises(KeyError):
+        _graph_to_edge_tensors(
+            graph, sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+        )
+
+
+def test_graph_to_edge_tensors_missing_attribute_raises():
+    """A missing requested edge attribute raises KeyError."""
+    _skip_if_no_pyg()
+    graph = _edge_graph([(0, 1, {"len": 1.0})])  # no "vdiff"
+    with pytest.raises(KeyError):
+        _graph_to_edge_tensors(
+            graph, sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+        )
+
+
+def test_graph_to_edge_tensors_inconsistent_vdiff_shape_raises():
+    """Mismatched vector attribute lengths across edges must fail loudly."""
+    _skip_if_no_pyg()
+    graph = _edge_graph(
+        [
+            (0, 1, {"len": 1.0, "vdiff": [1.0, 0.0]}),
+            (1, 2, {"len": 1.0, "vdiff": [1.0, 0.0, 0.0]}),
+        ]
+    )
+    with pytest.raises(ValueError):
+        _graph_to_edge_tensors(
+            graph, sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+        )
+
+
+def test_graph_to_edge_tensors_non_numeric_attribute_raises():
+    """A non-numeric edge attribute cannot be cast to float and must raise."""
+    _skip_if_no_pyg()
+    graph = _edge_graph([(0, 1, {"len": "x", "vdiff": [1.0, 0.0]})])
+    with pytest.raises(ValueError):
+        _graph_to_edge_tensors(
+            graph, sender_map=_IDENTITY_MAP, receiver_map=_IDENTITY_MAP
+        )
+
+
+# ─── networkx -> torch edge-index conversion pitfall ───
+
+
+def test_pyg_from_networkx_indexes_by_insertion_order_not_labels():
+    """Documents the recurring networkx -> pyg node-index pitfall.
+
+    This test deliberately uses no weather-model-graphs functionality: it
+    records what plain networkx + pyg do on their own, because this behaviour
+    has caused recurring bugs when converting ``networkx.DiGraph`` objects to
+    torch edge-index tensors.
+
+    networkx stores nodes in *insertion order*, and pyg's ``from_networkx``
+    numbers nodes by that iteration order (its node-to-index mapping is
+    ``zip(G.nodes(), range(N))``). The integer node *labels* on the graph are
+    ignored. So if nodes are inserted in any order other than sorted label
+    order, the values in ``edge_index`` mean "insertion position", not "node
+    label", and any code that treats them as labels reads the wrong nodes.
+
+    weather-model-graphs guards against this in two ways:
+
+    - the deprecated ``to_pyg`` path sorts the graph's nodes by label
+      (``sort_nodes_in_graph``) before calling ``from_networkx``, so
+      insertion position and label rank coincide;
+    - ``_graph_to_edge_tensors`` bypasses ``from_networkx`` entirely and
+      builds edge indices from explicit sender/receiver maps constructed
+      from sorted node labels.
+    """
+    _skip_if_no_pyg()
+    import torch_geometric.utils.convert as pyg_convert
+
+    # Insert nodes NOT in label order: 5 first, then 2, then 9.
+    graph = networkx.DiGraph()
+    graph.add_edge(5, 2)
+    graph.add_edge(2, 9)
+
+    data = pyg_convert.from_networkx(graph)
+
+    # Insertion order was [5, 2, 9], so from_networkx assigns 5->0, 2->1,
+    # 9->2. The edges (5->2) and (2->9) therefore come out as (0, 1) and
+    # (1, 2): insertion positions, with no relation to the node labels.
+    edge_cols = set(map(tuple, data.edge_index.t().tolist()))
+    assert edge_cols == {(0, 1), (1, 2)}
+
+    # Rebuilding the graph with nodes added in sorted label order makes the
+    # assigned indices coincide with label rank (2->0, 5->1, 9->2), which is
+    # the convention weather-model-graphs serialises with.
+    graph_sorted = networkx.DiGraph()
+    graph_sorted.add_nodes_from(sorted(graph.nodes))
+    graph_sorted.add_edges_from(graph.edges)
+
+    data_sorted = pyg_convert.from_networkx(graph_sorted)
+    edge_cols_sorted = set(map(tuple, data_sorted.edge_index.t().tolist()))
+    assert edge_cols_sorted == {(1, 0), (0, 2)}  # (5->2), (2->9) by label rank

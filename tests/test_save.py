@@ -1,3 +1,11 @@
+"""Tests for the deprecated pyg save path (``wmg.save.to_pyg``).
+
+``to_pyg`` is deprecated in favour of ``to_torch_tensors_on_disk`` (see
+``tests/test_save_torch_tensors.py`` for the tests of the new wmg to
+neural-lam bridge). These tests are expected to be deleted together with
+the deprecated functionality.
+"""
+
 import tempfile
 
 import pytest
@@ -40,3 +48,15 @@ def test_save_to_pyg(list_from_attribute):
                 name=name,
                 list_from_attribute=list_from_attribute,
             )
+
+
+def test_to_pyg_emits_deprecation_warning():
+    """to_pyg is retained for back-compat but must warn that it is deprecated."""
+    if not HAS_PYG:
+        pytest.skip("weather-model-graphs[pytorch] not installed")
+    xy = test_utils.create_fake_xy(N=64)
+    graph = wmg.create.archetype.create_keisler_graph(coords=xy)
+    g2m_graph = wmg.split_graph_by_edge_attribute(graph=graph, attr="component")["g2m"]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.warns(DeprecationWarning, match="to_torch_tensors_on_disk"):
+            wmg.save.to_pyg(graph=g2m_graph, output_directory=tmpdir, name="g2m")
