@@ -85,6 +85,9 @@ def plot_runtime_scaling(
     plt.title(f"Graph Creation Runtime Scaling: {archetype}")
     plt.xlabel("Number of Input Grid Nodes")
 
+    plt.savefig(output_path)
+    logger.info(f"Runtime scaling plot saved to {output_path}")
+
 
 def plot_memory_scaling(
     results: List[Dict[str, float]], archetype: str, output_path: str
@@ -108,6 +111,9 @@ def plot_memory_scaling(
     plt.ylabel("Peak Memory Usage (MB)")
     plt.grid(True, which="both", ls="--", alpha=0.7)
     plt.tight_layout()
+
+    plt.savefig(output_path)
+    logger.info(f"Memory scaling plot saved to {output_path}")
 
 
 def main():
@@ -168,9 +174,6 @@ def main():
 
     if args.output_plot_memory:
         plot_memory_scaling(results, args.archetype, args.output_plot_memory)
-
-    plt.savefig(args.output_plot_runtime)
-    logger.info(f"Runtime plot saved to {args.output_plot_runtime}")
 
     if args.show:
         plt.show()
