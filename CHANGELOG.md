@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   maintained going forward; use `wmg.save.to_torch_tensors_on_disk` instead.
   [\#123](https://github.com/mllam/weather-model-graphs/pull/123), @prajwal-tech07
 
+### Maintenance
+
+- add `nbclean` to `pre-commit` config to ensure that committed jupyter
+  notebooks have empty output cells (to keep notebook filesizes at minimum),
+  [\#146](https://github.com/mllam/weather-model-graphs/pull/146), @leifdenby
+
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
 
 
