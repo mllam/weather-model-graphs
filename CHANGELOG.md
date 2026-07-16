@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [\#123](https://github.com/mllam/weather-model-graphs/pull/123), @prajwal-tech07
 
 - Add functionality to auto-detect spatial metric from graph CRS and support
-  for using haversine distance when working in geometric coordinates.
+  for using haversine distance when working in geographic (lat/lon) coordinates.
   [\#86](https://github.com/mllam/weather-model-graphs/pull/86), @FAbdullah17
 
 ### Deprecated
