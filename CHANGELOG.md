@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with all existing entrypoints re-exported unchanged.
   [\#123](https://github.com/mllam/weather-model-graphs/pull/123), @prajwal-tech07
 
+- Add functionality to auto-detect spatial metric from graph CRS and support
+  for using haversine distance when working in geometric coordinates.
+  [\#86](https://github.com/mllam/weather-model-graphs/pull/86), @FAbdullah17
+
 ### Deprecated
 
 - `wmg.save.to_pyg` now emits a `DeprecationWarning` and will not be
@@ -41,10 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `nb-clean` to `pre-commit` config to ensure that committed jupyter
   notebooks have empty output cells (to keep notebook filesizes at minimum),
   [\#146](https://github.com/mllam/weather-model-graphs/pull/146), @leifdenby
-
-### Changed
-
-- Auto-detect spatial metric from CRS, with degree-based external haversine inputs/outputs and internal radian conversion. [\#86](https://github.com/mllam/weather-model-graphs/pull/86), @FAbdullah17
 
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
 
