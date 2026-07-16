@@ -184,7 +184,11 @@ def create_flat_singlescale_from_coordinates(
 
 
 def create_flat_multiscale_mesh_graph(
-    xy, mesh_node_distance: float, level_refinement_factor: int, max_num_levels: int
+    xy,
+    mesh_node_distance: float,
+    level_refinement_factor: int,
+    max_num_levels: int,
+    distance_metric: str = "euclidean",
 ) -> networkx.DiGraph:
     """
     Create flat mesh graph by merging the single-level mesh
@@ -208,6 +212,9 @@ def create_flat_multiscale_mesh_graph(
         NOTE: Must be an odd integer >1 to create proper multiscale graph
     max_num_levels : int
         Maximum number of levels in the multi-scale graph
+    distance_metric : str
+        Distance metric for edge length computation (default: ``"euclidean"``).
+
     Returns
     -------
     G_tot : networkx.DiGraph
@@ -223,11 +230,12 @@ def create_flat_multiscale_mesh_graph(
     return create_flat_multiscale_from_coordinates(
         G_coords_list,
         pattern="8-star",
+        distance_metric=distance_metric,
     )
 
 
 def create_flat_singlescale_mesh_graph(
-    xy, mesh_node_distance: float
+    xy, mesh_node_distance: float, distance_metric: str = "euclidean"
 ) -> networkx.DiGraph:
     """
     Create flat mesh graph of single level
@@ -245,6 +253,9 @@ def create_flat_singlescale_mesh_graph(
     mesh_node_distance: float
         Distance (in x- and y-direction) between created mesh nodes,
         in coordinate system of xy
+    distance_metric : str
+        Distance metric for edge length computation (default: ``"euclidean"``).
+
     Returns
     -------
     G_flat : networkx.DiGraph
@@ -263,4 +274,6 @@ def create_flat_singlescale_mesh_graph(
             " so that the mesh nodes are spaced closer together?"
         )
 
-    return mesh_coords.create_single_level_2d_mesh_graph(xy=xy, nx=nx, ny=ny)
+    return mesh_coords.create_single_level_2d_mesh_graph(
+        xy=xy, nx=nx, ny=ny, distance_metric=distance_metric
+    )

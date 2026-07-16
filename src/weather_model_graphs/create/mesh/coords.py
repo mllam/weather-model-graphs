@@ -116,7 +116,10 @@ def create_single_level_2d_mesh_primitive(
 
 
 def create_single_level_2d_mesh_graph(
-    xy: np.ndarray, nx: int, ny: int
+    xy: np.ndarray,
+    nx: int,
+    ny: int,
+    distance_metric: str = "euclidean",
 ) -> networkx.DiGraph:
     """
     Create directed graph with nx * ny nodes representing a 2D grid with
@@ -148,6 +151,8 @@ def create_single_level_2d_mesh_graph(
         Number of nodes in x direction
     ny : int
         Number of nodes in y direction
+    distance_metric : str
+        Distance metric for edge length computation (default: ``"euclidean"``).
 
     Returns
     -------
@@ -155,7 +160,9 @@ def create_single_level_2d_mesh_graph(
         Graph representing the 2D grid
     """
     G_coords = create_single_level_2d_mesh_primitive(xy, nx, ny)
-    return create_directed_mesh_graph(G_coords, pattern="8-star")
+    return create_directed_mesh_graph(
+        G_coords, pattern="8-star", distance_metric=distance_metric
+    )
 
 
 def create_multirange_2d_mesh_primitives(
@@ -249,6 +256,7 @@ def create_multirange_2d_mesh_graphs(
     mesh_node_distance: float = 3,
     level_refinement_factor: float = 3,
     pattern: str = "8-star",
+    distance_metric: str = "euclidean",
 ) -> List[networkx.DiGraph]:
     """
     Create a list of 2D grid mesh graphs representing different levels of edge-length
@@ -276,6 +284,8 @@ def create_multirange_2d_mesh_graphs(
     pattern : str
         Connectivity pattern for directed graph creation: ``"4-star"`` or
         ``"8-star"`` (default: ``"8-star"``)
+    distance_metric : str
+        Distance metric for edge length computation (default: ``"euclidean"``).
 
     Returns
     -------
@@ -292,7 +302,9 @@ def create_multirange_2d_mesh_graphs(
 
     G_all_levels = []
     for g_coords in G_coords_list:
-        g_directed = create_directed_mesh_graph(g_coords, pattern=pattern)
+        g_directed = create_directed_mesh_graph(
+            g_coords, pattern=pattern, distance_metric=distance_metric
+        )
         G_all_levels.append(g_directed)
 
     return G_all_levels

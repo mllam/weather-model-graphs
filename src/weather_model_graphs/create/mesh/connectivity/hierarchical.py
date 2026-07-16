@@ -66,7 +66,9 @@ def create_hierarchical_from_coordinates(
 
     # Convert each level's coordinate graph to directed graph with chosen pattern
     Gs_all_levels = [
-        create_directed_mesh_graph(g_coords, pattern=intra_level_pattern)
+        create_directed_mesh_graph(
+            g_coords, pattern=intra_level_pattern, distance_metric=distance_metric
+        )
         for g_coords in G_coords_list
     ]
 

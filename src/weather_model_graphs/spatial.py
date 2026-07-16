@@ -27,7 +27,11 @@ class SpatialCoordinateValuesSelector:
     Metric-aware spatial index for selecting coordinate values by proximity.
 
     Wraps a ball-tree to provide fast k-nearest-neighbour and radius queries.
-    The tree is built once at construction time; subsequent queries are cheap.
+    The tree is built lazily — it is only constructed when a tree-based query
+    (:meth:`k_nearest_to` or :meth:`within_radius`) is first called.
+    :meth:`distance_between` performs direct computation without the tree,
+    so callers that only need pairwise distances (e.g. ``create_directed_mesh_graph``)
+    never pay the cost of building the tree.
 
     Two distance metrics are supported:
 
@@ -88,15 +92,19 @@ class SpatialCoordinateValuesSelector:
 
         self.distance_metric: str = distance_metric
         self._coords: np.ndarray = np.asarray(coords, dtype=float)
+        self._tree: _BallTree | None = None
 
-        if distance_metric == "haversine":
-            # BallTree with haversine expects [latitude, longitude] in **radians**.
-            # coords are stored as [longitude, latitude] in degrees throughout the
-            # rest of the codebase, so we swap columns and convert.
-            tree_coords = np.deg2rad(self._coords[:, ::-1])  # (N, 2) [lat_rad, lon_rad]
+    # Private lazy tree constructor
+    def _get_tree(self) -> _BallTree:
+        """Build and cache the ball-tree on first call."""
+        if self._tree is not None:
+            return self._tree
+        if self.distance_metric == "haversine":
+            tree_coords = np.deg2rad(self._coords[:, ::-1])
             self._tree = _BallTree(tree_coords, metric="haversine")
         else:
             self._tree = _BallTree(self._coords, metric="euclidean")
+        return self._tree
 
     # Public query methods
     def k_nearest_to(self, point: np.ndarray, k: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -121,8 +129,9 @@ class SpatialCoordinateValuesSelector:
             Corresponding distances.  For ``"euclidean"`` these are in the same
             units as *coords*; for ``"haversine"`` these are in **degrees**.
         """
+        tree = self._get_tree()
         tree_point = self._prepare_query_point(point)
-        raw_dists, raw_idxs = self._tree.query(tree_point, k=k)
+        raw_dists, raw_idxs = tree.query(tree_point, k=k)
         indices = raw_idxs.flatten()
         distances = (
             np.rad2deg(raw_dists.flatten())
@@ -155,8 +164,9 @@ class SpatialCoordinateValuesSelector:
             are in the same units as *coords*; for ``"haversine"`` these are
             in **degrees**.
         """
+        tree = self._get_tree()
         tree_point = self._prepare_query_point(point)
-        raw_idxs, raw_dists = self._tree.query_radius(
+        raw_idxs, raw_dists = tree.query_radius(
             tree_point,
             r=np.deg2rad(radius) if self.distance_metric == "haversine" else radius,
             return_distance=True,
@@ -215,6 +225,43 @@ class SpatialCoordinateValuesSelector:
         # pyproj CRS exposes is_geographic as a bool property; cartopy CRS does too.
         metric = "haversine" if is_geographic else "euclidean"
         return cls(metric, coords)
+
+    # Public pairwise distance method
+    def distance_between(self, point_a: np.ndarray, point_b: np.ndarray) -> float:
+        """
+        Compute the distance between two points using the configured metric.
+
+        Parameters
+        ----------
+        point_a : array-like, shape (2,)
+            First point. Same coordinate convention as :meth:`k_nearest_to`.
+        point_b : array-like, shape (2,)
+            Second point. Same coordinate convention as :meth:`k_nearest_to`.
+
+        Returns
+        -------
+        float
+            Distance between *point_a* and *point_b*. For ``"euclidean"``
+            this is in the same units as *coords*; for ``"haversine"``
+            this is in degrees.
+        """
+        pt_a = self._prepare_query_point(point_a)
+        pt_b = self._prepare_query_point(point_b)
+        if self.distance_metric == "euclidean":
+            return float(np.linalg.norm(pt_a - pt_b))
+        elif self.distance_metric == "haversine":
+            # pt_a and pt_b are [lat_rad, lon_rad] shaped (1, 2)
+            lat1, lon1 = pt_a[0, 0], pt_a[0, 1]
+            lat2, lon2 = pt_b[0, 0], pt_b[0, 1]
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            a = (
+                np.sin(dlat / 2) ** 2
+                + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+            )
+            return float(np.rad2deg(2 * np.arcsin(np.sqrt(a))))
+        else:
+            raise ValueError(f"Unknown distance metric: {self.distance_metric!r}")
 
     # Private helpers
     def _prepare_query_point(self, point: np.ndarray) -> np.ndarray:
