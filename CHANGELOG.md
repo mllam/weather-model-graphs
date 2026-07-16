@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with all existing entrypoints re-exported unchanged.
   [\#123](https://github.com/mllam/weather-model-graphs/pull/123), @prajwal-tech07
 
+- Add functionality to auto-detect spatial metric from graph CRS and support
+  for using haversine distance when working in geographic (lat/lon) coordinates.
+  [\#86](https://github.com/mllam/weather-model-graphs/pull/86), @FAbdullah17
+
 ### Deprecated
 
 - `wmg.save.to_pyg` now emits a `DeprecationWarning` and will not be
