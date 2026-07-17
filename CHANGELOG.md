@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for writing benchmarking results to json,
   [\#140](https://github.com/mllam/weather-model-graphs/pull/140),
   @yuvraajnarula & @leifdenby
+- Add an automated benchmark regression check in CI: the scaling benchmark is
+  run on the PR and its base branch back-to-back on the same runner (swapping
+  only the library under test), and a sticky pull-request comment reports the
+  relative runtime change per grid size. Adds `tests/benchmarks/compare.py` and
+  a GitHub Actions workflow; informational and non-blocking for now, with a low
+  starting threshold to be calibrated against the runner's noise floor.
+  [\#144](https://github.com/mllam/weather-model-graphs/issues/144), @prajwal-tech07
 
 ### Deprecated
 

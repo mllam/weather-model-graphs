@@ -1,0 +1,112 @@
+# Automated benchmark regression check (PR vs base branch).
+#
+# Design (see https://github.com/mllam/weather-model-graphs/issues/144):
+#   * Run the scaling benchmark twice, back-to-back, on the SAME runner: once
+#     against the PR's install of the library and once against the base branch's
+#     install. Only the library under test is swapped - the benchmark harness
+#     itself always comes from the PR checkout (the package uses a src/ layout,
+#     so the working tree never shadows the installed library).
+#   * Compare RELATIVE (%) change, not absolute seconds, so per-runner noise
+#     largely cancels.
+#   * Post the result as a single, updating ("sticky") PR comment. The check is
+#     informational and NON-BLOCKING for now; the threshold starts low and can
+#     be raised once the runner's real noise floor is known.
+
+name: benchmark regression
+
+on:
+  pull_request:
+    paths:
+      - "src/weather_model_graphs/create/**"
+      - "tests/benchmarks/**"
+      - ".github/workflows/benchmark-regression.yml"
+  workflow_dispatch:
+
+# Only the latest run per PR needs to finish; cancel superseded runs.
+concurrency:
+  group: benchmark-regression-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Kept small so the whole job stays within a few minutes. Tune here.
+      BENCH_ARGS: "--min-N 50 --max-N 200 --num-steps 4 --archetype keisler"
+      # Start low; raise once we've seen the runner's noise floor across a few
+      # real runs (per the discussion on #144).
+      THRESHOLD_PCT: "0.1"
+      BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - name: Run benchmark on PR and base, then compare
+        run: |
+          set -euo pipefail
+          uv venv
+          source .venv/bin/activate
+
+          echo "::group::Install PR build and benchmark it"
+          uv pip install ".[visualisation]"
+          python -m tests.benchmarks.graph_creation_scaling $BENCH_ARGS \
+            --output-json pr.json --output-plot-runtime pr_plot.png
+          echo "::endgroup::"
+
+          echo "::group::Swap in the '$BASE_REF' library and benchmark it"
+          # Reinstall ONLY the library from the base branch; the harness on disk
+          # (the PR's) is untouched, so we measure with one fixed ruler.
+          uv pip install --reinstall-package weather-model-graphs \
+            "weather-model-graphs @ git+https://github.com/mllam/weather-model-graphs.git@${BASE_REF}"
+          python -m tests.benchmarks.graph_creation_scaling $BENCH_ARGS \
+            --output-json base.json --output-plot-runtime base_plot.png
+          echo "::endgroup::"
+
+          python -m tests.benchmarks.compare base.json pr.json \
+            --threshold-pct "$THRESHOLD_PCT" \
+            --baseline-label "$BASE_REF" --contender-label "PR" \
+            --output comment.md
+
+      - name: Publish result to the job summary
+        if: always()
+        run: cat comment.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Post or update sticky PR comment
+        # Only same-repo PRs get a writable token; fork PRs fall back to the job
+        # summary above. Never fail the job over the comment (informational).
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- benchmark-regression-check -->';
+            const body = fs.readFileSync('comment.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number, per_page: 100 }
+            );
+            const existing = comments.find(
+              (c) => c.body && c.body.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body,
+              });
+            }
