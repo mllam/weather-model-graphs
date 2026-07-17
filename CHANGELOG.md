@@ -29,9 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`save.base`, `save.neural_lam.torch_tensors`, `save.neural_lam.deprecated`)
   with all existing entrypoints re-exported unchanged.
   [\#123](https://github.com/mllam/weather-model-graphs/pull/123), @prajwal-tech07
-- Added `crop_to_grid_nodes_convex_hull` option to `mesh_layout_kwargs` to
-  prune mesh nodes outside the spatial boundary of grid coordinates using
-  Delaunay triangulation (#58) @AdMub
 
 ### Deprecated
 
