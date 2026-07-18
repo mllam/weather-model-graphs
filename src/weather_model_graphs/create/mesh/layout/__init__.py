@@ -9,8 +9,10 @@ Available layouts:
 
 - ``rectilinear``: nodes placed on a uniform rectangular grid.
 - ``triangular``: nodes placed on a regular (equilateral) triangular lattice.
+- ``prebuilt``: nodes taken from a user-provided mesh graph (edge-less node
+  clouds; mesh edges are built in the connectivity step).
 """
 
-from . import rectilinear, triangular
+from . import prebuilt, rectilinear, triangular
 
-__all__ = ["rectilinear", "triangular"]
+__all__ = ["prebuilt", "rectilinear", "triangular"]
