@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `mesh_layout="prebuilt"` support to `create_all_graph_components` for
+  user-provided mesh node positions (e.g. ICON grid vertices or an
+  observation-station network), given as a nodes-only `networkx.Graph` (or a
+  bare `[N, 2]` coordinate array) via `mesh_layout_kwargs=dict(mesh_graph=...)`.
+  Mesh edges are built in the connectivity step directly from the node
+  positions (`method="delaunay"`); hierarchical meshes are declared with an
+  integer `level` node attribute. New module `create/mesh/layout/prebuilt.py`
+  contains the input validation and primitive creation; the connectivity step
+  now also validates that an explicit `pattern` matches the adjacency types
+  present in the mesh primitive instead of silently producing an empty mesh.
+  [\#79](https://github.com/mllam/weather-model-graphs/issues/79), @prajwal-tech07
+- Add `mesh_layout="triangular"` support to `create_all_graph_components`, using
+  `networkx.triangular_lattice_graph` to produce an equilateral-triangle lattice
+  with 6-connectivity. Supports all three `m2m_connectivity` modes: `flat`,
+  `hierarchical`, and `flat_multiscale`. New module
+  `create/mesh/connectivity/triangular.py` contains the coordinate and
+  connectivity creation functions for triangular meshes.
+  [\#80](https://github.com/mllam/weather-model-graphs/issues/80), @prajwal-tech07
 - Add `mesh_layout` argument to mesh graph creation functions, with `rectilinear`
   as the first supported layout. Uses a two-step architecture separating coordinate
   creation from connectivity creation, enabling future alternative layouts (e.g. triangular).

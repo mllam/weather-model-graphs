@@ -5,14 +5,14 @@ import numpy as np
 import scipy
 
 from ....networkx_utils import prepend_node_index
-from .. import coords as mesh_coords
+from ..layout import rectilinear as mesh_layout
 from .general import create_directed_mesh_graph
 
 
 def create_hierarchical_from_coordinates(
     G_coords_list: List[networkx.Graph],
-    intra_level: Dict[str, object] = {"pattern": "8-star"},
-    inter_level: Dict[str, object] = {"pattern": "nearest", "k": 1},
+    intra_level: Optional[Dict[str, object]] = None,
+    inter_level: Optional[Dict[str, object]] = None,
 ) -> networkx.DiGraph:
     """
     Create a hierarchical multiscale mesh graph from a list of mesh primitive
@@ -23,10 +23,14 @@ def create_hierarchical_from_coordinates(
     directed mesh graph with intra-level connectivity and inter-level
     up/down connections.
 
-    The ``intra_level["pattern"]`` defines the spatial neighbourhood connectivity
-    within each mesh level:
-    - ``"4-star"``: only cardinal directions (horizontal and vertical neighbours)
-    - ``"8-star"``: cardinal directions plus diagonals (all 8 surrounding neighbours)
+    Intra-level connectivity is controlled by ``intra_level``:
+    - For primitives with adjacency edges (generated layouts), the optional
+      ``intra_level["pattern"]`` selects a subset of them (``"4-star"``:
+      only cardinal neighbours; ``"8-star"``: cardinal plus diagonal). When
+      no pattern is given, every edge the layout produced is used.
+    - For edge-less primitives (``mesh_layout="prebuilt"`` node clouds),
+      ``intra_level["method"]`` selects how edges are built from the node
+      positions per level (currently only ``"delaunay"``, the default).
 
     Parameters
     ----------
@@ -34,13 +38,18 @@ def create_hierarchical_from_coordinates(
         List of undirected mesh primitive graphs, one per level. Each graph
         must have:
         - Node attributes: ``"pos"`` (np.ndarray of shape [2,]), ``"type"`` (str)
-        - Edge attributes: ``"adjacency_type"`` (str, ``"cardinal"`` or ``"diagonal"``)
-        Created by ``create_multirange_2d_mesh_primitives``.
-    intra_level : dict
+        - Edge attributes (when the primitive has edges): ``"adjacency_type"``
+          (str, ``"cardinal"`` or ``"diagonal"``)
+        Created by ``create_multirange_2d_mesh_primitives`` (generated
+        layouts) or ``create_multi_level_prebuilt_mesh_primitives``
+        (prebuilt).
+    intra_level : dict, optional
         Configuration for intra-level connectivity. Keys:
-        - ``"pattern"`` (str): ``"4-star"`` or ``"8-star"``.
-        Default: ``{"pattern": "8-star"}``
-    inter_level : dict
+        - ``"pattern"`` (str): ``"4-star"`` or ``"8-star"`` (primitives with
+          adjacency edges only; default: use every edge).
+        - ``"method"`` (str): edge construction method for edge-less
+          primitives (default: ``"delaunay"``).
+    inter_level : dict, optional
         Configuration for inter-level connectivity. Keys:
         - ``"pattern"`` (str): Currently only ``"nearest"`` is supported.
         - ``"k"`` (int): Number of nearest neighbours for inter-level connections.
@@ -53,7 +62,12 @@ def create_hierarchical_from_coordinates(
         edges (direction="same"), inter-level down edges (direction="down"),
         and inter-level up edges (direction="up").
     """
-    intra_level_pattern = intra_level.get("pattern", "8-star")
+    if intra_level is None:
+        intra_level = {}
+    if inter_level is None:
+        inter_level = {}
+    intra_level_pattern = intra_level.get("pattern")
+    intra_level_method = intra_level.get("method")
     inter_level_pattern = inter_level.get("pattern", "nearest")
     inter_level_k = inter_level.get("k", 1)
 
@@ -63,9 +77,12 @@ def create_hierarchical_from_coordinates(
             "for hierarchical graphs. Only 'nearest' is currently implemented."
         )
 
-    # Convert each level's coordinate graph to directed graph with chosen pattern
+    # Convert each level's coordinate graph to directed graph with chosen
+    # pattern (adjacency-edge primitives) or method (edge-less primitives)
     Gs_all_levels = [
-        create_directed_mesh_graph(g_coords, pattern=intra_level_pattern)
+        create_directed_mesh_graph(
+            g_coords, pattern=intra_level_pattern, method=intra_level_method
+        )
         for g_coords in G_coords_list
     ]
 
@@ -207,7 +224,7 @@ def create_hierarchical_multiscale_mesh_graph(
         A directed graph containing the hierarchical mesh with intra-level,
         up, and down edges.
     """
-    G_coords_list = mesh_coords.create_multirange_2d_mesh_primitives(
+    G_coords_list = mesh_layout.create_multirange_2d_mesh_primitives(
         max_num_levels=max_num_levels,
         xy=xy,
         mesh_node_spacing=mesh_node_distance,

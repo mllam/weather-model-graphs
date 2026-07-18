@@ -7,5 +7,7 @@ chapters:
 - file: background
 - file: design
 - file: creating_the_graph
+- file: mesh_layout
+- file: prebuilt_mesh
 - file: lat_lons
 - file: decoding_mask
