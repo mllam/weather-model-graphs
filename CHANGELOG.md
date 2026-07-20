@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.3.0...HEAD)
+## [v0.4.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.4.0)
+
+This release lays the foundations for introducing new mesh node layouts
+(through the `mesh_layout` argument) and for creating graphs for
+`neural-lam` (by adding `save.neural_lam.torch_tensors` supporting the `v0.1.0`
+`neural-lam` graph format specification). In addition, this release introduces
+graph-filtering functionality (based on node and edge features), graph
+diagnostics (checking for e.g. unconnected grid nodes) and graph creation
+benchmarks (to support future runtime optimisation work).
 
 ### Added
 
