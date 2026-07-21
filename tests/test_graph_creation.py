@@ -267,3 +267,63 @@ def test_edgeless_nodes_preservation_in_different_graphs(
         G_source=graph_source, G_target=graph_target, method=method, **method_kwargs
     )
     assert set(graph.nodes) == set(graph_source.nodes) | set(graph_target.nodes)
+
+
+@pytest.mark.parametrize("kind", ["keisler", "oskarsson_hierarchical"])
+def test_convex_hull_cropping_supported_archetypes(kind):
+    import numpy as np
+
+    from weather_model_graphs.create.archetype import (
+        create_keisler_graph,
+        create_oskarsson_hierarchical_graph,
+    )
+
+    # Create a large 'L' shape.
+    coords = []
+    for x in range(11):
+        for y in range(11):
+            if x <= 5 or y <= 5:
+                coords.append([x, y])
+    coords = np.array(coords)
+
+    # Select the correct function based on the parameter
+    fn = (
+        create_keisler_graph
+        if kind == "keisler"
+        else create_oskarsson_hierarchical_graph
+    )
+
+    # Create graphs
+    graph_no_crop = fn(coords, mesh_node_distance=1)
+    graph_crop = fn(
+        coords,
+        mesh_node_distance=1,
+        crop_to_grid_nodes_convex_hull=True,
+    )
+
+    # Extract component
+    num_mesh_nodes_no_crop = len(
+        [n for n, d in graph_no_crop.nodes(data=True) if d.get("type") == "mesh"]
+    )
+    num_mesh_nodes_crop = len(
+        [n for n, d in graph_crop.nodes(data=True) if d.get("type") == "mesh"]
+    )
+
+    assert num_mesh_nodes_crop < num_mesh_nodes_no_crop
+
+
+def test_convex_hull_cropping_graphcast_error():
+    import numpy as np
+    import pytest
+
+    from weather_model_graphs.create.archetype import create_graphcast_graph
+
+    coords = np.array([[0, 0], [1, 0], [0, 1]])
+
+    # Verify that attempting to crop a GraphCast architecture throws our specific ValueError
+    with pytest.raises(ValueError, match="not supported for 'flat_multiscale'"):
+        create_graphcast_graph(
+            coords,
+            mesh_node_distance=1,
+            crop_to_grid_nodes_convex_hull=True,
+        )

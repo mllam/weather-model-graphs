@@ -13,6 +13,7 @@ def create_keisler_graph(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
+    crop_to_grid_nodes_convex_hull: bool = False,
 ) -> Union[networkx.DiGraph, Dict[str, networkx.DiGraph]]:
     """
     Create a flat LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -61,7 +62,10 @@ def create_keisler_graph(
         coords_crs=coords_crs,
         graph_crs=graph_crs,
         mesh_layout="rectilinear",
-        mesh_layout_kwargs=dict(mesh_node_spacing=mesh_node_distance),
+        mesh_layout_kwargs=dict(
+            mesh_node_spacing=mesh_node_distance,
+            crop_to_grid_nodes_convex_hull=crop_to_grid_nodes_convex_hull,
+        ),
         m2m_connectivity="flat",
         g2m_connectivity="within_radius",
         g2m_connectivity_kwargs=dict(rel_max_dist=0.51),
@@ -81,6 +85,7 @@ def create_graphcast_graph(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
+    crop_to_grid_nodes_convex_hull: bool = False,
 ) -> Union[networkx.DiGraph, Dict[str, networkx.DiGraph]]:
     """
     Create a multiscale LAM graph from Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -137,6 +142,7 @@ def create_graphcast_graph(
             mesh_node_spacing=mesh_node_distance,
             refinement_factor=level_refinement_factor,
             max_num_refinement_levels=max_num_levels,
+            crop_to_grid_nodes_convex_hull=crop_to_grid_nodes_convex_hull,
         ),
         m2m_connectivity="flat_multiscale",
         g2m_connectivity="within_radius",
@@ -157,6 +163,7 @@ def create_oskarsson_hierarchical_graph(
     graph_crs: pyproj.crs.CRS | None = None,
     decode_mask: Iterable[bool] | None = None,
     return_components: bool = False,
+    crop_to_grid_nodes_convex_hull: bool = False,
 ) -> Union[networkx.DiGraph, Dict[str, networkx.DiGraph]]:
     """
     Create a LAM graph following Oskarsson et al (2023, https://arxiv.org/abs/2309.17370)
@@ -218,6 +225,7 @@ def create_oskarsson_hierarchical_graph(
             mesh_node_spacing=mesh_node_distance,
             refinement_factor=level_refinement_factor,
             max_num_refinement_levels=max_num_levels,
+            crop_to_grid_nodes_convex_hull=crop_to_grid_nodes_convex_hull,
         ),
         m2m_connectivity="hierarchical",
         g2m_connectivity="within_radius",

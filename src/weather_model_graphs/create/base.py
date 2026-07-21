@@ -289,6 +289,39 @@ def create_all_graph_components(
             "Currently only 'rectilinear' is implemented."
         )
 
+    # --- CONVEX HULL PRUNING INJECTION ---
+    if mesh_layout_kwargs and mesh_layout_kwargs.get(
+        "crop_to_grid_nodes_convex_hull", False
+    ):
+
+        # TODO: Support crop_to_grid_nodes_convex_hull for 'flat_multiscale' graphs.
+        # Currently, `create_flat_multiscale_from_coordinates` (in mesh/connectivity/flat.py)
+        # merges hierarchy levels by reshaping the node array assuming a full (nx, ny, 2)
+        # rectangular grid and striding over indices. To support cropping here, that merging
+        # logic must first be refactored to be position-based (spatial) rather than index-based.
+        if m2m_connectivity == "flat_multiscale":
+            raise ValueError(
+                "crop_to_grid_nodes_convex_hull is currently not supported for 'flat_multiscale' "
+                "(GraphCast) architectures because they assume a regular rectangular grid."
+            )
+
+        from scipy.spatial import Delaunay
+
+        hull = Delaunay(xy)
+
+        def _crop(g):
+            outside = [
+                n for n, pos in g.nodes(data="pos") if hull.find_simplex(pos) < 0
+            ]
+            g.remove_nodes_from(outside)
+            return g
+
+        if isinstance(G_mesh_coords, list):
+            G_mesh_coords = [_crop(g) for g in G_mesh_coords]
+        else:
+            G_mesh_coords = _crop(G_mesh_coords)
+    # -------------------------------------
+
     # -----------------------------------------------------------------------
     # Step 2: Connectivity creation — converts mesh primitives to directed graph
     # -----------------------------------------------------------------------

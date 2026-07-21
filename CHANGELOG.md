@@ -5,48 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.3.0...HEAD)
+## [Unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.4.0...HEAD)
 
 ### Added
 
-- Add `mesh_layout` argument to mesh graph creation functions, with `rectilinear`
-  as the first supported layout. Uses a two-step architecture separating coordinate
-  creation from connectivity creation, enabling future alternative layouts (e.g. triangular).
-  [\#78](https://github.com/mllam/weather-model-graphs/issues/78), @prajwal-tech07
-- Add a standalone graph consistency checking tool (`wmg.diagnostics.check_graph_consistency`) to ensure structural health, such as verifying all grid nodes successfully connect to the mesh (#42).
-- Add Django-style graph filtering via `filter_graph`, for example to select
-  nodes by type (`node__type="mesh"`), edges by component
-  (`edge__component="g2m"`), long edges (`edge__len__gt=...`), and spatial
-  windows (`node__pos__bbox=(8, 16, 8, 16)`), including combined filters.
-  [\#46](https://github.com/mllam/weather-model-graphs/pull/46), @leifdenby & @Joltsy10
-- Add `__version__` attribute to the package init
-  [\#56](https://github.com/mllam/weather-model-graphs/pull/56) @AdMub
-- Add runtime and scaling benchmarks with CLI,
-  [\#117](https://github.com/mllam/weather-model-graphs/pull/117), @leifdenby
-- Add `wmg.save.to_torch_tensors_on_disk` to save graphs in the neural-lam
-  tensor-on-disk format (graph storage spec v0.1.0), tested against
-  neural-lam's own graph validator. `wmg.save` is restructured into a package
-  (`save.base`, `save.neural_lam.torch_tensors`, `save.neural_lam.deprecated`)
-  with all existing entrypoints re-exported unchanged.
-  [\#123](https://github.com/mllam/weather-model-graphs/pull/123), @prajwal-tech07
-- Add support for writing benchmarking results to json,
-  [\#140](https://github.com/mllam/weather-model-graphs/pull/140),
-  @yuvraajnarula & @leifdenby
+- Added `crop_to_grid_nodes_convex_hull` option to `mesh_layout_kwargs` to prune mesh nodes outside the spatial boundary of grid coordinates using Delaunay triangulation (#58) @AdMub
 
-### Deprecated
-
-- `wmg.save.to_pyg` now emits a `DeprecationWarning` and will not be
-  maintained going forward; use `wmg.save.to_torch_tensors_on_disk` instead.
-  [\#123](https://github.com/mllam/weather-model-graphs/pull/123), @prajwal-tech07
-
-### Maintenance
-
-- add `nb-clean` to `pre-commit` config to ensure that committed jupyter
-  notebooks have empty output cells (to keep notebook filesizes at minimum),
-  [\#146](https://github.com/mllam/weather-model-graphs/pull/146), @leifdenby
-
-## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
-
+## [v0.4.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.4.0)
 
 ### Added
 
@@ -56,100 +21,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add test to check python codeblocks in README keep working as code changes
   [\#38](https://github.com/mllam/weather-model-graphs/pull/38) @leifdenby
 
-- Add coords_crs and graph_crs arguments to allow for using lat-lons coordinates
-  or other CRSs as input. These are then converted to the specific CRS used when
-  constructing the graph.
-  [\#32](https://github.com/mllam/weather-model-graphs/pull/32), @joeloskarsson
+  - Add coords_crs and graph_crs arguments to allow for using lat-lons coordinates
+    or other CRSs as input. These are then converted to the specific CRS used when
+    constructing the graph.
+    [\#32](https://github.com/mllam/weather-model-graphs/pull/32), @joeloskarsson
 
-### Changed
+  ### Changed
 
-- Change coordinate input to array of shape [N_grid_points, 2] (was previously
-  [2, Ny, Nx]), to allow for non-regularly gridded coordinates
-  [\#32](https://github.com/mllam/weather-model-graphs/pull/32), @joeloskarsson
+  - Change coordinate input to array of shape [N_grid_points, 2] (was previously
+    [2, Ny, Nx]), to allow for non-regularly gridded coordinates
+    [\#32](https://github.com/mllam/weather-model-graphs/pull/32), @joeloskarsson
 
-### Fixed
+  ### Fixed
 
-- Fix the bug with edgeless nodes being dropped
-  [\#51](https://github.com/mllam/weather-model-graphs/pull/51), @pkhalaj, @wi-spang, @krikru
+  - Fix the bug with edgeless nodes being dropped
+    [\#51](https://github.com/mllam/weather-model-graphs/pull/51), @pkhalaj, @wi-spang, @krikru
 
-- Fix crash when trying to create flat multiscale graphs with >= 3 levels
-  [\#41](https://github.com/mllam/weather-model-graphs/pull/41), @joeloskarsson
+  - Fix crash when trying to create flat multiscale graphs with >= 3 levels
+    [\#41](https://github.com/mllam/weather-model-graphs/pull/41), @joeloskarsson
 
-- Fix example in README
-  [\#38](https://github.com/mllam/weather-model-graphs/pull/38) @leifdenby
+  - Fix example in README
+    [\#38](https://github.com/mllam/weather-model-graphs/pull/38) @leifdenby
 
-### Maintenance
+  ### Maintenance
 
-- Update github CI actions, including pre-commit action to fix caching issue
-  that lead to tests failing
-  [\#48](https://github.com/mllam/weather-model-graphs/pull/48), @leifdenby
+  - Update github CI actions, including pre-commit action to fix caching issue
+    that lead to tests failing
+    [\#48](https://github.com/mllam/weather-model-graphs/pull/48), @leifdenby
 
-- Update github CI actions to fix failing build and deploy of jupyterbook
-  [\#49](https://github.com/mllam/weather-model-graphs/pull/49),
-  [\#54](https://github.com/mllam/weather-model-graphs/pull/54), @leifdenby
+  - Update github CI actions to fix failing build and deploy of jupyterbook
+    [\#49](https://github.com/mllam/weather-model-graphs/pull/49),
+    [\#54](https://github.com/mllam/weather-model-graphs/pull/54), @leifdenby
 
-- Improve isolation of README example tests by executing each code block in an isolated namespace.
-  [#65](https://github.com/mllam/weather-model-graphs/pull/64) @Shristi-Goel
+  ## [v0.2.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.2.0)
 
-## [v0.2.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.2.0)
+  ### Added
 
-### Added
+  - added github pull-request template to ease contribution and review process
+    [\#18](https://github.com/mllam/weather-model-graphs/pull/18), @joeloskarsson
 
-- added github pull-request template to ease contribution and review process
-  [\#18](https://github.com/mllam/weather-model-graphs/pull/18), @joeloskarsson
+  - Allow for specifying relative distance as `rel_max_dist` when connecting nodes using `within_radius` method.
+    [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
+    @joeloskarsson
 
-- Allow for specifying relative distance as `rel_max_dist` when connecting nodes using `within_radius` method.
-  [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
-  @joeloskarsson
+  - `save.to_pyg` can now handle any number of 1D or 2D edge or node features when
+    converting pytorch-geometric `Data` objects to `torch.Tensor` objects.
+    [\#31](https://github.com/mllam/weather-model-graphs/pull/31)
+    @maxiimilian
 
-- `save.to_pyg` can now handle any number of 1D or 2D edge or node features when
-  converting pytorch-geometric `Data` objects to `torch.Tensor` objects.
-  [\#31](https://github.com/mllam/weather-model-graphs/pull/31)
-  @maxiimilian
+  - Add containing_rectangle graph connection method for m2g edges
+    [\#28](https://github.com/mllam/weather-model-graphs/pull/28)
+    @joeloskarsson
 
-- Add containing_rectangle graph connection method for m2g edges
-  [\#28](https://github.com/mllam/weather-model-graphs/pull/28)
-  @joeloskarsson
+  ### Changed
 
-### Changed
+  - Create different number of mesh nodes in x- and y-direction.
+    [\#21](https://github.com/mllam/weather-model-graphs/pull/21)
+    @joeloskarsson
 
-- Create different number of mesh nodes in x- and y-direction.
-  [\#21](https://github.com/mllam/weather-model-graphs/pull/21)
-  @joeloskarsson
+  - Changed the `refinement_factor` argument into two: a `grid_refinement_factor` and a `level_refinement_factor`.
+    [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
+    @joeloskarsson
 
-- Changed the `refinement_factor` argument into two: a `grid_refinement_factor` and a `level_refinement_factor`.
-  [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
-  @joeloskarsson
+  - Connect grid nodes only to the bottom level of hierarchical mesh graphs.
+    [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
+    @joeloskarsson
 
-- Connect grid nodes only to the bottom level of hierarchical mesh graphs.
-  [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
-  @joeloskarsson
+  - Change default archetypes to match the graph creation from neural-lam.
+    [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
+    @joeloskarsson
 
-- Change default archetypes to match the graph creation from neural-lam.
-  [\#19](https://github.com/mllam/weather-model-graphs/pull/19)
-  @joeloskarsson
+  ### Fixed
 
-### Fixed
+  - Fix `attribute` keyword bug in save function
+    [\#35](https://github.com/mllam/weather-model-graphs/pull/35)
+    @joeloskarsson
 
-- Fix `attribute` keyword bug in save function
-  [\#35](https://github.com/mllam/weather-model-graphs/pull/35)
-  @joeloskarsson
+  - Fix wrong number of mesh levels when grid is multiple of refinement factor
+    [\#26](https://github.com/mllam/weather-model-graphs/pull/26)
+    @joeloskarsson
 
-- Fix wrong number of mesh levels when grid is multiple of refinement factor
-  [\#26](https://github.com/mllam/weather-model-graphs/pull/26)
-  @joeloskarsson
+  ### Maintenance
 
-### Maintenance
+  - Ensure that cell execution doesn't time out when building jupyterbook based
+    documentation [\#25](https://github.com/mllam/weather-model-graphs/pull/25),
+    @leifdenby
 
-- Ensure that cell execution doesn't time out when building jupyterbook based
-  documentation [\#25](https://github.com/mllam/weather-model-graphs/pull/25),
-  @leifdenby
+  ## [v0.1.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.1.0)
 
-## [v0.1.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.1.0)
-
-First tagged release of `weather-model-graphs` which includes functionality to
-create three graph archetypes (Keisler nearest-neighbour, GraphCast multi-range
-and Oskarsson hierarchical graphs) deliniating the different connectivity
-options, background on graph-based data-driven models, 2D plotting utilities,
-JupyterBook based documentation. In this version the graph assumes grid
-coordinates are Cartesian coordinates.
+  First tagged release of `weather-model-graphs` which includes functionality to
+  create three graph archetypes (Keisler nearest-neighbour, GraphCast multi-range
+  and Oskarsson hierarchical graphs) deliniating the different connectivity
+  options, background on graph-based data-driven models, 2D plotting utilities,
+  JupyterBook based documentation. In this version the graph assumes grid
+  coordinates are Cartesian coordinates.
