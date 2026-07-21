@@ -57,17 +57,15 @@ def create_keisler_graph(
     networkx.DiGraph or dict[networkx.DiGraph]
         The graph or graph components.
     """
-    kwargs = dict(
-        mesh_node_spacing=mesh_node_distance,
-        crop_to_grid_nodes_convex_hull=crop_to_grid_nodes_convex_hull,
-    )
-
     return create_all_graph_components(
         coords=coords,
         coords_crs=coords_crs,
         graph_crs=graph_crs,
         mesh_layout="rectilinear",
-        mesh_layout_kwargs=kwargs,
+        mesh_layout_kwargs=dict(
+            mesh_node_spacing=mesh_node_distance,
+            crop_to_grid_nodes_convex_hull=crop_to_grid_nodes_convex_hull,
+        ),
         m2m_connectivity="flat",
         g2m_connectivity="within_radius",
         g2m_connectivity_kwargs=dict(rel_max_dist=0.51),
@@ -135,19 +133,17 @@ def create_graphcast_graph(
     networkx.DiGraph or dict[networkx.DiGraph]
         The graph or graph components.
     """
-    kwargs = dict(
-        mesh_node_spacing=mesh_node_distance,
-        refinement_factor=level_refinement_factor,
-        max_num_refinement_levels=max_num_levels,
-        crop_to_grid_nodes_convex_hull=crop_to_grid_nodes_convex_hull,
-    )
-
     return create_all_graph_components(
         coords=coords,
         coords_crs=coords_crs,
         graph_crs=graph_crs,
         mesh_layout="rectilinear",
-        mesh_layout_kwargs=kwargs,
+        mesh_layout_kwargs=dict(
+            mesh_node_spacing=mesh_node_distance,
+            refinement_factor=level_refinement_factor,
+            max_num_refinement_levels=max_num_levels,
+            crop_to_grid_nodes_convex_hull=crop_to_grid_nodes_convex_hull,
+        ),
         m2m_connectivity="flat_multiscale",
         g2m_connectivity="within_radius",
         g2m_connectivity_kwargs=dict(rel_max_dist=0.51),
@@ -220,19 +216,17 @@ def create_oskarsson_hierarchical_graph(
     networkx.DiGraph or dict[networkx.DiGraph]
         The graph or graph components.
     """
-    kwargs = dict(
-        mesh_node_spacing=mesh_node_distance,
-        refinement_factor=level_refinement_factor,
-        max_num_refinement_levels=max_num_levels,
-        crop_to_grid_nodes_convex_hull=crop_to_grid_nodes_convex_hull,
-    )
-
     return create_all_graph_components(
         coords=coords,
         coords_crs=coords_crs,
         graph_crs=graph_crs,
         mesh_layout="rectilinear",
-        mesh_layout_kwargs=kwargs,
+        mesh_layout_kwargs=dict(
+            mesh_node_spacing=mesh_node_distance,
+            refinement_factor=level_refinement_factor,
+            max_num_refinement_levels=max_num_levels,
+            crop_to_grid_nodes_convex_hull=crop_to_grid_nodes_convex_hull,
+        ),
         m2m_connectivity="hierarchical",
         g2m_connectivity="within_radius",
         g2m_connectivity_kwargs=dict(rel_max_dist=0.51),
