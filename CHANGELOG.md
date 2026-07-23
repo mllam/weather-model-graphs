@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.3.0...HEAD)
+## [v0.4.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.4.0)
+
+This release lays the foundations for introducing new mesh node layouts
+(through the `mesh_layout` argument) and for creating graphs for
+`neural-lam` (by adding `save.neural_lam.torch_tensors` supporting the `v0.1.0`
+`neural-lam` graph format specification). In addition, this release introduces
+graph-filtering functionality (based on node and edge features), graph
+diagnostics (checking for e.g. unconnected grid nodes) and graph creation
+benchmarks (to support future runtime optimisation work).
 
 ### Added
 
@@ -13,7 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as the first supported layout. Uses a two-step architecture separating coordinate
   creation from connectivity creation, enabling future alternative layouts (e.g. triangular).
   [\#78](https://github.com/mllam/weather-model-graphs/issues/78), @prajwal-tech07
-- Add a standalone graph consistency checking tool (`wmg.diagnostics.check_graph_consistency`) to ensure structural health, such as verifying all grid nodes successfully connect to the mesh (#42).
+- Add a standalone graph consistency checking tool
+  (`wmg.diagnostics.check_graph_consistency`) to ensure structural health, such
+  as verifying all grid nodes successfully connect to the mesh
+  [\#59](https://github.com/mllam/weather-model-graphs/pull/59), @AdMub
 - Add Django-style graph filtering via `filter_graph`, for example to select
   nodes by type (`node__type="mesh"`), edges by component
   (`edge__component="g2m"`), long edges (`edge__len__gt=...`), and spatial
@@ -41,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Maintenance
 
+- Improve isolation of README example tests by executing each code block in an isolated namespace.
+  [\#65](https://github.com/mllam/weather-model-graphs/pull/64) @Shristi-Goel
 - add `nb-clean` to `pre-commit` config to ensure that committed jupyter
   notebooks have empty output cells (to keep notebook filesizes at minimum),
   [\#146](https://github.com/mllam/weather-model-graphs/pull/146), @leifdenby
@@ -87,9 +100,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update github CI actions to fix failing build and deploy of jupyterbook
   [\#49](https://github.com/mllam/weather-model-graphs/pull/49),
   [\#54](https://github.com/mllam/weather-model-graphs/pull/54), @leifdenby
-
-- Improve isolation of README example tests by executing each code block in an isolated namespace.
-  [#65](https://github.com/mllam/weather-model-graphs/pull/64) @Shristi-Goel
 
 ## [v0.2.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.2.0)
 
