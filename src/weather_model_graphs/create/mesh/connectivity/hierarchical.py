@@ -5,7 +5,7 @@ import numpy as np
 import scipy
 
 from ....networkx_utils import prepend_node_index
-from .. import coords as mesh_coords
+from ..layout import rectilinear as mesh_layout
 from .general import create_directed_mesh_graph
 
 
@@ -207,7 +207,7 @@ def create_hierarchical_multiscale_mesh_graph(
         A directed graph containing the hierarchical mesh with intra-level,
         up, and down edges.
     """
-    G_coords_list = mesh_coords.create_multirange_2d_mesh_primitives(
+    G_coords_list = mesh_layout.create_multirange_2d_mesh_primitives(
         max_num_levels=max_num_levels,
         xy=xy,
         mesh_node_spacing=mesh_node_distance,

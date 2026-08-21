@@ -20,8 +20,37 @@ benchmarks (to support future runtime optimisation work).
 - Fix duplicate `coords_crs` condition in `create_all_graph_components` that should check `graph_crs`
   [\#69](https://github.com/mllam/weather-model-graphs/issues/69)
 
+### Fixed
+
+- Make `max_num_levels` optional in the multi-level layout primitives
+  (`create_multirange_2d_mesh_primitives`, both layouts). It was a required
+  positional argument, so calling `create_all_graph_components` with
+  `m2m_connectivity="flat_multiscale"` or `"hierarchical"` and without
+  `max_num_refinement_levels` raised a `TypeError`, despite the argument being
+  documented as optional. Omitting it now creates as many levels as the domain
+  allows. The archetypes were unaffected as they always pass the argument.
+  @prajwal-tech07
+
 ### Added
 
+- Add public `weather_model_graphs.create.MESH_LAYOUT_OPTIONS` constant listing the
+  supported `mesh_layout` names, so downstream tools (e.g. neural-lam's
+  `create_graph_with_wmg` CLI) can populate their layout choices without
+  hardcoding the list. Also used for argument validation and error messages, making
+  it the single source of truth for which layouts exist.
+  [\#661](https://github.com/mllam/neural-lam/issues/661), @prajwal-tech07
+- Add `mesh_layout="triangular"` support to `create_all_graph_components`, using
+  `networkx.triangular_lattice_graph` to produce an equilateral-triangle lattice
+  with 6-connectivity. Supports all three `m2m_connectivity` modes: `flat`,
+  `hierarchical`, and `flat_multiscale`. The lattice is scaled by a single
+  factor in both directions, so the triangles stay equilateral for any domain
+  shape and `mesh_node_spacing` is the actual distance between neighbouring
+  mesh nodes; the lattice is sized to cover the domain, so the outermost nodes
+  can sit just outside it. Multi-level meshes anchor every level to the same
+  origin, so coarser-level nodes coincide with finer-level ones as multiscale
+  connectivity requires. New module `create/mesh/layout/triangular.py` contains
+  the coordinate creation functions for triangular meshes.
+  [\#80](https://github.com/mllam/weather-model-graphs/issues/80), @prajwal-tech07
 - Add `mesh_layout` argument to mesh graph creation functions, with `rectilinear`
   as the first supported layout. Uses a two-step architecture separating coordinate
   creation from connectivity creation, enabling future alternative layouts (e.g. triangular).
