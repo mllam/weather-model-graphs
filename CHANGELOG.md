@@ -57,6 +57,10 @@ benchmarks (to support future runtime optimisation work).
   against the runner's noise floor.
   [\#144](https://github.com/mllam/weather-model-graphs/issues/144), @prajwal-tech07
 
+- Add functionality to auto-detect spatial metric from graph CRS and support
+  for using haversine distance when working in geographic (lat/lon) coordinates.
+  [\#86](https://github.com/mllam/weather-model-graphs/pull/86), @FAbdullah17
+
 ### Deprecated
 
 - `wmg.save.to_pyg` now emits a `DeprecationWarning` and will not be

@@ -1,9 +1,13 @@
 import networkx
 import numpy as np
 
+from ....spatial import SpatialCoordinateValuesSelector
+
 
 def create_directed_mesh_graph(
-    G_undirected: networkx.Graph, pattern: str = "8-star"
+    G_undirected: networkx.Graph,
+    pattern: str = "8-star",
+    distance_metric: str = "euclidean",
 ) -> networkx.DiGraph:
     """
     Convert an undirected mesh primitive graph with spatial adjacency edges to a
@@ -30,6 +34,10 @@ def create_directed_mesh_graph(
         Connectivity pattern. Options:
         - ``"4-star"``: only cardinal edges (horizontal/vertical neighbours)
         - ``"8-star"``: all edges (cardinal + diagonal neighbours)
+    distance_metric : str
+        Distance metric for edge length computation. Options:
+        - ``"euclidean"``: standard Cartesian distance (default)
+        - ``"haversine"``: great-circle distance for lon/lat in degrees
 
     Returns
     -------
@@ -61,19 +69,18 @@ def create_directed_mesh_graph(
 
     # Convert to directed graph (creates edges in both directions)
     dg = networkx.DiGraph(g_filtered)
+
+    pos = {n: G_undirected.nodes[n]["pos"] for n in G_undirected.nodes}
+    all_positions = np.array(list(pos.values()))
+    selector = SpatialCoordinateValuesSelector(distance_metric, all_positions)
+
     for u, v in g_filtered.edges():
-        d = np.sqrt(
-            np.sum((G_undirected.nodes[u]["pos"] - G_undirected.nodes[v]["pos"]) ** 2)
-        )
+        d = selector.distance_between(pos[u], pos[v])
         dg.edges[u, v]["len"] = d
-        dg.edges[u, v]["vdiff"] = (
-            G_undirected.nodes[u]["pos"] - G_undirected.nodes[v]["pos"]
-        )
+        dg.edges[u, v]["vdiff"] = pos[u] - pos[v]
         # Ensure reverse edge exists and has attributes
         dg.edges[v, u]["len"] = d
-        dg.edges[v, u]["vdiff"] = (
-            G_undirected.nodes[v]["pos"] - G_undirected.nodes[u]["pos"]
-        )
+        dg.edges[v, u]["vdiff"] = pos[v] - pos[u]
 
     # Preserve graph-level attributes (dx, dy, level, etc.)
     dg.graph.update(G_undirected.graph)
