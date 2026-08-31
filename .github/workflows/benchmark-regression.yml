@@ -8,6 +8,8 @@
 #     so the working tree never shadows the installed library).
 #   * Compare RELATIVE (%) change, not absolute seconds, so per-runner noise
 #     largely cancels. Both runtime and peak memory usage are compared.
+#   * Time each grid size several times and compare the MEDIAN, so one noisy
+#     run on a busy runner doesn't get reported as a regression.
 #   * Post the result as a single, updating ("sticky") PR comment. The check is
 #     informational and NON-BLOCKING for now; the threshold starts low and can
 #     be raised once the runner's real noise floor is known.
@@ -39,9 +41,18 @@ jobs:
       # Kept small so the whole job stays within a few minutes. Tune here.
       # --track-memory is included so compare.py can also report peak-memory
       # deltas alongside runtime (per the discussion on #144).
-      BENCH_ARGS: "--min-N 50 --max-N 200 --num-steps 4 --archetype keisler --track-memory"
-      # Start low; raise once we've seen the runner's noise floor across a few
-      # real runs (per the discussion on #144).
+      # --repetitions reports the median of several timings per grid size, so a
+      # single noisy run on a busy runner doesn't look like a regression. Only
+      # the timed runs are repeated (peak memory is measured once), which is
+      # what keeps this affordable.
+      BENCH_ARGS: >-
+        --min-N 50 --max-N 200 --num-steps 4 --archetype keisler
+        --track-memory --repetitions 5
+      # Still deliberately low, so that whatever noise remains stays visible in
+      # the PR comment. Repetitions (above) are the first half of making this
+      # number meaningful; the second half is calibrating it against runs on a
+      # real runner rather than a developer machine, which is why it is left
+      # alone here (see #144).
       THRESHOLD_PCT: "0.1"
       BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
     steps:

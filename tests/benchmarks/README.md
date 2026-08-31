@@ -54,7 +54,11 @@ uv run python -m tests.benchmarks.graph_creation_scaling
 - `--max-N <int>`: The maximum grid size N ($N \times N$ nodes). Default: 400
 - `--num-steps <int>`: Number of intermediate grid sizes to test between min and max. Default: 8
 - `--archetype <name>`: The archetype graph to create. Options are `keisler`, `oskarsson_hierarchical`, and `graphcast`.
-- `--output <path>`: The file path to save the generated plot. Default: `scaling_plot.png`
+- `--repetitions <int>`: Time each grid size this many times and report the **median**. Default: 1
+- `--track-memory`: Also record peak memory usage (via `tracemalloc`) for each grid size.
+- `--output-plot-runtime <path>`: File path for the runtime plot. Default: `runtime_scaling.png`
+- `--output-plot-memory <path>`: File path for the memory plot (requires `--track-memory`).
+- `--output-json <path>`: Save the raw results as JSON (consumed by `compare.py`, below).
 - `--show`: Opens a matplotlib interactive window to display the plot after benchmarking.
 
 **Examples:**
@@ -63,3 +67,37 @@ Test scaling from $100 \times 100$ to $500 \times 500$ and open the plot interac
 ```bash
 uv run python -m tests.benchmarks.graph_creation_scaling --min-N 100 --max-N 500 --num-steps 10 --show
 ```
+
+#### A note on `--repetitions`
+
+A single timing is surprisingly noisy — on a shared machine the same code
+timed twice can easily differ by 10% or more, which is enough to look like a
+performance regression when it isn't. Passing `--repetitions 5` times each
+grid size five times and reports the median, which discards those one-off
+outliers; the individual timings are kept in the JSON output (as
+`runtime_samples`) if you want to inspect the spread.
+
+Only the *timed* runs are repeated. Peak memory is measured once per grid
+size, because for a fixed input it is deterministic, and measuring it is
+comparatively expensive (`tracemalloc` slows graph creation down by roughly
+5x, so it is also kept out of the timed runs entirely).
+
+## 3. CI Regression Comparison (`compare.py`)
+
+`compare.py` compares two `--output-json` files produced by
+`graph_creation_scaling.py` — typically one from `main` and one from a pull
+request — and renders a Markdown table of the relative runtime and peak-memory
+change per grid size. This is what powers the automated benchmark regression
+check in CI (see
+[\#144](https://github.com/mllam/weather-model-graphs/issues/144)).
+
+```bash
+uv run python -m tests.benchmarks.compare main.json pr.json --threshold-pct 0.1
+```
+
+### Options
+
+- `--threshold-pct <float>`: Flag a grid size whose runtime or peak memory grows by more than this percentage. Default: 0.1
+- `--baseline-label <str>` / `--contender-label <str>`: Column headings for the two runs. Defaults: `main` / `PR`
+- `--output <path>`: Also write the Markdown report to a file (used for the PR comment).
+- `--fail-on-regression`: Exit non-zero if anything regressed. Off by default, so the check stays informational.

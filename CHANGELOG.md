@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.4.0...HEAD)
+
+### Added
+
+- Add an automated benchmark regression check in CI: the scaling benchmark is
+  run on the PR and its base branch back-to-back on the same runner (swapping
+  only the library under test), and a sticky pull-request comment reports the
+  relative runtime and peak-memory change per grid size. Adds
+  `tests/benchmarks/compare.py` and a GitHub Actions workflow; informational
+  and non-blocking for now, with a low starting threshold to be calibrated
+  against the runner's noise floor.
+  [\#144](https://github.com/mllam/weather-model-graphs/issues/144), @prajwal-tech07
+- Add `--repetitions` to the scaling benchmark, which times each grid size
+  several times and reports the median rather than a single measurement, so
+  that one unusually slow run doesn't get reported as a regression. The CI
+  regression check now uses it. Peak memory continues to be measured once per
+  grid size, and is no longer measured during the timed runs, so the reported
+  runtimes are no longer inflated by `tracemalloc`.
+  [\#144](https://github.com/mllam/weather-model-graphs/issues/144), @prajwal-tech07
+
 ## [v0.4.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.4.0)
 
 This release lays the foundations for introducing new mesh node layouts
@@ -48,14 +68,6 @@ benchmarks (to support future runtime optimisation work).
 - Add support for writing benchmarking results to json,
   [\#140](https://github.com/mllam/weather-model-graphs/pull/140),
   @yuvraajnarula & @leifdenby
-- Add an automated benchmark regression check in CI: the scaling benchmark is
-  run on the PR and its base branch back-to-back on the same runner (swapping
-  only the library under test), and a sticky pull-request comment reports the
-  relative runtime and peak-memory change per grid size. Adds
-  `tests/benchmarks/compare.py` and a GitHub Actions workflow; informational
-  and non-blocking for now, with a low starting threshold to be calibrated
-  against the runner's noise floor.
-  [\#144](https://github.com/mllam/weather-model-graphs/issues/144), @prajwal-tech07
 
 ### Deprecated
 

@@ -1,8 +1,9 @@
 import argparse
 import json
+import statistics
 import time
 import tracemalloc
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,19 +13,61 @@ import tests.utils as test_utils
 import weather_model_graphs as wmg
 
 
+def _measure_runtimes(create_fn, xy, repetitions: int) -> List[float]:
+    """Time ``repetitions`` graph creations, returning each duration in seconds.
+
+    ``tracemalloc`` is deliberately *not* active while timing: it slows graph
+    creation down by roughly 5x, which would both inflate the reported
+    runtimes and blow the CI time budget once repetitions are involved.
+    """
+    durations = []
+    for _ in range(repetitions):
+        t0 = time.perf_counter()
+        create_fn(coords=xy)
+        durations.append(time.perf_counter() - t0)
+    return durations
+
+
+def _measure_peak_memory(create_fn, xy) -> float:
+    """Measure peak memory of a single graph creation, in MB.
+
+    Measured once rather than once per repetition: for a fixed input the peak
+    allocation is essentially deterministic (measured run-to-run spread well
+    under 0.01%), while ``tracemalloc`` costs ~5x in runtime -- so repeating it
+    would dominate the benchmark without making the number any better.
+    """
+    tracemalloc.start()
+    try:
+        create_fn(coords=xy)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    return float(peak) / (1024 * 1024)
+
+
 def run_benchmark(
     min_N: int,
     max_N: int,
     num_steps: int,
     archetype: str,
     track_memory: bool = False,
-) -> List[Dict[str, float]]:
+    repetitions: int = 1,
+) -> List[Dict[str, Any]]:
     """
     Run the graph creation benchmark over a range of grid sizes.
 
+    Each grid size is timed ``repetitions`` times and the *median* is reported,
+    so that a single unusually slow (or fast) run doesn't move the result. This
+    keeps the PR-vs-base comparison in CI stable enough to act on (see #144).
+
     Returns a list of dicts with keys:
-        "grid_points" (int), "runtime_s" (float), "peak_memory_mb" (float, optional).
+        "grid_points" (int), "runtime_s" (float, the median),
+        "peak_memory_mb" (float, optional), "repetitions" (int),
+        "runtime_samples" (list of float, the individual timings).
     """
+    if repetitions < 1:
+        raise ValueError(f"repetitions must be >= 1, got {repetitions}")
+
     Ns = np.linspace(min_N, max_N, num_steps, dtype=int)
     fn_name = f"create_{archetype}_graph"
     create_fn = getattr(wmg.create.archetype, fn_name)
@@ -33,25 +76,25 @@ def run_benchmark(
 
     for n in Ns:
         num_nodes = int(n * n)  # convert to Python int
-        logger.info(f"Testing N={n:4d} ({num_nodes:7d} nodes)...")
+        logger.info(
+            f"Testing N={n:4d} ({num_nodes:7d} nodes), "
+            f"{repetitions} repetition(s)..."
+        )
 
         xy = test_utils.create_fake_xy(N=n)
 
-        if track_memory:
-            tracemalloc.start()
+        durations = _measure_runtimes(create_fn, xy, repetitions)
+        duration = statistics.median(durations)
 
-        t0 = time.time()
-        _ = create_fn(coords=xy)
-        t1 = time.time()
-        duration = t1 - t0
+        peak_mb = _measure_peak_memory(create_fn, xy) if track_memory else None
 
-        peak_mb = None
-        if track_memory:
-            _, peak = tracemalloc.get_traced_memory()
-            peak_mb = float(peak) / (1024 * 1024)  # convert to float
-            tracemalloc.stop()
-
-        logger.info(f" {duration:.3f} seconds.")
+        if repetitions > 1:
+            logger.info(
+                f" {duration:.3f} seconds (median of {repetitions}: "
+                f"min {min(durations):.3f}, max {max(durations):.3f})."
+            )
+        else:
+            logger.info(f" {duration:.3f} seconds.")
         if peak_mb is not None:
             logger.info(f" Peak memory: {peak_mb:.1f} MB")
 
@@ -60,6 +103,8 @@ def run_benchmark(
                 "grid_points": num_nodes,
                 "runtime_s": duration,
                 "peak_memory_mb": peak_mb,
+                "repetitions": repetitions,
+                "runtime_samples": durations,
             }
         )
 
@@ -67,7 +112,7 @@ def run_benchmark(
 
 
 def plot_runtime_scaling(
-    results: List[Dict[str, float]], archetype: str, output_path: str
+    results: List[Dict[str, Any]], archetype: str, output_path: str
 ):
     """Create a scaling plot for runtime vs number of grid points."""
     grid_points = [r["grid_points"] for r in results]
@@ -90,7 +135,7 @@ def plot_runtime_scaling(
 
 
 def plot_memory_scaling(
-    results: List[Dict[str, float]], archetype: str, output_path: str
+    results: List[Dict[str, Any]], archetype: str, output_path: str
 ):
     """Create a scaling plot for peak memory vs number of grid points."""
     # Filter out results without memory data (should not happen if track_memory=True)
@@ -148,6 +193,14 @@ def main():
     parser.add_argument(
         "--track-memory", action="store_true", help="Profile peak memory usage"
     )
+    parser.add_argument(
+        "--repetitions",
+        type=int,
+        default=1,
+        help="Number of times to time each grid size. The median is reported, "
+        "which damps run-to-run noise; peak memory is still measured once, "
+        "since it is deterministic for a given input (default: 1)",
+    )
     parser.add_argument("--show", action="store_true", help="Show plots interactively")
 
     args = parser.parse_args()
@@ -155,12 +208,16 @@ def main():
     if args.output_plot_memory and not args.track_memory:
         parser.error("--output-plot-memory requires --track-memory")
 
+    if args.repetitions < 1:
+        parser.error("--repetitions must be >= 1")
+
     results = run_benchmark(
         min_N=args.min_N,
         max_N=args.max_N,
         num_steps=args.num_steps,
         archetype=args.archetype,
         track_memory=args.track_memory,
+        repetitions=args.repetitions,
     )
 
     if args.output_json:
