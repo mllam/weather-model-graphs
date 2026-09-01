@@ -86,6 +86,10 @@ def to_pyg(
     if len(set(graph.nodes)) != len(graph.nodes):
         raise ValueError("Node labels must be unique.")
 
+    # Work on a copy so trimming node attributes down to `node_features`
+    # does not mutate the caller's graph object.
+    graph = graph.copy()
+
     # remove all node attributes but the ones we want to keep
     for node in graph.nodes:
         for attr in list(graph.nodes[node].keys()):
