@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixes
+
+- Relax `torch-geometric` floor in `pytorch` optional dependencies from `>=2.5.3` to `>=2.3.1` to restore compatibility with `neural-lam` [\#149](https://github.com/mllam/weather-model-graphs/issues/149)
+
 ## [v0.4.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.4.0)
 
 This release lays the foundations for introducing new mesh node layouts
