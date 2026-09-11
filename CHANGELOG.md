@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.4.0...HEAD)
 
+### Fixes
+
+- Relax `torch-geometric` floor in `pytorch` optional dependencies from
+  `>=2.5.3` to `>=2.3.1` to restore compatibility with `neural-lam`.
+  [\#152](https://github.com/mllam/weather-model-graphs/pull/152), @harshitthek
+
 ### Maintenance
 
 - Pin the Python version used by `pre-commit` hooks to 3.12, as `black`

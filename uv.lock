@@ -4493,7 +4493,7 @@ wheels = [
 
 [[package]]
 name = "weather-model-graphs"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "loguru" },
@@ -4548,7 +4548,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.13.0" },
     { name = "sphinxcontrib-mermaid", marker = "extra == 'docs'", specifier = ">=0.9.2" },
     { name = "torch", marker = "extra == 'pytorch'", specifier = ">=2.3.0" },
-    { name = "torch-geometric", marker = "extra == 'pytorch'", specifier = ">=2.5.3" },
+    { name = "torch-geometric", marker = "extra == 'pytorch'", specifier = ">=2.3.1" },
 ]
 provides-extras = ["pytorch", "visualisation", "docs"]
 
