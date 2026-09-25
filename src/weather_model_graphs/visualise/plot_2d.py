@@ -146,7 +146,7 @@ def nx_draw_with_pos_and_attr(
             graph, edge_color_attr, component="edges"
         )
 
-        if "cmap" not in kwargs:
+        if "edge_cmap" not in kwargs:
             if "discrete_labels" in edge_attr_vals:
                 kwargs["edge_cmap"] = plt.get_cmap("tab20")
             else:
