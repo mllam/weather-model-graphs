@@ -18,6 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `__version__` attribute to the package init
   [\#56](https://github.com/mllam/weather-model-graphs/pull/56) @AdMub
 
+### Fixed
+
+- Fix incorrect source-node mapping in `connect_nodes_across_graphs` where KDTree
+  was built from insertion-order nodes but indices resolved against sorted nodes,
+  silently creating wrong edges
+  [\#82](https://github.com/mllam/weather-model-graphs/issues/82),
+  [\#142](https://github.com/mllam/weather-model-graphs/pull/142) @Raj-taware
+
+- Fix `TypeError: 'numpy.int64' object is not iterable` crash in
+  `connect_nodes_across_graphs` when using `method="nearest_neighbours"` with
+  `max_num_neighbours=1`
+  [\#83](https://github.com/mllam/weather-model-graphs/issues/83),
+  [\#142](https://github.com/mllam/weather-model-graphs/pull/142) @Raj-taware
+
 ## [v0.3.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.3.0)
 
 
