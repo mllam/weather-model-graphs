@@ -1064,6 +1064,45 @@ class TestTriangularGeometry:
         np.testing.assert_allclose(lengths, lengths[0])
 
 
+class TestTriangularCoverage:
+    """Alternate lattice rows are offset by half a spacing, so check that the
+    mesh reaches every grid point for both odd and even numbers of rows, and
+    that g2m `rel_max_dist` must be at least 1/sqrt(3) to connect them all."""
+
+    # (grid points per side, spacing); the first two give an odd number of
+    # lattice rows, the last two an even number
+    COVERAGE_CASES = [(30, 4.0), (41, 2.5), (20, 3.0), (41, 3.0)]
+
+    @pytest.mark.parametrize("n_points, spacing", COVERAGE_CASES)
+    def test_grid_points_within_covering_radius(self, n_points, spacing):
+        xy = test_utils.create_fake_xy(N=n_points)
+        G = create_single_level_2d_triangular_mesh_primitive(
+            xy, mesh_node_spacing=spacing
+        )
+        mesh_pos = np.array([G.nodes[n]["pos"] for n in G.nodes])
+        dist, _ = scipy.spatial.KDTree(mesh_pos).query(xy)
+        # 1/sqrt(3) of the spacing is the largest distance from any point in a
+        # triangular lattice to its nearest node
+        assert dist.max() <= spacing / np.sqrt(3) + 1e-9
+
+    @pytest.mark.parametrize("n_points, spacing", COVERAGE_CASES)
+    @pytest.mark.parametrize("rel_max_dist", [0.58, 0.6])
+    def test_g2m_connects_every_grid_node(self, n_points, spacing, rel_max_dist):
+        xy = test_utils.create_fake_xy(N=n_points)
+        components = wmg.create.create_all_graph_components(
+            coords=xy,
+            m2m_connectivity="flat",
+            m2g_connectivity="nearest_neighbour",
+            g2m_connectivity="within_radius",
+            mesh_layout="triangular",
+            mesh_layout_kwargs=dict(mesh_node_spacing=spacing),
+            g2m_connectivity_kwargs=dict(rel_max_dist=rel_max_dist),
+            return_components=True,
+        )
+        connected_grid_nodes = {u for u, _ in components["g2m"].edges}
+        assert len(connected_grid_nodes) == len(xy)
+
+
 class TestMultiLevelTriangularGeometry:
     """Levels share an origin so coarse nodes land on fine nodes, which is
     what multiscale connectivity needs to merge the levels."""

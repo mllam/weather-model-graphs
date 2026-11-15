@@ -145,7 +145,14 @@ def create_all_graph_components(
     - "nearest_neighbour": Find the nearest neighbour in grid for each node in mesh
     - "nearest_neighbours": Find the `max_num_neighbours` nearest neighbours in grid for each node in mesh
     - "within_radius": Find all neighbours in grid within an absolute distance
-        of `max_dist` or relative distance of `rel_max_dist` from each node in mesh
+        of `max_dist` or relative distance of `rel_max_dist` from each node in mesh.
+        `rel_max_dist` is relative to the longest edge in the mesh, so a suitable
+        value depends on `mesh_layout`: for "rectilinear" the longest edge is the
+        diagonal and 0.51 reaches every grid node, but for "triangular" all edges
+        have length `mesh_node_spacing` and a grid node can be
+        `mesh_node_spacing / sqrt(3)` from its nearest mesh node, so use
+        `rel_max_dist >= 1 / sqrt(3)` (about 0.58, e.g. 0.6). With 0.51 on a
+        triangular mesh some grid nodes get no g2m edge.
 
     mesh_layout:
     - "rectilinear": Uniform regular grid with ``mesh_node_spacing`` resolution.
