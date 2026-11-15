@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Pin the Python version used by `pre-commit` hooks to 3.12, as `black`
   22.3.0 crashes on Python 3.14 (now the default on GitHub runners).
-  [\#XXX](https://github.com/mllam/weather-model-graphs/pull/XXX), @Joltsy10
+  [\#156](https://github.com/mllam/weather-model-graphs/pull/156), @Joltsy10
 
 ## [v0.4.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.4.0)
 
