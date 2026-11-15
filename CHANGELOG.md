@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased](https://github.com/mllam/weather-model-graphs/compare/v0.4.0...HEAD)
+
+### Maintenance
+
+- Pin the Python version used by `pre-commit` hooks to 3.12, as `black`
+  22.3.0 crashes on Python 3.14 (now the default on GitHub runners).
+  [\#XXX](https://github.com/mllam/weather-model-graphs/pull/XXX), @Joltsy10
+
 ## [v0.4.0](https://github.com/mllam/weather-model-graphs/releases/tag/v0.4.0)
 
 This release lays the foundations for introducing new mesh node layouts
