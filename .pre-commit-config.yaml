@@ -1,4 +1,7 @@
 # https://pre-commit.com/
+# black 22.3.0 crashes on Python >= 3.14, so pin the hooks' Python version
+default_language_version:
+  python: python3.12
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.0.1
