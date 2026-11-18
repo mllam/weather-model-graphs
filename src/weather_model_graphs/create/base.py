@@ -8,6 +8,7 @@ used to represent the encode-process-decode steps respectively. These are create
 function uses `connect_nodes_across_graphs` to connect nodes across the component graphs.
 """
 
+import warnings
 from typing import Dict, Iterable, List, Tuple, Union
 
 import networkx
@@ -28,9 +29,21 @@ from .mesh.connectivity.flat import (
     create_flat_singlescale_from_coordinates,
 )
 from .mesh.connectivity.hierarchical import create_hierarchical_from_coordinates
-from .mesh.coords import (
-    create_multirange_2d_mesh_primitives,
-    create_single_level_2d_mesh_primitive,
+from .mesh.layout.prebuilt import (
+    create_multi_level_prebuilt_mesh_primitives,
+    create_single_level_prebuilt_mesh_primitive,
+)
+from .mesh.layout.rectilinear import (
+    create_multirange_2d_mesh_primitives as create_multirange_2d_rectilinear_mesh_primitives,
+)
+from .mesh.layout.rectilinear import (
+    create_single_level_2d_mesh_primitive as create_single_level_2d_rectilinear_mesh_primitive,
+)
+from .mesh.layout.triangular import (
+    create_multirange_2d_mesh_primitives as create_multirange_2d_triangular_mesh_primitives,
+)
+from .mesh.layout.triangular import (
+    create_single_level_2d_mesh_primitive as create_single_level_2d_triangular_mesh_primitive,
 )
 
 
@@ -141,26 +154,53 @@ def create_all_graph_components(
     - "rectilinear": Uniform regular grid with ``mesh_node_spacing`` resolution.
       Produces an undirected mesh primitive with 4-star (cardinal) and
       8-star (cardinal + diagonal) spatial adjacency edges.
+    - "triangular": Regular triangular lattice with ``mesh_node_spacing``
+      resolution. Uses ``networkx.triangular_lattice_graph`` to produce
+      equilateral triangles with 6-connectivity. A CRS warning is emitted
+      if ``graph_crs`` is geographic (lat/lon).
+    - "prebuilt": User-provided mesh node positions (e.g. ICON grid vertices
+      or an observation-station network). The mesh nodes are taken from
+      ``mesh_layout_kwargs["mesh_graph"]`` and mesh edges are built in the
+      connectivity step (``method``, Delaunay triangulation by default).
+      Currently nodes-only input is supported (the given graph must not
+      contain edges) and ``m2m_connectivity`` must be "flat" or
+      "hierarchical". See ``create.mesh.layout.prebuilt`` for the input
+      contract.
 
-    mesh_layout_kwargs (for mesh_layout="rectilinear"):
+    mesh_layout_kwargs (for mesh_layout="rectilinear" or "triangular"):
     - mesh_node_spacing: float, distance between mesh nodes in coordinate units.
     - refinement_factor: int, refinement factor between levels
       (for multi-level and hierarchical mesh graphs, default: 3)
     - max_num_refinement_levels: int, maximum number of mesh levels
       (for multi-level and hierarchical mesh graphs)
 
-    Wherever the ``pattern`` argument appears below it defines the spatial
-    neighbourhood connectivity:
+    mesh_layout_kwargs (for mesh_layout="prebuilt"):
+    - mesh_graph: networkx.Graph with node attributes ``pos`` (np.ndarray of
+      shape (2,), same coordinate system as ``coords``), ``type`` ("mesh"),
+      and -- for hierarchical meshes -- integer ``level`` (lowest value =
+      finest level); or an np.ndarray of shape [N_mesh_nodes, 2] with node
+      positions. No ``mesh_node_spacing`` is needed (spacing is implied by
+      the node positions).
+
+    Wherever the ``pattern`` argument appears below it selects a subset of
+    the spatial adjacency edges created by the (generated) mesh layout:
+    - not given (default): use every edge the layout produced
     - ``"4-star"``: only cardinal directions (horizontal and vertical neighbours)
     - ``"8-star"``: cardinal plus diagonal neighbours (all 8 surrounding nodes)
+    For mesh_layout="prebuilt" the primitives are edge-less node clouds, so
+    ``pattern`` does not apply; the ``method`` argument (default:
+    ``"delaunay"``) selects how mesh edges are built from the node positions.
 
     m2m_connectivity:
     - "flat": Create a single-level directed mesh graph.
-      m2m_connectivity_kwargs: pattern (default: "8-star")
+      m2m_connectivity_kwargs: pattern (generated layouts) or
+      method (mesh_layout="prebuilt", default: "delaunay")
     - "flat_multiscale": Create a flat multiscale mesh graph.
-      m2m_connectivity_kwargs: pattern (default: "8-star")
+      m2m_connectivity_kwargs: pattern
+      (not yet supported for mesh_layout="prebuilt")
     - "hierarchical": Create a hierarchical mesh graph with up/down connections.
-      m2m_connectivity_kwargs: intra_level=dict(pattern=...), inter_level=dict(pattern=..., k=...)
+      m2m_connectivity_kwargs: intra_level=dict(pattern=... or method=...),
+      inter_level=dict(pattern=..., k=...)
 
     m2g_connectivity:
     - "nearest_neighbour": Find the nearest neighbour in mesh for each node in grid
@@ -255,46 +295,116 @@ def create_all_graph_components(
     # -----------------------------------------------------------------------
     G_mesh_coords: Union[networkx.Graph, List[networkx.Graph]]
 
-    if mesh_layout == "rectilinear":
+    # CRS warning for triangular layout in geographic coordinates
+    if (
+        mesh_layout == "triangular"
+        and graph_crs is not None
+        and graph_crs.is_geographic
+    ):
+        warnings.warn(
+            "mesh_layout='triangular' produces non-uniform physical spacing in "
+            "geographic coordinates. Consider mesh_layout='icosahedral' for "
+            "uniform coverage on a sphere.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    # Validate mesh_layout and resolve the requested mesh node spacing once
+    # (shared by all m2m_connectivity modes and layouts).
+    if mesh_layout not in ("rectilinear", "triangular", "prebuilt"):
+        raise NotImplementedError(
+            f"mesh_layout='{mesh_layout}' is not yet supported. "
+            "Currently supported: 'rectilinear', 'triangular', 'prebuilt'."
+        )
+
+    if mesh_layout == "prebuilt":
+        # Prebuilt meshes carry their own node positions, so no
+        # mesh_node_spacing is needed (spacing is implied by the positions)
+        mesh_graph = mesh_layout_kwargs.get("mesh_graph")
+        if mesh_graph is None:
+            raise ValueError(
+                "mesh_layout='prebuilt' requires 'mesh_graph' in "
+                "mesh_layout_kwargs: a networkx.Graph of mesh nodes (or an "
+                "np.ndarray of node positions with shape [N_mesh_nodes, 2])."
+            )
+    else:
         mesh_node_spacing = mesh_layout_kwargs.get(
             "mesh_node_spacing"
         ) or mesh_layout_kwargs.get("grid_spacing")
         if mesh_node_spacing is None:
             raise ValueError(
-                "mesh_layout='rectilinear' requires 'mesh_node_spacing' in "
+                f"mesh_layout='{mesh_layout}' requires 'mesh_node_spacing' in "
                 "mesh_layout_kwargs (or 'mesh_node_distance' in "
                 "m2m_connectivity_kwargs for backward compatibility)."
             )
 
-        if m2m_connectivity == "flat":
-            # Single-level mesh
-            G_mesh_coords = create_single_level_2d_mesh_primitive(
+    # Pick the coordinate-creation function based on the mesh_layout value,
+    # nested inside the m2m_connectivity branch (single-level vs multi-level).
+    if m2m_connectivity == "flat":
+        # Single-level mesh primitive
+        if mesh_layout == "rectilinear":
+            G_mesh_coords = create_single_level_2d_rectilinear_mesh_primitive(
                 xy, mesh_node_spacing=mesh_node_spacing
             )
+        elif mesh_layout == "triangular":
+            G_mesh_coords = create_single_level_2d_triangular_mesh_primitive(
+                xy, mesh_node_spacing=mesh_node_spacing
+            )
+        elif mesh_layout == "prebuilt":
+            G_mesh_coords = create_single_level_prebuilt_mesh_primitive(mesh_graph)
         else:
-            # Multi-level mesh: build kwargs for create_multirange_2d_mesh_primitives
-            primitives_kwargs = dict(xy=xy, mesh_node_spacing=mesh_node_spacing)
-            if "refinement_factor" in mesh_layout_kwargs:
-                primitives_kwargs["interlevel_refinement_factor"] = mesh_layout_kwargs[
-                    "refinement_factor"
-                ]
-            if "max_num_refinement_levels" in mesh_layout_kwargs:
-                primitives_kwargs["max_num_levels"] = mesh_layout_kwargs[
-                    "max_num_refinement_levels"
-                ]
-            G_mesh_coords = create_multirange_2d_mesh_primitives(**primitives_kwargs)
+            raise NotImplementedError(
+                f"mesh_layout='{mesh_layout}' is not implemented. "
+                "Supported layouts: 'rectilinear', 'triangular', 'prebuilt'."
+            )
+    elif mesh_layout == "prebuilt":
+        # Multi-level prebuilt primitives, split by the nodes' `level` attribute
+        if m2m_connectivity == "flat_multiscale":
+            raise NotImplementedError(
+                "m2m_connectivity='flat_multiscale' is not yet supported for "
+                "mesh_layout='prebuilt'. Use 'flat' or 'hierarchical'."
+            )
+        G_mesh_coords = create_multi_level_prebuilt_mesh_primitives(mesh_graph)
     else:
-        raise NotImplementedError(
-            f"mesh_layout='{mesh_layout}' is not yet supported. "
-            "Currently only 'rectilinear' is implemented."
-        )
+        # Multi-level mesh primitives (flat_multiscale or hierarchical)
+        primitives_kwargs = dict(xy=xy, mesh_node_spacing=mesh_node_spacing)
+        if "refinement_factor" in mesh_layout_kwargs:
+            primitives_kwargs["interlevel_refinement_factor"] = mesh_layout_kwargs[
+                "refinement_factor"
+            ]
+        if "max_num_refinement_levels" in mesh_layout_kwargs:
+            primitives_kwargs["max_num_levels"] = mesh_layout_kwargs[
+                "max_num_refinement_levels"
+            ]
+        if mesh_layout == "rectilinear":
+            G_mesh_coords = create_multirange_2d_rectilinear_mesh_primitives(
+                **primitives_kwargs
+            )
+        elif mesh_layout == "triangular":
+            G_mesh_coords = create_multirange_2d_triangular_mesh_primitives(
+                **primitives_kwargs
+            )
+        else:
+            raise NotImplementedError(
+                f"mesh_layout='{mesh_layout}' is not implemented. "
+                "Supported layouts: 'rectilinear', 'triangular', 'prebuilt'."
+            )
 
     # -----------------------------------------------------------------------
     # Step 2: Connectivity creation — converts mesh primitives to directed graph
     # -----------------------------------------------------------------------
     if m2m_connectivity == "flat":
+        # `pattern` selects adjacency edges of generated layouts; `method`
+        # builds edges from node positions for edge-less (prebuilt)
+        # primitives. Both default to "use what the layout implies" when not
+        # given (all layout edges, and Delaunay triangulation respectively).
+        conn_kwargs = {
+            key: m2m_connectivity_kwargs[key]
+            for key in ("pattern", "method")
+            if key in m2m_connectivity_kwargs
+        }
         graph_components["m2m"] = create_flat_singlescale_from_coordinates(
-            G_mesh_coords, **m2m_connectivity_kwargs
+            G_mesh_coords, **conn_kwargs
         )
         grid_connect_graph = graph_components["m2m"]
 
@@ -302,8 +412,15 @@ def create_all_graph_components(
         # hierarchical mesh graph has three sub-graphs:
         # `m2m` (mesh-to-mesh), `mesh_up` (up edge connections) and
         # `mesh_down` (down edge connections)
+        hierarchical_kwargs = {}
+        intra_level = m2m_connectivity_kwargs.get("intra_level")
+        if intra_level is not None:
+            hierarchical_kwargs["intra_level"] = intra_level
+        inter_level = m2m_connectivity_kwargs.get("inter_level")
+        if inter_level is not None:
+            hierarchical_kwargs["inter_level"] = inter_level
         graph_components["m2m"] = create_hierarchical_from_coordinates(
-            G_mesh_coords, **m2m_connectivity_kwargs
+            G_mesh_coords, **hierarchical_kwargs
         )
         # Only connect grid to bottom level of hierarchy
         grid_connect_graph = split_graph_by_edge_attribute(
@@ -311,8 +428,13 @@ def create_all_graph_components(
         )[0]
 
     elif m2m_connectivity == "flat_multiscale":
+        conn_kwargs = {
+            key: m2m_connectivity_kwargs[key]
+            for key in ("pattern",)
+            if key in m2m_connectivity_kwargs
+        }
         graph_components["m2m"] = create_flat_multiscale_from_coordinates(
-            G_mesh_coords, **m2m_connectivity_kwargs
+            G_mesh_coords, **conn_kwargs
         )
         grid_connect_graph = graph_components["m2m"]
 

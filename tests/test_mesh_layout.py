@@ -34,7 +34,7 @@ from weather_model_graphs.create.mesh.connectivity.general import (
 from weather_model_graphs.create.mesh.connectivity.hierarchical import (
     create_hierarchical_from_coordinates,
 )
-from weather_model_graphs.create.mesh.coords import (
+from weather_model_graphs.create.mesh.layout.rectilinear import (
     create_multirange_2d_mesh_primitives,
     create_single_level_2d_mesh_primitive,
 )
@@ -617,7 +617,7 @@ class TestErrorHandling:
             wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="flat",
-                mesh_layout="triangular",
+                mesh_layout="nonexistent_layout",
                 mesh_layout_kwargs=dict(mesh_node_spacing=3),
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
