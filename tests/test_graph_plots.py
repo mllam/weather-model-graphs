@@ -1,5 +1,6 @@
 import tempfile
 
+import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -62,6 +63,103 @@ def test_plot():
                         fn()
                 else:
                     fn()
+
+    with tempfile.NamedTemporaryFile(suffix=".png") as fh:
+        fig.savefig(fh)
+
+
+def test_plot_with_projection():
+    longitudes = np.linspace(-90, 90, 10)
+    latitudes = np.linspace(-45, 45, 10)
+    meshgridded_lat_lons = np.meshgrid(longitudes, latitudes)
+    coords = np.stack([mg_coord.flatten() for mg_coord in meshgridded_lat_lons], axis=1)
+
+    graph = wmg.create.archetype.create_keisler_graph(
+        coords,
+        mesh_node_distance=30,
+        coords_crs=ccrs.PlateCarree(),
+        graph_crs=ccrs.PlateCarree(),
+    )
+
+    fig, ax = plt.subplots(
+        subplot_kw={
+            "projection": ccrs.Orthographic(central_longitude=0, central_latitude=0)
+        }
+    )
+
+    wmg.visualise.nx_draw_with_pos(
+        graph,
+        ax=ax,
+        node_size=30,
+        edge_color="gray",
+        node_color="blue",
+        with_labels=False,
+        coords_crs=ccrs.PlateCarree(),
+    )
+    ax.coastlines()
+
+    with tempfile.NamedTemporaryFile(suffix=".png") as fh:
+        fig.savefig(fh)
+
+
+def test_plot_with_projection_and_attr():
+    longitudes = np.linspace(-90, 90, 10)
+    latitudes = np.linspace(-45, 45, 10)
+    meshgridded_lat_lons = np.meshgrid(longitudes, latitudes)
+    coords = np.stack([mg_coord.flatten() for mg_coord in meshgridded_lat_lons], axis=1)
+
+    graph = wmg.create.archetype.create_keisler_graph(
+        coords,
+        mesh_node_distance=30,
+        coords_crs=ccrs.PlateCarree(),
+        graph_crs=ccrs.PlateCarree(),
+    )
+
+    fig, ax = plt.subplots(
+        subplot_kw={
+            "projection": ccrs.Orthographic(central_longitude=0, central_latitude=0)
+        }
+    )
+
+    wmg.visualise.nx_draw_with_pos_and_attr(
+        graph,
+        ax=ax,
+        node_size=30,
+        coords_crs=ccrs.PlateCarree(),
+    )
+    ax.coastlines()
+
+    with tempfile.NamedTemporaryFile(suffix=".png") as fh:
+        fig.savefig(fh)
+
+
+def test_plot_with_projection_full_globe():
+    """Reproduces the notebook scenario: full-globe PlateCarree graph on
+    Orthographic projection.  Nodes on the far side become NaN after
+    coordinate transformation — the helper must filter them out."""
+    longitudes = np.linspace(-180, 180, 20)
+    latitudes = np.linspace(-90, 90, 20)
+    meshgridded_lat_lons = np.meshgrid(longitudes, latitudes)
+    coords = np.stack([mg_coord.flatten() for mg_coord in meshgridded_lat_lons], axis=1)
+
+    graph = wmg.create.archetype.create_keisler_graph(
+        coords,
+        mesh_node_distance=30,
+        coords_crs=ccrs.PlateCarree(),
+        graph_crs=ccrs.PlateCarree(),
+    )
+
+    fig, ax = plt.subplots(subplot_kw={"projection": ccrs.Orthographic()})
+
+    wmg.visualise.nx_draw_with_pos_and_attr(
+        graph,
+        ax=ax,
+        node_size=30,
+        edge_color_attr="component",
+        node_color_attr="type",
+        coords_crs=ccrs.PlateCarree(),
+    )
+    ax.coastlines()
 
     with tempfile.NamedTemporaryFile(suffix=".png") as fh:
         fig.savefig(fh)

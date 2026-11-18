@@ -38,6 +38,7 @@ from weather_model_graphs.create.mesh.coords import (
     create_multirange_2d_mesh_primitives,
     create_single_level_2d_mesh_primitive,
 )
+from weather_model_graphs.spatial import SpatialCoordinateValuesSelector
 
 # ====================
 # Step 1: Coordinate creation tests
@@ -915,16 +916,19 @@ class TestConnectivityCreationEdgeCases:
                 )
 
     def test_edge_len_matches_vdiff_norm(self):
-        """Edge length should equal the norm of vdiff."""
+        """Edge length should match the metric-aware distance."""
         xy = test_utils.create_fake_xy(N=10)
         G_coords = create_single_level_2d_mesh_primitive(xy, nx=4, ny=4)
         G = create_directed_mesh_graph(G_coords, pattern="8-star")
+        pos = {n: G_coords.nodes[n]["pos"] for n in G_coords.nodes}
+        all_positions = np.array(list(pos.values()))
+        selector = SpatialCoordinateValuesSelector("euclidean", all_positions)
         for u, v, d in G.edges(data=True):
-            expected_len = np.sqrt(np.sum(d["vdiff"] ** 2))
+            expected_len = selector.distance_between(pos[u], pos[v])
             np.testing.assert_allclose(
                 d["len"],
                 expected_len,
-                err_msg=f"Edge ({u},{v}) len doesn't match vdiff norm",
+                err_msg=f"Edge ({u},{v}) len doesn't match metric-aware distance",
             )
 
     def test_flat_multiscale_single_level_input(self):
