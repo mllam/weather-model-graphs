@@ -34,7 +34,7 @@ from weather_model_graphs.create.mesh.connectivity.general import (
 from weather_model_graphs.create.mesh.connectivity.hierarchical import (
     create_hierarchical_from_coordinates,
 )
-from weather_model_graphs.create.mesh.coords import (
+from weather_model_graphs.create.mesh.layout.rectilinear import (
     create_multirange_2d_mesh_primitives,
     create_single_level_2d_mesh_primitive,
 )
@@ -608,6 +608,101 @@ class TestBackwardCompatibility:
 # ====================
 
 
+class TestMeshLayoutOptions:
+    """Tests for the public ``MESH_LAYOUT_OPTIONS`` constant.
+
+    The constant is the single source of truth for which mesh layouts exist,
+    and is consumed by downstream tools (e.g. neural-lam's
+    ``create_graph_with_wmg`` CLI) to populate their layout choices.
+    """
+
+    def test_exposed_on_create_namespace(self):
+        """It must be reachable as ``wmg.create.MESH_LAYOUT_OPTIONS``."""
+        assert hasattr(wmg.create, "MESH_LAYOUT_OPTIONS")
+        options = wmg.create.MESH_LAYOUT_OPTIONS
+        assert len(options) == len(set(options)), "options must be unique"
+        assert all(isinstance(option, str) for option in options)
+        assert "rectilinear" in options
+
+    @pytest.mark.parametrize("mesh_layout", wmg.create.MESH_LAYOUT_OPTIONS)
+    @pytest.mark.parametrize(
+        "m2m_connectivity", ["flat", "flat_multiscale", "hierarchical"]
+    )
+    def test_every_advertised_layout_is_dispatched(self, mesh_layout, m2m_connectivity):
+        """Every advertised layout must actually build a graph.
+
+        This is the drift guard: if a layout name is added to
+        ``MESH_LAYOUT_OPTIONS`` without being wired into the dispatch in
+        ``create_all_graph_components``, this test fails instead of the
+        constant silently advertising something unusable.
+        """
+        xy = test_utils.create_fake_xy(N=32)
+        graph = wmg.create.create_all_graph_components(
+            coords=xy,
+            m2m_connectivity=m2m_connectivity,
+            mesh_layout=mesh_layout,
+            mesh_layout_kwargs=dict(mesh_node_spacing=3),
+            g2m_connectivity="nearest_neighbour",
+            m2g_connectivity="nearest_neighbour",
+        )
+        assert graph.number_of_nodes() > 0
+
+    @pytest.mark.parametrize("mesh_layout", wmg.create.MESH_LAYOUT_OPTIONS)
+    @pytest.mark.parametrize("m2m_connectivity", ["flat_multiscale", "hierarchical"])
+    def test_max_num_refinement_levels_is_optional(self, mesh_layout, m2m_connectivity):
+        """Multi-level meshes must build without an explicit level cap.
+
+        ``max_num_refinement_levels`` is documented as optional ("maximum
+        number of mesh levels"), and omitting it should simply create as many
+        levels as the domain allows. It previously raised a TypeError because
+        the layout primitives took ``max_num_levels`` as a required positional
+        argument.
+        """
+        # Large enough that three mesh levels fit, so that capping to two
+        # levels is a meaningful restriction. Hierarchical connectivity
+        # requires at least two levels.
+        xy = test_utils.create_fake_xy(N=64)
+        common = dict(
+            coords=xy,
+            m2m_connectivity=m2m_connectivity,
+            mesh_layout=mesh_layout,
+            g2m_connectivity="nearest_neighbour",
+            m2g_connectivity="nearest_neighbour",
+        )
+
+        without_cap = wmg.create.create_all_graph_components(
+            mesh_layout_kwargs=dict(mesh_node_spacing=2), **common
+        )
+        assert without_cap.number_of_nodes() > 0
+
+        # An explicit cap must still be honoured
+        with_cap = wmg.create.create_all_graph_components(
+            mesh_layout_kwargs=dict(mesh_node_spacing=2, max_num_refinement_levels=2),
+            **common,
+        )
+        # Compared on edges rather than nodes: coarser levels reuse node
+        # positions from finer ones, so capping levels need not change the
+        # node count, but it always removes the longer-range edges.
+        assert with_cap.number_of_nodes() > 0
+        assert with_cap.number_of_edges() < without_cap.number_of_edges()
+
+    def test_error_message_lists_the_advertised_options(self):
+        """The rejection message must be generated from the constant."""
+        xy = test_utils.create_fake_xy(N=32)
+        with pytest.raises(NotImplementedError) as exc_info:
+            wmg.create.create_all_graph_components(
+                coords=xy,
+                m2m_connectivity="flat",
+                mesh_layout="nonexistent_layout",
+                mesh_layout_kwargs=dict(mesh_node_spacing=3),
+                g2m_connectivity="nearest_neighbour",
+                m2g_connectivity="nearest_neighbour",
+            )
+        message = str(exc_info.value)
+        for option in wmg.create.MESH_LAYOUT_OPTIONS:
+            assert repr(option) in message
+
+
 class TestErrorHandling:
     """Tests for proper error handling."""
 
@@ -617,7 +712,7 @@ class TestErrorHandling:
             wmg.create.create_all_graph_components(
                 coords=xy,
                 m2m_connectivity="flat",
-                mesh_layout="triangular",
+                mesh_layout="nonexistent_layout",
                 mesh_layout_kwargs=dict(mesh_node_spacing=3),
                 g2m_connectivity="nearest_neighbour",
                 m2g_connectivity="nearest_neighbour",
