@@ -507,9 +507,15 @@ def connect_nodes_across_graphs(
                 "to use `nearest_neighbours` you should not set `max_dist` or `rel_max_dist`"
             )
 
+        # KDTree.query pads missing neighbours with index len(source) when
+        # more neighbours are requested than there are source nodes, so clamp
+        # to the number of available source nodes
+        num_neighbours = min(max_num_neighbours, len(source_nodes_list))
+
         def _find_neighbour_node_idxs_in_source_mesh(xy_target):
-            neigh_idxs = kdt_s.query(xy_target, max_num_neighbours)[1]
-            return neigh_idxs
+            # query returns a scalar rather than an array when k == 1
+            neigh_idxs = kdt_s.query(xy_target, num_neighbours)[1]
+            return np.atleast_1d(neigh_idxs)
 
     elif method == "within_radius":
         if max_num_neighbours is not None:
