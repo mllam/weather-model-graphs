@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
 
+- Fix `IndexError` in `connect_nodes_across_graphs` with `nearest_neighbours`
+  when `max_num_neighbours` exceeds the number of source nodes; the number of
+  neighbours is now clamped to the number of source nodes.
+  [\#153](https://github.com/mllam/weather-model-graphs/issues/153), @ArnabOPP
 - Relax `torch-geometric` floor in `pytorch` optional dependencies from
   `>=2.5.3` to `>=2.3.1` to restore compatibility with `neural-lam`.
   [\#152](https://github.com/mllam/weather-model-graphs/pull/152), @harshitthek

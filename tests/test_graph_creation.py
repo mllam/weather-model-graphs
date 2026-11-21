@@ -267,3 +267,31 @@ def test_edgeless_nodes_preservation_in_different_graphs(
         G_source=graph_source, G_target=graph_target, method=method, **method_kwargs
     )
     assert set(graph.nodes) == set(graph_source.nodes) | set(graph_target.nodes)
+
+
+@pytest.mark.parametrize(
+    "n_source, max_num_neighbours, n_expected_edges",
+    [(1, 4, 1), (3, 4, 3), (4, 4, 4), (5, 4, 4)],
+)
+def test_connect_nodes_nearest_neighbours_more_than_source_nodes(
+    n_source, max_num_neighbours, n_expected_edges
+):
+    """`nearest_neighbours` must connect to all available source nodes when
+    `max_num_neighbours` exceeds the number of source nodes."""
+    G_source = nx.DiGraph()
+    for i in range(n_source):
+        G_source.add_node(i, pos=np.array([float(i), 0.0]))
+    G_target = nx.DiGraph()
+    G_target.add_node(0, pos=np.array([0.1, 0.0]))
+
+    G_connect = wmg.create.base.connect_nodes_across_graphs(
+        G_source,
+        G_target,
+        method="nearest_neighbours",
+        max_num_neighbours=max_num_neighbours,
+    )
+
+    assert G_connect.number_of_edges() == n_expected_edges
+    # the nearest source nodes are connected, with no duplicates
+    assert len(set(G_connect.edges)) == n_expected_edges
+    assert (0, 0) in G_connect.edges
